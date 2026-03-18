@@ -6,7 +6,7 @@ export default class MetaScene extends Phaser.Scene {
 
   create() {
     const { width: W, height: H } = this.scale
-    this._mp = new MetaProgress(); this._mp.load()
+    this._mp = new MetaProgress()
 
     this.add.rectangle(0, 0, W, H, 0x0d0d1a).setOrigin(0)
     this.add.text(W/2, 14, '⚔ 武魂強化', { fontSize: '10px', color: '#f0d040', fontFamily: 'monospace' }).setOrigin(0.5)
@@ -24,6 +24,7 @@ export default class MetaScene extends Phaser.Scene {
       const cur = this._mp.data.nodes[id] || 0
       const maxed = cur >= def.max
 
+      const canAfford = this._mp.data.souls >= def.cost
       const tileColor = maxed ? 0xf0a030 : (cur > 0 ? 0x1a3a1a : 0x1a1a2e)
       const tile = this.add.rectangle(x, y, 42, 30, tileColor).setStrokeStyle(1, maxed ? 0xf0a030 : 0x444444)
 
@@ -36,7 +37,7 @@ export default class MetaScene extends Phaser.Scene {
       if (!maxed) {
         this.add.text(x + 18, y + 12, `${def.cost}`, { fontSize: '5px', color: '#aa88ff', fontFamily: 'monospace' }).setOrigin(1)
         tile.setInteractive()
-        tile.on('pointerover', () => tile.setStrokeStyle(1, 0xf0d040))
+        tile.on('pointerover', () => tile.setStrokeStyle(1, canAfford ? 0xf0d040 : 0xcc4444))
         tile.on('pointerout',  () => tile.setStrokeStyle(1, 0x444444))
         tile.on('pointerdown', () => {
           if (this._mp.upgradeNode(id)) {

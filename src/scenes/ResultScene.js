@@ -30,9 +30,11 @@ export default class ResultScene extends Phaser.Scene {
 
     let displayed = 0
     const soulTxt = this.add.text(W/2, H*0.65, '🔮 +0', { fontSize: '10px', color: '#aa88ff', fontFamily: 'monospace' }).setOrigin(0.5)
-    this.time.addEvent({
-      delay: 30, repeat: souls,
-      callback: () => { displayed++; soulTxt.setText(`🔮 +${displayed}`) },
-    })
+    if (souls > 0) {
+      this.time.addEvent({
+        delay: 30, repeat: souls - 1,
+        callback: () => { displayed++; soulTxt.setText(`🔮 +${displayed}`) },
+      })
+    }
   }
 }

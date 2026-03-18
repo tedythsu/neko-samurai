@@ -69,6 +69,7 @@ export default class UpgradeScene extends Phaser.Scene {
   }
 
   _choose(card, chosen) {
+    this.input.enabled = false
     this.children.list
       .filter(c => c !== chosen && c.type === 'Container')
       .forEach(c => this.tweens.add({ targets: c, y: this.scale.height + 80, duration: 200 }))

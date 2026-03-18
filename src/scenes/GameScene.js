@@ -23,7 +23,7 @@ export default class GameScene extends Phaser.Scene {
     this._mapId  = data.mapId  || 'bamboo_village'
     const mapDef = MAPS[this._mapId]
 
-    this._mp = new MetaProgress(); this._mp.load()
+    this._mp = new MetaProgress()
     const bonuses = this._mp.getStatBonuses()
 
     // Tilemap background (tiled)
@@ -65,6 +65,8 @@ export default class GameScene extends Phaser.Scene {
     this._kills      = 0
     this._souls      = 0
     this._paused     = false
+    this._gameOver   = false
+    this._upgradePending = 0
 
     // Pause key
     this.input.keyboard.on('keydown-P', () => this._togglePause())
@@ -131,7 +133,7 @@ export default class GameScene extends Phaser.Scene {
 
   update(time, delta) {
     if (this._paused) return
-    if (this._player.isDead) { this._onDeath(); return }
+    if (this._player.isDead && !this._gameOver) { this._onDeath(); return }
 
     this._player.update()
 
@@ -203,7 +205,8 @@ export default class GameScene extends Phaser.Scene {
     if (leveled) {
       this._vfx.levelUp(this._player.x, this._player.y)
       this._levelTxt.setText(`Lv.${this._player.level}`)
-      this._openUpgrade()
+      this._upgradePending++
+      if (this._upgradePending === 1) this._openUpgrade()
     }
     this._updateHpBar()
   }
@@ -218,8 +221,13 @@ export default class GameScene extends Phaser.Scene {
       cards,
       onChoice: (card) => {
         this._applyUpgrade(card)
-        this._paused = false
-        this.scene.stop('UpgradeScene')
+        this._upgradePending--
+        if (this._upgradePending > 0) {
+          this._openUpgrade()
+        } else {
+          this._paused = false
+          this.scene.stop('UpgradeScene')
+        }
       },
     })
   }
@@ -237,6 +245,7 @@ export default class GameScene extends Phaser.Scene {
       if (e.type === 'speed') this._player.speed += e.value
       if (e.type === 'atk')   this._player.atkMult += e.value
       if (e.type === 'luck')  this._player.luck += e.value
+      if (e.type === 'cd')    this._weapons.forEach(w => { if (typeof w.cooldown === 'number') w.cooldown *= (1 - e.value) })
     }
     this._updateHpBar()
   }
@@ -246,6 +255,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   _endRun(survived) {
+    this._gameOver = true
     this._mp.addSouls(this._souls)
     this._mp.data.stats.totalRuns++
     this._mp.data.stats.totalKills += this._kills
