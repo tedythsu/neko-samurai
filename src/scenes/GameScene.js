@@ -191,7 +191,11 @@ export default class GameScene extends Phaser.Scene {
     // Check boss killed
     if (this._wave.activeBoss) {
       const bossAlive = this._enemies.getChildren().some(e => e.active && e._isBoss)
-      if (!bossAlive) this._wave.onBossKilled()
+      if (!bossAlive) {
+        const wasFinal = this._wave.isFinalBossActive
+        this._wave.onBossKilled()
+        if (wasFinal && !this._gameOver) this._endRun(true)
+      }
     }
 
     // Timer HUD
