@@ -8,16 +8,19 @@ export default class Tachi {
     this.id     = 'tachi'
     this.level  = 1
     this._timer = 0
+    this._cdOverride = null
     // Visual slash arc
     this._slashGfx = scene.add.graphics().setDepth(9)
   }
 
   get def() { return WEAPONS.tachi.levels[this.level - 1] }
+  get cooldown() { return this._cdOverride ?? this.def.cooldown }
+  set cooldown(v) { this._cdOverride = v }
   get group() { return null } // arc uses graphics, not sprites
 
   update(delta, enemies) {
     this._timer += delta
-    if (this._timer < this.def.cooldown) return
+    if (this._timer < this.cooldown) return
     this._timer = 0
 
     const arcRad = Phaser.Math.DegToRad(this.def.arc)

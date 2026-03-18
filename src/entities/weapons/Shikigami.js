@@ -9,11 +9,14 @@ export default class Shikigami {
     this.level   = 1
     this._angle  = 0
     this._timer  = 0
+    this._cdOverride = null
     this._orbs   = []
     this._updateOrbs()
   }
 
   get def() { return WEAPONS.shikigami.levels[this.level - 1] }
+  get cooldown() { return this._cdOverride ?? this.def.cooldown }
+  set cooldown(v) { this._cdOverride = v }
   get group() { return null }
 
   _updateOrbs() {
@@ -35,7 +38,7 @@ export default class Shikigami {
       orb.setPosition(this.player.x + Math.cos(a) * r, this.player.y + Math.sin(a) * r)
     })
 
-    if (this._timer < this.def.cooldown) return
+    if (this._timer < this.cooldown) return
     this._timer = 0
 
     // Damage enemies touching any orb

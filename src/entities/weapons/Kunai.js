@@ -8,15 +8,18 @@ export default class Kunai {
     this.id      = 'kunai'
     this.level   = 1
     this._timer  = 0
+    this._cdOverride = null
     this._group  = scene.physics.add.group({ classType: Phaser.Physics.Arcade.Image, maxSize: 20, runChildUpdate: false })
   }
 
   get def() { return WEAPONS.kunai.levels[this.level - 1] }
+  get cooldown() { return this._cdOverride ?? this.def.cooldown }
+  set cooldown(v) { this._cdOverride = v }
   get group() { return this._group }
 
   update(delta, enemies) {
     this._timer += delta
-    if (this._timer < this.def.cooldown) return
+    if (this._timer < this.cooldown) return
     this._timer = 0
 
     const allEnemies = enemies.getChildren().filter(e => e.active)

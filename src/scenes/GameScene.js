@@ -10,6 +10,7 @@ import VFX from '../systems/VFX.js'
 import MetaProgress from '../systems/MetaProgress.js'
 import { MAPS } from '../data/maps.js'
 import { CHARACTERS } from '../data/characters.js'
+import { ENEMIES } from '../data/enemies.js'
 
 const WEAPON_CLASSES = { kunai: Kunai, tachi: Tachi, shikigami: Shikigami }
 const MAX_ENEMIES = 300
@@ -122,10 +123,15 @@ export default class GameScene extends Phaser.Scene {
     else                 { x = -20; y = Phaser.Math.Between(0, H) }
 
     const enemy = this._enemies.getFirstDead(false)
-    if (enemy) enemy.spawn(x, y, enemyId || 'oni_soldier', hpOverride)
+    if (enemy) {
+      const baseHp = ENEMIES[enemyId]?.hp ?? 300
+      const actualHp = hpOverride != null ? baseHp * hpOverride : undefined
+      enemy.spawn(x, y, enemyId || 'oni_soldier', actualHp)
+    }
   }
 
   _togglePause() {
+    if (this._gameOver) return
     this._paused = !this._paused
     if (this._paused) this.scene.launch('PauseScene', { gameScene: this })
     else this.scene.stop('PauseScene')
