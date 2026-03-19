@@ -3,7 +3,7 @@ import Phaser from 'phaser'
 import Player   from '../entities/Player.js'
 import Enemy    from '../entities/Enemy.js'
 import Shuriken from '../entities/Shuriken.js'
-import { CFG, randomEdgePoint } from '../config.js'
+import { CFG, randomEdgePoint, xpThreshold, UPGRADES } from '../config.js'
 
 export default class GameScene extends Phaser.Scene {
   constructor() { super('GameScene') }
@@ -24,7 +24,6 @@ export default class GameScene extends Phaser.Scene {
       (_, enemy) => Enemy.dealDamage(enemy, this._player)
     )
 
-    this._level = 1
     this.time.addEvent({
       delay: CFG.ENEMY_SPAWN_INTERVAL,
       loop: true,
@@ -32,11 +31,9 @@ export default class GameScene extends Phaser.Scene {
       callbackScope: this,
     })
 
-    // Shuriken pool
     Shuriken.createTexture(this)
     this._shurikens = this.physics.add.group({ maxSize: 40 })
 
-    // Shuriken hits enemy
     this.physics.add.overlap(
       this._shurikens,
       this._enemies,
@@ -48,7 +45,6 @@ export default class GameScene extends Phaser.Scene {
       }
     )
 
-    // Deactivate shurikens that leave world bounds
     this.physics.world.on('worldbounds', (body) => {
       if (body.gameObject && this._shurikens.contains(body.gameObject)) {
         body.gameObject.disableBody(true, true)
@@ -57,6 +53,13 @@ export default class GameScene extends Phaser.Scene {
 
     this._fireTimer = 0
 
+    // XP / level system
+    this._xp       = 0
+    this._level    = 1
+    this._xpToNext = xpThreshold(this._level)
+    this._upgrading = false
+
+    this.events.on('enemy-died', ({ x, y }) => this._spawnOrb(x, y))
     this.events.on('player-dead', this._onPlayerDead, this)
   }
 
@@ -64,7 +67,6 @@ export default class GameScene extends Phaser.Scene {
     this._player.update(delta)
     this._enemies.getChildren().forEach(e => Enemy.update(e, this._player, delta))
 
-    // Shuriken auto-fire
     this._fireTimer += delta
     if (this._fireTimer >= this._player.fireRate) {
       this._fireTimer = 0
@@ -94,6 +96,40 @@ export default class GameScene extends Phaser.Scene {
         enemy.setDepth(5)
       }
       Enemy.activate(enemy, x, y)
+    }
+  }
+
+  _spawnOrb(ex, ey) {
+    const orb = this.add.circle(ex, ey, 8, 0xffee00).setDepth(4)
+    this.tweens.add({
+      targets: orb,
+      x: this._player.x, y: this._player.y,
+      duration: 400, ease: 'Sine.In',
+      onComplete: () => {
+        orb.destroy()
+        this._addXp(CFG.XP_PER_ENEMY)
+      },
+    })
+  }
+
+  _addXp(amount) {
+    if (this._upgrading) return
+    this._xp += amount
+    if (this._xp >= this._xpToNext) {
+      this._xp      -= this._xpToNext
+      this._level   += 1
+      this._xpToNext = xpThreshold(this._level)
+      this._upgrading = true
+      this.events.once('upgrade-chosen', (id) => {
+        this._player.applyUpgrade(id)
+        this._upgrading = false
+        this.scene.resume('GameScene')
+      })
+      this.scene.launch('UpgradeScene', {
+        level: this._level,
+        upgrades: Phaser.Utils.Array.Shuffle(UPGRADES.slice()).slice(0, 3),
+      })
+      this.scene.pause('GameScene')
     }
   }
 
