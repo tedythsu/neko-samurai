@@ -20,8 +20,15 @@ export default {
     { id: 'range',    name: '斬擊延伸', desc: '射程 +30%', apply: s => { s.range    *= 1.30 } },
   ],
 
-  // No texture needed for melee
-  createTexture(/* scene */) {},
+  createTexture(scene) {
+    if (scene.anims.exists('tachi-slash')) return
+    scene.anims.create({
+      key: 'tachi-slash',
+      frames: scene.anims.generateFrameNumbers('tachi-slash', { start: 0, end: 5 }),
+      frameRate: 18,   // 6 frames ≈ 333ms total
+      repeat: 0,       // play once
+    })
+  },
 
   fire(scene, _pool, fromX, fromY, stats, enemies) {
     // Damage all active enemies within range
@@ -30,19 +37,14 @@ export default {
         Phaser.Math.Distance.Between(fromX, fromY, e.x, e.y) < stats.range)
       .forEach(e => Enemy.takeDamage(e, stats.damage))
 
-    // Visual: fading ring at player position
-    const ring = scene.add.graphics().setDepth(6)
-    ring.lineStyle(3, 0x88aaff, 1)
-    ring.strokeCircle(fromX, fromY, stats.range)
-    scene.tweens.add({
-      targets: ring,
-      alpha: 0,
-      scaleX: 1.15,
-      scaleY: 1.15,
-      duration: 280,
-      ease: 'Sine.Out',
-      onComplete: () => ring.destroy(),
-    })
+    // Visual: sprite animation centered on player, scaled to match range
+    const scale = (stats.range * 2) / 206   // frame is 206px wide, range is radius
+    const slash = scene.add.sprite(fromX, fromY, 'tachi-slash', 0)
+      .setDepth(6)
+      .setOrigin(0.5, 0.5)
+      .setScale(scale)
+    slash.play('tachi-slash')
+    slash.once('animationcomplete', () => slash.destroy())
   },
 
   // No projectiles to update
