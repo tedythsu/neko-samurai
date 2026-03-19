@@ -28,6 +28,10 @@ export const CFG = {
   // Combat
   CRIT_CHANCE:     0.50,  // 50% base crit chance (temp)
   CRIT_MULTIPLIER: 2.00,  // crit deals 2× damage
+
+  // Weapon slots
+  WEAPON_SLOT_LEVELS: [5, 10, 16],  // player level at which 2nd/3rd/4th slot opens
+  MAX_WEAPONS: 4,
 }
 
 /** XP required to reach `level + 1` */
