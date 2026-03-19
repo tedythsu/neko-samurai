@@ -24,8 +24,8 @@ export default {
     if (scene.anims.exists('tachi-slash')) return
     scene.anims.create({
       key: 'tachi-slash',
-      frames: scene.anims.generateFrameNumbers('tachi-slash', { start: 0, end: 5 }),
-      frameRate: 18,   // 6 frames ≈ 333ms total
+      frames: scene.anims.generateFrameNumbers('tachi-slash', { start: 0, end: 7 }),
+      frameRate: 16,   // 8 frames ≈ 500ms total
       repeat: 0,       // play once
     })
   },
@@ -38,7 +38,7 @@ export default {
       .forEach(e => Enemy.takeDamage(e, stats.damage))
 
     // Visual: sprite animation centered on player, scaled to match range
-    const scale = (stats.range * 2) / 206   // frame is 206px wide, range is radius
+    const scale = (stats.range * 2) / 166   // frame is 166px wide, range is radius
     const slash = scene.add.sprite(fromX, fromY, 'tachi-slash', 0)
       .setDepth(6)
       .setOrigin(0.5, 0.5)
