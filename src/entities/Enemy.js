@@ -93,7 +93,7 @@ export default class Enemy {
     }
 
     // Poison DoT
-    if (se.poison.stacks > 0 && se.poison.timer > 0) {
+    if (se.poison.stacks > 0 && se.poison.timer > 0 && !sprite.dying) {
       se.poison.timer -= delta
       sprite.hp       -= 3 * se.poison.stacks * corrMult * (delta / 1000)
       if (se.poison.timer <= 0) se.poison.stacks = 0
@@ -194,9 +194,13 @@ export default class Enemy {
         // to prevent stale state if any code path bypasses activate()
         if (sprite._statusEffects) {
           sprite._statusEffects.burn.stacks   = 0
+          sprite._statusEffects.burn.timer    = 0
           sprite._statusEffects.poison.stacks = 0
+          sprite._statusEffects.poison.timer  = 0
           sprite._statusEffects.chill.active  = false
+          sprite._statusEffects.chill.timer   = 0
           sprite._statusEffects.curse.active  = false
+          sprite._statusEffects.curse.timer   = 0
         }
         sprite.dying = false
         sprite.setAlpha(1)
@@ -208,7 +212,7 @@ export default class Enemy {
   /**
    * Reduce enemy HP. Returns true if enemy died.
    */
-  static takeDamage(sprite, amount, fromX, fromY) {
+  static takeDamage(sprite, amount, fromX, fromY /* TODO Task 5: add affixes = [] param */) {
     if (sprite.dying) return false
 
     const isCrit   = Math.random() < CFG.CRIT_CHANCE
