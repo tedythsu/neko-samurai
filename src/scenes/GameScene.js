@@ -24,6 +24,26 @@ export default class GameScene extends Phaser.Scene {
     this._player = new Player(this, CFG.WORLD_WIDTH / 2, CFG.WORLD_HEIGHT / 2)
     this.cameras.main.startFollow(this._player.sprite, true, 0.1, 0.1)
 
+    // Slice musou orb spritesheet (6×6) and register looping animation
+    const musouTex = this.textures.get('musou')
+    if (!musouTex.has(0)) {
+      const src = musouTex.source[0]
+      const fw  = Math.floor(src.width  / 6)
+      const fh  = Math.floor(src.height / 6)
+      let idx = 0
+      for (let r = 0; r < 6; r++)
+        for (let c = 0; c < 6; c++)
+          musouTex.add(idx++, 0, c * fw, r * fh, fw, fh)
+    }
+    if (!this.anims.exists('musou-spin')) {
+      this.anims.create({
+        key:       'musou-spin',
+        frames:    Array.from({ length: 36 }, (_, i) => ({ key: 'musou', frame: i })),
+        frameRate: 20,
+        repeat:    -1,
+      })
+    }
+
     Enemy.createTexture(this)
     this._enemies = this.physics.add.group()
 
@@ -50,7 +70,7 @@ export default class GameScene extends Phaser.Scene {
         if (proj.hitSet.has(enemy)) return
         proj.hitSet.add(enemy)
         Enemy.takeDamage(enemy, proj.damage, proj.x, proj.y)
-        if (!proj.penetrate) proj.disableBody(true, true)
+        if (!proj.penetrate) proj._spent = true   // defer — let all overlaps fire first
       }
     )
 
@@ -94,21 +114,42 @@ export default class GameScene extends Phaser.Scene {
       this._fireTimer = 0
       this._weapon.fire(this, this._projectiles, this._player.x, this._player.y, this._weaponStats, this._enemies, this._player)
     }
-    this._projectiles.getChildren().forEach(s => this._weapon.update(s))
+    this._projectiles.getChildren().forEach(s => {
+      if (s._spent) { s._spent = false; s.disableBody(true, true); return }
+      this._weapon.update(s)
+    })
 
     this._elapsed += delta
     this._hudTimer.setText(`${Math.floor(this._elapsed / 1000)}s`)
     this._drawHud()
 
-    // Collect orbs within pickup radius
+    // Orb attract & collect
+    const px = this._player.x
+    const py = this._player.y
     for (let i = this._orbs.length - 1; i >= 0; i--) {
-      const orb = this._orbs[i]
-      if (Phaser.Math.Distance.Between(
-        this._player.x, this._player.y, orb.x, orb.y
-      ) < CFG.ORB_COLLECT_RADIUS) {
+      const orb  = this._orbs[i]
+      const dist = Phaser.Math.Distance.Between(px, py, orb.x, orb.y)
+
+      if (dist < CFG.ORB_COLLECT_RADIUS) {
+        if (orb._emitter) orb._emitter.destroy()
         orb.destroy()
         this._orbs.splice(i, 1)
         this._addXp(CFG.XP_PER_ENEMY)
+        continue
+      }
+
+      if (dist < CFG.ORB_ATTRACT_RADIUS) {
+        // First frame entering attract zone — stop floating tween
+        if (!orb._attracted) {
+          orb._attracted = true
+          this.tweens.killTweensOf(orb)
+          orb.setScale(orb.scaleX * 1.3)  // slight grow to signal attraction
+        }
+        // Fly toward player, faster the closer it gets
+        const speed = Phaser.Math.Linear(500, 200, dist / CFG.ORB_ATTRACT_RADIUS)
+        const angle = Phaser.Math.Angle.Between(orb.x, orb.y, px, py)
+        orb.x += Math.cos(angle) * speed * (delta / 1000)
+        orb.y += Math.sin(angle) * speed * (delta / 1000)
       }
     }
   }
@@ -146,7 +187,39 @@ export default class GameScene extends Phaser.Scene {
   }
 
   _spawnOrb(ex, ey) {
-    const orb = this.add.circle(ex, ey, 8, 0xffee00).setDepth(4)
+    const frame0 = this.textures.get('musou').frames[0]
+    const orbH   = 24
+    const orbW   = Math.round(orbH * frame0.realWidth / frame0.realHeight)
+    const orb = this.add.sprite(ex, ey, 'musou', 0)
+      .setDisplaySize(orbW, orbH)
+      .setDepth(4)
+    orb.play('musou-spin')
+
+    // Floating bob ±8px
+    this.tweens.add({
+      targets:  orb,
+      y:        ey - 10,
+      yoyo:     true,
+      repeat:   -1,
+      duration: 1000,
+      ease:     'Sine.easeInOut',
+    })
+
+    // Gold shimmer particles drifting upward
+    const emitter = this.add.particles(ex, ey, 'dust-particle', {
+      speed:     { min: 8, max: 24 },
+      angle:     { min: 255, max: 285 },
+      scale:     { start: 0.5, end: 0 },
+      alpha:     { start: 0.9, end: 0 },
+      lifespan:  900,
+      frequency: 180,
+      quantity:  1,
+      tint:      [0xffee44, 0xffcc00, 0xffaa22],
+    })
+    emitter.setDepth(3)
+    emitter.startFollow(orb)
+    orb._emitter = emitter
+
     this._orbs.push(orb)
   }
 

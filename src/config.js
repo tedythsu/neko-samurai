@@ -11,18 +11,23 @@ export const CFG = {
 
   // Enemy
   ENEMY_SPEED:              80,
-  ENEMY_HP:                 40,
+  ENEMY_HP:                 60,
   ENEMY_DAMAGE:             10,
   ENEMY_SPAWN_INTERVAL:   2000,  // ms
 
   // XP
   XP_PER_ENEMY:             10,
-  ORB_COLLECT_RADIUS:       60,   // px — player must walk within this to collect
+  ORB_ATTRACT_RADIUS:      130,   // px — orb starts flying toward player
+  ORB_COLLECT_RADIUS:       30,   // px — orb is collected
   XP_BASE:                  50,
   XP_SCALE:                1.4,
 
   // Waves
   WAVE_SCALE: 3,  // extra enemy added per N levels
+
+  // Combat
+  CRIT_CHANCE:     0.50,  // 50% base crit chance (temp)
+  CRIT_MULTIPLIER: 2.00,  // crit deals 2× damage
 }
 
 /** XP required to reach `level + 1` */

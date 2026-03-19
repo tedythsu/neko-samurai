@@ -12,5 +12,6 @@ export function getOrCreate(pool, fromX, fromY, texKey) {
     s.body.onWorldBounds = true
   }
   s.enableBody(true, fromX, fromY, true, true)
+  s._spent = false
   return s
 }

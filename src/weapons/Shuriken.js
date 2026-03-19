@@ -9,7 +9,7 @@ export default {
   texKey: 'shuriken-tex',
 
   baseStats: {
-    damage: 20,
+    damage: 10,
     fireRate: 800,
     projectileCount: 3,
     range: 300,

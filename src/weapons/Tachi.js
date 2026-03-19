@@ -8,9 +8,9 @@ export default {
   desc: '爆發型・近距揮砍',
 
   baseStats: {
-    damage:    50,
+    damage:    20,
     fireRate:  1500,
-    range:     150,
+    range:     50,
     // projectileCount / speed / penetrate not used by melee
   },
 

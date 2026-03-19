@@ -9,7 +9,7 @@ export default {
   texKey: 'kunai-tex',
 
   baseStats: {
-    damage: 12,
+    damage: 8,
     fireRate: 350,
     projectileCount: 1,
     range: 500,

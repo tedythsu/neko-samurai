@@ -1,7 +1,7 @@
 // src/entities/Player.js
 import { CFG } from '../config.js'
 
-const CHAR_H  = 120   // display height px
+const CHAR_H  = 64    // display height px
 const RUN_FPS = 24
 const IDL_FPS = 12
 
@@ -27,7 +27,7 @@ export default class Player {
     this.sprite = scene.physics.add.sprite(x, y, 'idle', 0)
       .setDisplaySize(this._dW.idle, CHAR_H)
       .setCollideWorldBounds(true)
-    this.sprite.body.setSize(40, 60)   // hitbox smaller than visual
+    this.sprite.body.setSize(22, 40)   // hitbox smaller than visual
 
     // Keyboard
     this._keys = scene.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT')
