@@ -10,7 +10,7 @@ export const CFG = {
   PLAYER_HP_MAX:           100,
   PLAYER_DAMAGE:            20,
   PLAYER_FIRE_RATE:        800,  // ms between shots
-  PLAYER_PROJECTILE_COUNT:   1,
+  PLAYER_PROJECTILE_COUNT:   3,
 
   // Shuriken
   SHURIKEN_SPEED:          400,
