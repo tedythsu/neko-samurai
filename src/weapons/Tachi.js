@@ -44,6 +44,12 @@ export default {
       .setOrigin(0.5, 0.5)
       .setScale(scale)
     slash.play('tachi-slash')
+    scene.tweens.add({
+      targets: slash,
+      angle: 360,
+      duration: 500,   // matches animation length (8 frames @ 16fps)
+      ease: 'Linear',
+    })
     slash.once('animationcomplete', () => slash.destroy())
   },
 
