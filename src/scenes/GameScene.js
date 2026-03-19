@@ -3,6 +3,8 @@ import Phaser from 'phaser'
 import Player   from '../entities/Player.js'
 import Enemy    from '../entities/Enemy.js'
 import { CFG, randomEdgePoint, xpThreshold, PLAYER_UPGRADES } from '../config.js'
+import { ALL_AFFIXES, ALL_MECHANICAL, checkResonances } from '../affixes/index.js'
+import { ALL_WEAPONS } from '../weapons/index.js'
 
 export default class GameScene extends Phaser.Scene {
   constructor() { super('GameScene') }
@@ -315,19 +317,17 @@ export default class GameScene extends Phaser.Scene {
         weaponId: entry.weapon.id,
       })))
 
-    // Elemental affixes (available once src/affixes/index.js exists — Task 6)
-    if (typeof ALL_AFFIXES !== 'undefined')
-      pool.push(...ALL_AFFIXES.map(a => ({ id: a.id, name: a.name, desc: a.desc, target: 'affix', affix: a })))
+    // Elemental affixes
+    pool.push(...ALL_AFFIXES.map(a => ({ id: a.id, name: a.name, desc: a.desc, target: 'affix', affix: a })))
 
     // Mechanical affixes
-    if (typeof ALL_MECHANICAL !== 'undefined')
-      pool.push(...ALL_MECHANICAL.map(m => ({ ...m, target: 'mechanical' })))
+    pool.push(...ALL_MECHANICAL.map(m => ({ ...m, target: 'mechanical' })))
 
     // New weapon (if next slot is available)
     const nextSlotLevel = CFG.WEAPON_SLOT_LEVELS[this._weapons.length - 1]
     if (this._weapons.length < CFG.MAX_WEAPONS && nextSlotLevel && this._level >= nextSlotLevel) {
       const owned      = new Set(this._weapons.map(e => e.weapon.id))
-      const candidates = (typeof ALL_WEAPONS !== 'undefined' ? ALL_WEAPONS : []).filter(w => !owned.has(w.id))
+      const candidates = ALL_WEAPONS.filter(w => !owned.has(w.id))
       if (candidates.length)
         pool.push({
           id: 'new_weapon', name: '新武器', desc: '獲得一把新武器',
@@ -346,7 +346,7 @@ export default class GameScene extends Phaser.Scene {
     this._affixes.push(affix)
     const count = (this._affixCounts.get(affix.id) || 0) + 1
     this._affixCounts.set(affix.id, count)
-    // TODO Task 6: this._resonances = checkResonances(this._affixCounts)
+    this._resonances = checkResonances(this._affixCounts)
   }
 
   _applyMechanical(mechanical) {

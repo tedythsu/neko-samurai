@@ -1,0 +1,23 @@
+// src/affixes/burst.js
+import Enemy from '../entities/Enemy.js'
+import Phaser from 'phaser'
+
+export default {
+  id:   'burst',
+  name: '爆裂',
+  desc: '20%機率：40px範圍爆炸，0.4倍傷害',
+
+  onHit(enemy, damage, scene) {
+    if (Math.random() > 0.20) return
+    scene._enemies.getChildren()
+      .filter(e => e.active && !e.dying && e !== enemy &&
+        Phaser.Math.Distance.Between(enemy.x, enemy.y, e.x, e.y) < 40)
+      .forEach(e => Enemy.takeDamage(e, damage * 0.4, enemy.x, enemy.y, []))
+
+    // Visual: brief AoE ring
+    const g = scene.add.graphics().setDepth(10)
+    g.lineStyle(2, 0xff4400, 0.8)
+    g.strokeCircle(enemy.x, enemy.y, 40)
+    scene.tweens.add({ targets: g, alpha: 0, duration: 200, onComplete: () => g.destroy() })
+  },
+}
