@@ -12,6 +12,18 @@ export default class GameScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, CFG.WORLD_WIDTH, CFG.WORLD_HEIGHT)
     this.cameras.main.setBounds(0, 0, CFG.WORLD_WIDTH, CFG.WORLD_HEIGHT)
 
+    // Grid background
+    const bg = this.add.graphics().setDepth(0)
+    bg.fillStyle(0x1a1a2e).fillRect(0, 0, CFG.WORLD_WIDTH, CFG.WORLD_HEIGHT)
+    bg.lineStyle(1, 0x222244, 0.5)
+    for (let x = 0; x <= CFG.WORLD_WIDTH; x += 100)
+      bg.lineBetween(x, 0, x, CFG.WORLD_HEIGHT)
+    for (let y = 0; y <= CFG.WORLD_HEIGHT; y += 100)
+      bg.lineBetween(0, y, CFG.WORLD_WIDTH, y)
+    // Arena border
+    bg.lineStyle(3, 0x4444aa, 1)
+    bg.strokeRect(0, 0, CFG.WORLD_WIDTH, CFG.WORLD_HEIGHT)
+
     this._player = new Player(this, CFG.WORLD_WIDTH / 2, CFG.WORLD_HEIGHT / 2)
     this.cameras.main.startFollow(this._player.sprite, true, 0.1, 0.1)
 
@@ -61,6 +73,18 @@ export default class GameScene extends Phaser.Scene {
 
     this.events.on('enemy-died', ({ x, y }) => this._spawnOrb(x, y))
     this.events.on('player-dead', this._onPlayerDead, this)
+
+    // HUD — fixed to camera
+    this._hud = this.add.graphics().setScrollFactor(0).setDepth(200)
+    this._hudLevel = this.add.text(16, 52, 'Lv 1', {
+      fontSize: '14px', color: '#88bbff',
+    }).setScrollFactor(0).setDepth(200)
+    this._hudTimer = this.add.text(
+      this.cameras.main.width - 16, 16,
+      '0s', { fontSize: '16px', color: '#ffffff' }
+    ).setScrollFactor(0).setDepth(200).setOrigin(1, 0)
+
+    this._elapsed = 0
   }
 
   update(_, delta) {
@@ -84,6 +108,29 @@ export default class GameScene extends Phaser.Scene {
       }
     }
     this._shurikens.getChildren().forEach(s => Shuriken.update(s))
+
+    this._elapsed += delta
+    this._hudTimer.setText(`${Math.floor(this._elapsed / 1000)}s`)
+    this._drawHud()
+  }
+
+  _drawHud() {
+    const W    = this.cameras.main.width
+    const hpPct = this._player.hp / this._player.maxHp
+    const xpPct = this._xp / this._xpToNext
+
+    this._hud.clear()
+
+    // HP bar (200px wide)
+    this._hud.fillStyle(0x555555).fillRect(16, 16, 200, 14)
+    this._hud.fillStyle(0xee3333).fillRect(16, 16, 200 * hpPct, 14)
+
+    // XP bar
+    this._hud.fillStyle(0x333355).fillRect(16, 34, 200, 10)
+    this._hud.fillStyle(0x4488ff).fillRect(16, 34, 200 * xpPct, 10)
+
+    this._hudLevel.setText(`Lv ${this._level}`)
+    this._hudTimer.setX(W - 16)
   }
 
   _spawnWave() {
