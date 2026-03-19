@@ -39,10 +39,11 @@ export default class Enemy {
     sprite._timer         = 0
     sprite.setAlpha(1).clearTint()
     sprite._statusEffects = {
-      burn:   { stacks: 0, timer: 0, dps: 5 },
-      poison: { stacks: 0, timer: 0 },
+      burn:   { stacks: 0, timer: 0, dps: 5, _accum: 0 },
+      poison: { stacks: 0, timer: 0, _accum: 0 },
       chill:  { active: false, timer: 0 },
       curse:  { active: false, timer: 0 },
+      frozen: { active: false, timer: 0 },
     }
     const frame0 = sprite.scene.textures.get('kisotsu-run').frames[0]
     const dH = 64
@@ -87,7 +88,14 @@ export default class Enemy {
     // Burn DoT
     if (se.burn.stacks > 0 && se.burn.timer > 0) {
       se.burn.timer -= delta
-      sprite.hp     -= se.burn.dps * corrMult * (delta / 1000)
+      const dmg = se.burn.dps * corrMult * (delta / 1000)
+      sprite.hp -= dmg
+      se.burn._accum += dmg
+      if (se.burn._accum >= 1) {
+        const shown = Math.floor(se.burn._accum)
+        se.burn._accum -= shown
+        Enemy.showDamageNumber(sprite, shown, '#ff6600')
+      }
       if (se.burn.timer <= 0) se.burn.stacks = 0
       if (sprite.hp <= 0 && !sprite.dying) Enemy._triggerDeath(sprite)
     }
@@ -95,7 +103,14 @@ export default class Enemy {
     // Poison DoT
     if (se.poison.stacks > 0 && se.poison.timer > 0 && !sprite.dying) {
       se.poison.timer -= delta
-      sprite.hp       -= 3 * se.poison.stacks * corrMult * (delta / 1000)
+      const dmg = 3 * se.poison.stacks * corrMult * (delta / 1000)
+      sprite.hp -= dmg
+      se.poison._accum += dmg
+      if (se.poison._accum >= 1) {
+        const shown = Math.floor(se.poison._accum)
+        se.poison._accum -= shown
+        Enemy.showDamageNumber(sprite, shown, '#44cc44')
+      }
       if (se.poison.timer <= 0) se.poison.stacks = 0
       if (sprite.hp <= 0 && !sprite.dying) Enemy._triggerDeath(sprite)
     }
@@ -195,8 +210,10 @@ export default class Enemy {
         if (sprite._statusEffects) {
           sprite._statusEffects.burn.stacks   = 0
           sprite._statusEffects.burn.timer    = 0
+          sprite._statusEffects.burn._accum   = 0
           sprite._statusEffects.poison.stacks = 0
           sprite._statusEffects.poison.timer  = 0
+          sprite._statusEffects.poison._accum = 0
           sprite._statusEffects.chill.active  = false
           sprite._statusEffects.chill.timer   = 0
           sprite._statusEffects.curse.active  = false
@@ -206,6 +223,24 @@ export default class Enemy {
         sprite.setAlpha(1)
         sprite.disableBody(true, true)
       },
+    })
+  }
+
+  /**
+   * Display a floating damage number above the enemy.
+   */
+  static showDamageNumber(sprite, amount, color) {
+    if (!amount || amount < 1) return
+    const scene = sprite.scene
+    const txt = scene.add.text(
+      sprite.x + Phaser.Math.Between(-12, 12),
+      sprite.y - 20,
+      `${Math.round(amount)}`,
+      { fontSize: '14px', color, stroke: '#000000', strokeThickness: 2 }
+    ).setDepth(15).setOrigin(0.5)
+    scene.tweens.add({
+      targets: txt, y: txt.y - 28, alpha: 0, duration: 750,
+      ease: 'Power1', onComplete: () => txt.destroy(),
     })
   }
 
