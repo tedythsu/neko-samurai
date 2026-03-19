@@ -1,13 +1,11 @@
 // src/entities/Shuriken.js
 import Phaser from 'phaser'
-
-const SPEED = 400
-const SIZE  = 12
+import { CFG } from '../config.js'
 
 export default class Shuriken {
   static createTexture(scene) {
     if (scene.textures.exists('shuriken-tex')) return
-    const rt = scene.add.renderTexture(0, 0, SIZE, SIZE)
+    const rt = scene.add.renderTexture(0, 0, CFG.SHURIKEN_SIZE, CFG.SHURIKEN_SIZE)
     rt.fill(0x222244)
     rt.saveTexture('shuriken-tex')
     rt.destroy()
@@ -31,7 +29,7 @@ export default class Shuriken {
 
       const angle = Phaser.Math.Angle.Between(fromX, fromY, target.x, target.y)
       scene.physics.velocityFromAngle(
-        Phaser.Math.RadToDeg(angle), SPEED, s.body.velocity
+        Phaser.Math.RadToDeg(angle), CFG.SHURIKEN_SPEED, s.body.velocity
       )
     })
   }
