@@ -93,6 +93,26 @@ export default class GameScene extends Phaser.Scene {
       '0s', { fontSize: '16px', color: '#ffffff' }
     ).setScrollFactor(0).setDepth(200).setOrigin(1, 0)
 
+    // Weapon icon row — each entry is { icon, label } so both can be destroyed together
+    this._hudWeaponIcons  = []
+    this._lastWeaponCount = 0
+
+    // Affix dot row (pre-create up to 8 slots)
+    this._hudAffixDots = Array.from({ length: 8 }, (_, i) =>
+      this.add.rectangle(16 + i * 20, 72, 14, 14, 0x444466)
+        .setScrollFactor(0).setDepth(200).setAlpha(0)
+    )
+    this._hudAffixLabels = Array.from({ length: 8 }, (_, i) =>
+      this.add.text(16 + i * 20, 72, '', { fontSize: '9px', color: '#ffffff' })
+        .setScrollFactor(0).setDepth(201).setOrigin(0.5)
+        .setAlpha(0)
+    )
+
+    // Resonance glyph row
+    this._hudResonanceText = this.add.text(16, 92, '', {
+      fontSize: '11px', color: '#ffcc44',
+    }).setScrollFactor(0).setDepth(200)
+
     this._elapsed = 0
   }
 
@@ -106,13 +126,13 @@ export default class GameScene extends Phaser.Scene {
       (proj, enemy) => {
         if (proj.hitSet.has(enemy)) return
         proj.hitSet.add(enemy)
-        Enemy.takeDamage(enemy, proj.damage, proj.x, proj.y, this._affixes) // TODO Task 5: receiver will consume affixes
+        Enemy.takeDamage(enemy, proj.damage, proj.x, proj.y, this._affixes)
         // Explosive projectiles (Ofuda, Homura)
         if (proj._explodeRadius) {
           this._enemies.getChildren()
             .filter(e => e.active && !e.dying && e !== enemy &&
               Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y) < proj._explodeRadius)
-            .forEach(e => Enemy.takeDamage(e, proj.damage * (proj._explodeMult || 1), proj.x, proj.y, this._affixes)) // TODO Task 5
+            .forEach(e => Enemy.takeDamage(e, proj.damage * (proj._explodeMult || 1), proj.x, proj.y, this._affixes))
         }
         if (!proj.penetrate) proj._spent = true
       }
@@ -225,6 +245,44 @@ export default class GameScene extends Phaser.Scene {
 
     this._hudLevel.setText(`Lv ${this._level}`)
     this._hudTimer.setX(W - 16)
+
+    // Weapon icon row — rebuild only when weapon count changes
+    if (this._weapons.length !== this._lastWeaponCount) {
+      this._lastWeaponCount = this._weapons.length
+      const weaponColors = [0xff8844, 0x44aaff, 0xaaff44, 0xff44aa]
+      this._hudWeaponIcons.forEach(({ icon, label }) => { icon.destroy(); label.destroy() })
+      this._hudWeaponIcons = this._weapons.map((entry, i) => {
+        const icon = this.add.rectangle(16 + i * 26, 58, 20, 20, weaponColors[i] || 0xffffff)
+          .setScrollFactor(0).setDepth(200).setStrokeStyle(1, 0xffffff)
+        const label = this.add.text(16 + i * 26, 58, entry.weapon.name[0], {
+          fontSize: '8px', color: '#000000',
+        }).setScrollFactor(0).setDepth(201).setOrigin(0.5)
+        return { icon, label }
+      })
+    }
+
+    // Affix dot row
+    const affixIds   = [...this._affixCounts.keys()]
+    const affixColor = { burn: 0xff6600, poison: 0x44cc44, chain: 0xffff00,
+                         chill: 0x88ccff, curse: 0xaa44aa, leech: 0xff4488,
+                         burst: 0xff4400, lucky: 0xffdd88 }
+    this._hudAffixDots.forEach((dot, i) => {
+      if (i < affixIds.length) {
+        const id = affixIds[i]
+        dot.setFillStyle(affixColor[id] || 0x888888).setAlpha(1)
+        this._hudAffixLabels[i].setText(`${this._affixCounts.get(id)}`).setAlpha(1).setPosition(16 + i * 20, 72)
+      } else {
+        dot.setAlpha(0); this._hudAffixLabels[i].setAlpha(0)
+      }
+    })
+
+    // Resonance glyph row
+    const resonanceNames = {
+      explode_burn: '爆炎', toxic_chain: '毒鏈', blizzard_arc: '雪電',
+      corrosion: '腐蝕', dark_harvest: '暗刈'
+    }
+    const glyphs = [...this._resonances].map(id => resonanceNames[id] || id).join('  ')
+    this._hudResonanceText.setText(glyphs)
   }
 
   _spawnWave() {
