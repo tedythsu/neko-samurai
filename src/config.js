@@ -17,6 +17,7 @@ export const CFG = {
 
   // XP
   XP_PER_ENEMY:             10,
+  ORB_COLLECT_RADIUS:       60,   // px — player must walk within this to collect
   XP_BASE:                  50,
   XP_SCALE:                1.4,
 

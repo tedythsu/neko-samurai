@@ -74,6 +74,7 @@ export default class GameScene extends Phaser.Scene {
     this._level    = 1
     this._xpToNext = xpThreshold(this._level)
     this._upgrading = false
+    this._orbs = []
 
     this.events.on('enemy-died', ({ x, y }) => this._spawnOrb(x, y))
     this.events.on('player-dead', this._onPlayerDead, this)
@@ -105,6 +106,18 @@ export default class GameScene extends Phaser.Scene {
     this._elapsed += delta
     this._hudTimer.setText(`${Math.floor(this._elapsed / 1000)}s`)
     this._drawHud()
+
+    // Collect orbs within pickup radius
+    for (let i = this._orbs.length - 1; i >= 0; i--) {
+      const orb = this._orbs[i]
+      if (Phaser.Math.Distance.Between(
+        this._player.x, this._player.y, orb.x, orb.y
+      ) < CFG.ORB_COLLECT_RADIUS) {
+        orb.destroy()
+        this._orbs.splice(i, 1)
+        this._addXp(CFG.XP_PER_ENEMY)
+      }
+    }
   }
 
   _drawHud() {
@@ -141,15 +154,7 @@ export default class GameScene extends Phaser.Scene {
 
   _spawnOrb(ex, ey) {
     const orb = this.add.circle(ex, ey, 8, 0xffee00).setDepth(4)
-    this.tweens.add({
-      targets: orb,
-      x: this._player.x, y: this._player.y,
-      duration: 400, ease: 'Sine.In',
-      onComplete: () => {
-        orb.destroy()
-        this._addXp(CFG.XP_PER_ENEMY)
-      },
-    })
+    this._orbs.push(orb)
   }
 
   _addXp(amount) {
