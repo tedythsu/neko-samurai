@@ -99,7 +99,7 @@ export default class GameScene extends Phaser.Scene {
     this._fireTimer += delta
     if (this._fireTimer >= this._weaponStats.fireRate) {
       this._fireTimer = 0
-      this._weapon.fire(this, this._projectiles, this._player.x, this._player.y, this._weaponStats, this._enemies)
+      this._weapon.fire(this, this._projectiles, this._player.x, this._player.y, this._weaponStats, this._enemies, this._player)
     }
     this._projectiles.getChildren().forEach(s => this._weapon.update(s))
 

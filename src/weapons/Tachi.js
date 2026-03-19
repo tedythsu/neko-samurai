@@ -30,27 +30,31 @@ export default {
     })
   },
 
-  fire(scene, _pool, fromX, fromY, stats, enemies) {
-    // Damage all active enemies within range
-    enemies.getChildren()
-      .filter(e => e.active &&
-        Phaser.Math.Distance.Between(fromX, fromY, e.x, e.y) < stats.range)
-      .forEach(e => Enemy.takeDamage(e, stats.damage))
+  fire(scene, _pool, fromX, fromY, stats, enemies, player) {
+    const scale  = (stats.range * 2) / 166
+    const hitSet = new Set()
 
-    // Visual: sprite animation centered on player, scaled to match range
-    const scale = (stats.range * 2) / 166   // frame is 166px wide, range is radius
     const slash = scene.add.sprite(fromX, fromY, 'tachi-slash', 0)
       .setDepth(6)
       .setOrigin(0.5, 0.5)
       .setScale(scale)
+
+    // Follow player and check hits each frame during the animation
+    const onUpdate = () => {
+      slash.setPosition(player.x, player.y)
+      enemies.getChildren()
+        .filter(e => e.active && !hitSet.has(e) &&
+          Phaser.Math.Distance.Between(player.x, player.y, e.x, e.y) < stats.range)
+        .forEach(e => { hitSet.add(e); Enemy.takeDamage(e, stats.damage) })
+    }
+
+    scene.events.on('update', onUpdate)
     slash.play('tachi-slash')
-    scene.tweens.add({
-      targets: slash,
-      angle: 360,
-      duration: 500,   // matches animation length (8 frames @ 16fps)
-      ease: 'Linear',
+    scene.tweens.add({ targets: slash, angle: 360, duration: 500, ease: 'Linear' })
+    slash.once('animationcomplete', () => {
+      scene.events.off('update', onUpdate)
+      slash.destroy()
     })
-    slash.once('animationcomplete', () => slash.destroy())
   },
 
   // No projectiles to update
