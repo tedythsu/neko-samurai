@@ -30,7 +30,7 @@ export default {
     })
   },
 
-  fire(scene, _pool, fromX, fromY, stats, enemies, player) {
+  fire(scene, _pool, fromX, fromY, stats, enemies, player, affixes = []) {
     const scale  = (stats.range * 2) / 166
     const hitSet = new Set()
 
@@ -45,7 +45,7 @@ export default {
       enemies.getChildren()
         .filter(e => e.active && !e.dying && !hitSet.has(e) &&
           Phaser.Math.Distance.Between(player.x, player.y, e.x, e.y) < stats.range)
-        .forEach(e => { hitSet.add(e); Enemy.takeDamage(e, stats.damage, player.x, player.y) })
+        .forEach(e => { hitSet.add(e); Enemy.takeDamage(e, stats.damage, player.x, player.y, affixes) })
     }
 
     scene.events.on('update', onUpdate)
