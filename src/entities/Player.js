@@ -1,0 +1,201 @@
+// src/entities/Player.js
+import { CFG } from '../config.js'
+
+const CHAR_H  = 120   // display height px
+const ATK_FPS = 24
+const RUN_FPS = 24
+const IDL_FPS = 12
+
+export default class Player {
+  constructor(scene, x, y) {
+    this.scene  = scene
+    // Stats (mutable by upgrades)
+    this.speed            = CFG.PLAYER_SPEED
+    this.damage           = CFG.PLAYER_DAMAGE
+    this.fireRate         = CFG.PLAYER_FIRE_RATE
+    this.projectileCount  = CFG.PLAYER_PROJECTILE_COUNT
+    this.maxHp            = CFG.PLAYER_HP_MAX
+    this.hp               = this.maxHp
+
+    // Slice frames into each texture
+    _sliceSheet(scene, 'idle',   6, 6)
+    _sliceSheet(scene, 'run',    6, 6)
+    _sliceSheet(scene, 'attack', 6, 6)
+
+    // Precompute display widths (aspect-correct per sheet)
+    this._dW = {
+      idle:   _frameAspectW(scene, 'idle',   CHAR_H),
+      run:    _frameAspectW(scene, 'run',    CHAR_H),
+      attack: _frameAspectW(scene, 'attack', CHAR_H),
+    }
+
+    // Physics sprite
+    this.sprite = scene.physics.add.sprite(x, y, 'idle', 0)
+      .setDisplaySize(this._dW.idle, CHAR_H)
+      .setCollideWorldBounds(true)
+    this.sprite.body.setSize(40, 60)   // hitbox smaller than visual
+
+    // Keyboard
+    this._keys = scene.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT')
+
+    // Touch joystick
+    this._touch   = { active: false, startX: 0, startY: 0, dx: 0, dy: 0 }
+    this._joyBase = scene.add.circle(0, 0, 55, 0x000000, 0.15).setDepth(100).setVisible(false)
+    this._joyKnob = scene.add.circle(0, 0, 28, 0x000000, 0.30).setDepth(101).setVisible(false)
+    scene.input.on('pointerdown',  p  => this._onDown(p))
+    scene.input.on('pointermove',  p  => this._onMove(p))
+    scene.input.on('pointerup',    ()  => this._onUp())
+
+    // Animation state
+    this._state          = 'idle'
+    this._frame          = { idle: 0, run: 0, attack: 0 }
+    this._timer          = { idle: 0, run: 0, attack: 0 }
+    this._attacking      = false
+    this._attackElapsed  = 0   // raw ms since last startAttack() — not modulo'd
+    this._dead           = false
+  }
+
+  // ── Public ────────────────────────────────────────────────────────────────
+
+  get x() { return this.sprite.x }
+  get y() { return this.sprite.y }
+
+  update(delta) {
+    if (this._dead) return
+    this._move(delta)
+    this._animateTick(delta)
+  }
+
+  startAttack() {
+    if (this._attacking) return
+    this._attacking      = true
+    this._frame.attack   = 0
+    this._timer.attack   = 0
+    this._attackElapsed  = 0   // raw ms accumulator (not modulo'd)
+  }
+
+  takeDamage(amount) {
+    this.hp = Math.max(0, this.hp - amount)
+    if (this.hp <= 0 && !this._dead) {
+      this._dead = true
+      this.scene.events.emit('player-dead')
+    }
+  }
+
+  heal(amount) {
+    this.hp = Math.min(this.maxHp, this.hp + amount)
+  }
+
+  applyUpgrade(id) {
+    switch (id) {
+      case 'dmg':       this.damage          *= 1.20; break
+      case 'firerate':  this.fireRate         *= 0.75; break
+      case 'multishot': this.projectileCount += 1;    break
+      case 'speed':     this.speed            *= 1.15; break
+      case 'maxhp':     this.maxHp *= 1.20; this.heal(this.maxHp); break
+      case 'regen':
+        this.scene.time.addEvent({
+          delay: 5000, loop: true,
+          callback: () => this.heal(1),
+        })
+        break
+    }
+  }
+
+  // ── Private ───────────────────────────────────────────────────────────────
+
+  _move(delta) {
+    const k  = this._keys
+    let vx = 0, vy = 0
+    if (k.A.isDown || k.LEFT.isDown)  vx -= 1
+    if (k.D.isDown || k.RIGHT.isDown) vx += 1
+    if (k.W.isDown || k.UP.isDown)    vy -= 1
+    if (k.S.isDown || k.DOWN.isDown)  vy += 1
+    if (this._touch.active) { vx += this._touch.dx; vy += this._touch.dy }
+
+    const len = Math.hypot(vx, vy)
+    if (len > 1) { vx /= len; vy /= len }
+
+    this.sprite.setVelocity(vx * this.speed, vy * this.speed)
+
+    if      (vx >  0.05) this.sprite.setFlipX(false)
+    else if (vx < -0.05) this.sprite.setFlipX(true)
+
+    const moving = len > 0.1
+    if (!this._attacking) this._state = moving ? 'run' : 'idle'
+  }
+
+  _animateTick(delta) {
+    let key, fps, count
+
+    if (this._attacking) {
+      key = 'attack'; fps = ATK_FPS; count = 36
+    } else if (this._state === 'run') {
+      key = 'run';    fps = RUN_FPS; count = 36
+    } else {
+      key = 'idle';   fps = IDL_FPS; count = 9
+    }
+
+    this._timer[key] += delta
+    const interval = 1000 / fps
+    while (this._timer[key] >= interval) {
+      this._timer[key] -= interval
+      this._frame[key]  = (this._frame[key] + 1) % count
+    }
+
+    // Attack completion: use raw accumulator (never modulo'd) so the threshold is reachable.
+    // _frame.attack loops via % 36, so elapsed-from-frame would always be < 36 intervals.
+    if (this._attacking) {
+      this._attackElapsed += delta
+      if (this._attackElapsed >= 36 * (1000 / ATK_FPS)) this._attacking = false
+    }
+
+    this.sprite
+      .setTexture(key, this._frame[key])
+      .setDisplaySize(this._dW[key], CHAR_H)
+  }
+
+  _onDown(p) {
+    this._touch.active = true
+    this._touch.startX = p.x; this._touch.startY = p.y
+    this._touch.dx = 0; this._touch.dy = 0
+    this._joyBase.setPosition(p.x, p.y).setVisible(true)
+    this._joyKnob.setPosition(p.x, p.y).setVisible(true)
+  }
+
+  _onMove(p) {
+    if (!this._touch.active) return
+    const dx   = p.x - this._touch.startX
+    const dy   = p.y - this._touch.startY
+    const dist = Math.hypot(dx, dy)
+    const maxR = 55, ratio = dist > maxR ? maxR / dist : 1
+    this._touch.dx = (dx / maxR) * ratio
+    this._touch.dy = (dy / maxR) * ratio
+    this._joyKnob.setPosition(this._touch.startX + dx * ratio, this._touch.startY + dy * ratio)
+  }
+
+  _onUp() {
+    this._touch.active = false; this._touch.dx = 0; this._touch.dy = 0
+    this._joyBase.setVisible(false); this._joyKnob.setVisible(false)
+  }
+}
+
+// ── Module-level helpers ──────────────────────────────────────────────────
+
+function _sliceSheet(scene, key, cols, rows) {
+  const tex = scene.textures.get(key)
+  if (tex.has(0)) return            // already sliced (guard for scene restart)
+  const src = tex.source[0]
+  const fw  = Math.floor(src.width  / cols)
+  const fh  = Math.floor(src.height / rows)
+  let idx = 0
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++)
+      tex.add(idx++, 0, c * fw, r * fh, fw, fh)
+}
+
+function _frameAspectW(scene, key, h) {
+  const frame0 = scene.textures.get(key).frames[0]
+  if (!frame0) return h
+  return Math.round(h * frame0.realWidth / frame0.realHeight)
+}
