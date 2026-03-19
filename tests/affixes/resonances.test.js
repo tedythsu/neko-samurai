@@ -32,6 +32,11 @@ describe('checkResonances', () => {
     expect(checkResonances(m).has('dark_harvest')).toBe(true)
   })
 
+  it('activates blizzard_arc with chain + chill', () => {
+    const m = new Map([['chain', 1], ['chill', 1]])
+    expect(checkResonances(m).has('blizzard_arc')).toBe(true)
+  })
+
   it('activates multiple resonances simultaneously', () => {
     const m = new Map([['burn', 1], ['burst', 1], ['poison', 1], ['chain', 1]])
     const result = checkResonances(m)
