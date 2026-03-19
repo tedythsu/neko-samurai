@@ -6,10 +6,7 @@ export default [
   {
     id: 'burn2', name: '業火', requires: 'burn',
     desc: '燃燒傷害 ×2',
-    onHit(enemy) {
-      const se = enemy._statusEffects
-      if (se && se.burn.stacks > 0) se.burn.dps = 10
-    },
+    onHit() {},  // burn.js reads scene._affixCounts.has('burn2') to double dps
   },
   {
     id: 'poison2', name: '猛毒擴散', requires: 'poison',
@@ -22,7 +19,7 @@ export default [
     onHit() {},  // chain.js reads scene._affixCounts.has('chain2')
   },
   {
-    id: 'chill2', name: '凍結', requires: 'chill',
+    id: 'chill2', name: '氷結', requires: 'chill',
     desc: '完全停止敵人移動2秒（取代減速）',
     onHit(enemy) {
       const se = enemy._statusEffects

@@ -12,6 +12,8 @@ export default {
     const dps      = count >= 3 ? 7.5 : 5
     se.burn.stacks = 1
     se.burn.dps    = dps
+    // burn2: double the DoT damage
+    if (scene._affixCounts?.has('burn2')) se.burn.dps = se.burn.dps * 2
     se.burn.timer  = duration
   },
 }

@@ -191,6 +191,10 @@ export default class GameScene extends Phaser.Scene {
         shield.gfx.fillStyle(0xffdd44, 0.08)
         shield.gfx.fillCircle(px, py, RING_RADIUS)
 
+        // Purge stale cooldown entries for inactive enemies (pooled sprite reuse fix)
+        for (const key of shield.damageCd.keys()) {
+          if (!key.active) shield.damageCd.delete(key)
+        }
         // Damage any enemy within ring radius
         this._enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
           if (Phaser.Math.Distance.Between(px, py, e.x, e.y) < RING_RADIUS + 8) {
