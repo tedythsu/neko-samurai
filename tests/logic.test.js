@@ -1,6 +1,6 @@
 // tests/logic.test.js
 import { describe, it, expect } from 'vitest'
-import { CFG, xpThreshold, randomEdgePoint, UPGRADES } from '../src/config.js'
+import { CFG, xpThreshold, randomEdgePoint, PLAYER_UPGRADES } from '../src/config.js'
 
 describe('xpThreshold', () => {
   it('returns > 0 for level 1', () => {
@@ -32,10 +32,10 @@ describe('randomEdgePoint', () => {
   })
 })
 
-describe('UPGRADES', () => {
-  it('has 6 entries', () => expect(UPGRADES).toHaveLength(6))
+describe('PLAYER_UPGRADES', () => {
+  it('has 3 entries', () => expect(PLAYER_UPGRADES).toHaveLength(3))
   it('all have id, name, desc', () => {
-    UPGRADES.forEach(u => {
+    PLAYER_UPGRADES.forEach(u => {
       expect(u.id).toBeTruthy()
       expect(u.name).toBeTruthy()
       expect(u.desc).toBeTruthy()

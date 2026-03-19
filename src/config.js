@@ -8,14 +8,6 @@ export const CFG = {
   // Player
   PLAYER_SPEED:            200,
   PLAYER_HP_MAX:           100,
-  PLAYER_DAMAGE:            20,
-  PLAYER_FIRE_RATE:        800,  // ms between shots
-  PLAYER_PROJECTILE_COUNT:   3,
-
-  // Shuriken
-  SHURIKEN_SPEED:          400,
-  SHURIKEN_SIZE:            12,
-  SHURIKEN_RANGE:          300,   // px before shuriken deactivates
 
   // Enemy
   ENEMY_SPEED:              80,
@@ -48,11 +40,13 @@ export function randomEdgePoint(worldW, worldH, inset = 20) {
   }
 }
 
-export const UPGRADES = [
-  { id: 'dmg',       name: '手裏剣強化', desc: '傷害 +20%' },
-  { id: 'firerate',  name: '連射',       desc: '射速 +25%' },
-  { id: 'multishot', name: '雙発',       desc: '子彈數 +1' },
-  { id: 'speed',     name: '疾風',       desc: '移速 +15%' },
-  { id: 'maxhp',     name: '武者の意志', desc: '最大HP +20%' },
-  { id: 'regen',     name: '忍の回復',   desc: '每5秒回復1 HP' },
+export const PLAYER_UPGRADES = [
+  { id: 'speed',  name: '疾風',      desc: '移速 +15%',
+    apply: (player /*, scene */) => { player.speed *= 1.15 } },
+  { id: 'maxhp',  name: '武者の意志', desc: '最大HP +20%',
+    apply: (player /*, scene */) => { player.maxHp *= 1.20; player.heal(player.maxHp * 0.20) } },
+  { id: 'regen',  name: '忍の回復',  desc: '每5秒回復1 HP',
+    apply: (player, scene) => {
+      scene.time.addEvent({ delay: 5000, loop: true, callback: () => player.heal(1) })
+    } },
 ]

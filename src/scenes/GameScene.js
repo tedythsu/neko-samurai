@@ -2,11 +2,15 @@
 import Phaser from 'phaser'
 import Player   from '../entities/Player.js'
 import Enemy    from '../entities/Enemy.js'
-import Shuriken from '../entities/Shuriken.js'
-import { CFG, randomEdgePoint, xpThreshold, UPGRADES } from '../config.js'
+import { CFG, randomEdgePoint, xpThreshold, PLAYER_UPGRADES } from '../config.js'
 
 export default class GameScene extends Phaser.Scene {
   constructor() { super('GameScene') }
+
+  init(data) {
+    this._weapon      = data.weapon
+    this._weaponStats = { ...data.weapon.baseStats }
+  }
 
   create() {
     this.physics.world.setBounds(0, 0, CFG.WORLD_WIDTH, CFG.WORLD_HEIGHT)
@@ -43,22 +47,22 @@ export default class GameScene extends Phaser.Scene {
       callbackScope: this,
     })
 
-    Shuriken.createTexture(this)
-    this._shurikens = this.physics.add.group({ maxSize: 40 })
+    this._weapon.createTexture(this)
+    this._projectiles = this.physics.add.group({ maxSize: 60 })
 
     this.physics.add.overlap(
-      this._shurikens,
+      this._projectiles,
       this._enemies,
-      (shuriken, enemy) => {
-        if (shuriken.hitSet.has(enemy)) return
-        shuriken.hitSet.add(enemy)
-        Enemy.takeDamage(enemy, shuriken.damage)
-        shuriken.disableBody(true, true)
+      (proj, enemy) => {
+        if (proj.hitSet.has(enemy)) return
+        proj.hitSet.add(enemy)
+        Enemy.takeDamage(enemy, proj.damage)
+        if (!proj.penetrate) proj.disableBody(true, true)
       }
     )
 
     this.physics.world.on('worldbounds', (body) => {
-      if (body.gameObject && this._shurikens.contains(body.gameObject)) {
+      if (body.gameObject && this._projectiles.contains(body.gameObject)) {
         body.gameObject.disableBody(true, true)
       }
     })
@@ -92,18 +96,11 @@ export default class GameScene extends Phaser.Scene {
     this._enemies.getChildren().forEach(e => Enemy.update(e, this._player, delta))
 
     this._fireTimer += delta
-    if (this._fireTimer >= this._player.fireRate) {
+    if (this._fireTimer >= this._weaponStats.fireRate) {
       this._fireTimer = 0
-      Shuriken.fire(
-        this,
-        this._shurikens,
-        this._player.x,
-        this._player.y,
-        this._player.projectileCount,
-        this._player.damage
-      )
+      this._weapon.fire(this, this._projectiles, this._player.x, this._player.y, this._weaponStats, this._enemies)
     }
-    this._shurikens.getChildren().forEach(s => Shuriken.update(s))
+    this._projectiles.getChildren().forEach(s => this._weapon.update(s))
 
     this._elapsed += delta
     this._hudTimer.setText(`${Math.floor(this._elapsed / 1000)}s`)
@@ -163,15 +160,17 @@ export default class GameScene extends Phaser.Scene {
       this._level   += 1
       this._xpToNext = xpThreshold(this._level)
       this._upgrading = true
-      this.events.once('upgrade-chosen', (id) => {
-        this._player.applyUpgrade(id)
+      this.events.once('upgrade-chosen', (upgrade) => {
+        if (upgrade.target === 'weapon') upgrade.apply(this._weaponStats)
+        else upgrade.apply(this._player, this)
         this._upgrading = false
         this.scene.resume('GameScene')
       })
-      this.scene.launch('UpgradeScene', {
-        level: this._level,
-        upgrades: Phaser.Utils.Array.Shuffle(UPGRADES.slice()).slice(0, 3),
-      })
+      const weaponUps = this._weapon.upgrades.map(u => ({ ...u, target: 'weapon' }))
+      const playerUps = PLAYER_UPGRADES.map(u => ({ ...u, target: 'player' }))
+      const pool = Phaser.Utils.Array.Shuffle([...weaponUps, ...playerUps])
+      const choices = pool.slice(0, 3)
+      this.scene.launch('UpgradeScene', { level: this._level, upgrades: choices })
       this.scene.pause('GameScene')
     }
   }

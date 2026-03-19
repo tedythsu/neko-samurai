@@ -1,7 +1,8 @@
 import Phaser from 'phaser'
-import BootScene     from './scenes/BootScene.js'
-import GameScene     from './scenes/GameScene.js'
-import UpgradeScene  from './scenes/UpgradeScene.js'
+import BootScene          from './scenes/BootScene.js'
+import WeaponSelectScene  from './scenes/WeaponSelectScene.js'
+import GameScene          from './scenes/GameScene.js'
+import UpgradeScene       from './scenes/UpgradeScene.js'
 
 new Phaser.Game({
   type: Phaser.AUTO,
@@ -14,5 +15,5 @@ new Phaser.Game({
     mode: Phaser.Scale.RESIZE,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [BootScene, GameScene, UpgradeScene],
+  scene: [BootScene, WeaponSelectScene, GameScene, UpgradeScene],
 })

@@ -10,9 +10,6 @@ export default class Player {
     this.scene  = scene
     // Stats (mutable by upgrades)
     this.speed            = CFG.PLAYER_SPEED
-    this.damage           = CFG.PLAYER_DAMAGE
-    this.fireRate         = CFG.PLAYER_FIRE_RATE
-    this.projectileCount  = CFG.PLAYER_PROJECTILE_COUNT
     this.maxHp            = CFG.PLAYER_HP_MAX
     this.hp               = this.maxHp
 
@@ -71,22 +68,6 @@ export default class Player {
 
   heal(amount) {
     this.hp = Math.min(this.maxHp, this.hp + amount)
-  }
-
-  applyUpgrade(id) {
-    switch (id) {
-      case 'dmg':       this.damage          *= 1.20; break
-      case 'firerate':  this.fireRate         *= 0.75; break
-      case 'multishot': this.projectileCount += 1;    break
-      case 'speed':     this.speed            *= 1.15; break
-      case 'maxhp':     this.maxHp *= 1.20; this.heal(this.maxHp); break
-      case 'regen':
-        this.scene.time.addEvent({
-          delay: 5000, loop: true,
-          callback: () => this.heal(1),
-        })
-        break
-    }
   }
 
   // ── Private ───────────────────────────────────────────────────────────────

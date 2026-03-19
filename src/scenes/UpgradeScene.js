@@ -46,12 +46,12 @@ export default class UpgradeScene extends Phaser.Scene {
 
       bg.on('pointerover',  () => bg.setFillColor(0x2a2a5e))
       bg.on('pointerout',   () => bg.setFillColor(0x1a1a3e))
-      bg.on('pointerdown',  () => this._choose(upg.id))
+      bg.on('pointerdown',  () => this._choose(upg))
     })
   }
 
-  _choose(id) {
-    this.scene.get('GameScene').events.emit('upgrade-chosen', id)
+  _choose(upgrade) {
+    this.scene.get('GameScene').events.emit('upgrade-chosen', upgrade)
     this.scene.stop()
   }
 }
