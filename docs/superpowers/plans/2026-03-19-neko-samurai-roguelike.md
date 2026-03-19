@@ -332,11 +332,12 @@ export default class Player {
     scene.input.on('pointerup',    ()  => this._onUp())
 
     // Animation state
-    this._state     = 'idle'
-    this._frame     = { idle: 0, run: 0, attack: 0 }
-    this._timer     = { idle: 0, run: 0, attack: 0 }
-    this._attacking = false
-    this._dead      = false
+    this._state          = 'idle'
+    this._frame          = { idle: 0, run: 0, attack: 0 }
+    this._timer          = { idle: 0, run: 0, attack: 0 }
+    this._attacking      = false
+    this._attackElapsed  = 0   // raw ms since last startAttack() — not modulo'd
+    this._dead           = false
   }
 
   // ── Public ────────────────────────────────────────────────────────────────
@@ -352,9 +353,10 @@ export default class Player {
 
   startAttack() {
     if (this._attacking) return
-    this._attacking = true
-    this._frame.attack = 0
-    this._timer.attack = 0
+    this._attacking      = true
+    this._frame.attack   = 0
+    this._timer.attack   = 0
+    this._attackElapsed  = 0   // raw ms accumulator (not modulo'd)
   }
 
   takeDamage(amount) {
@@ -426,10 +428,11 @@ export default class Player {
       this._frame[key]  = (this._frame[key] + 1) % count
     }
 
-    // Attack completion: track total elapsed time (frame * interval + remainder timer)
+    // Attack completion: use raw accumulator (never modulo'd) so the threshold is reachable.
+    // _frame.attack loops via % 36, so elapsed-from-frame would always be < 36 intervals.
     if (this._attacking) {
-      const elapsed = this._frame.attack * (1000 / ATK_FPS) + this._timer.attack
-      if (elapsed >= 36 * (1000 / ATK_FPS)) this._attacking = false
+      this._attackElapsed += delta
+      if (this._attackElapsed >= 36 * (1000 / ATK_FPS)) this._attacking = false
     }
 
     this.sprite
@@ -485,7 +488,7 @@ function _frameAspectW(scene, key, h) {
 }
 ```
 
-> **Note:** Attack completion is tracked by elapsed time: `frame * interval + timer`. Once elapsed ≥ 36 frames × (1000/24 ms), `_attacking` resets to false and the next tick returns to idle/run. The `_frame.attack` counter uses `% count` internally but completion is time-based, not a wrap-detection, to avoid the impossible `frame === 0 && frame > 0` condition.
+> **Note:** Attack completion uses `_attackElapsed`, a raw ms accumulator that is **never** modulo'd. This avoids the pitfall where `_frame.attack % 36` resets to 0, making the threshold unreachable from `frame * interval + timer`. Once `_attackElapsed >= 36 * (1000/ATK_FPS)` (≈ 1500 ms), `_attacking` resets and the next tick returns to idle/run.
 
 - [ ] **Step 2: Wire Player into GameScene stub to verify it doesn't crash**
 
@@ -1068,7 +1071,7 @@ Verify all success criteria:
 npm test -- --run
 ```
 
-Expected: 6 tests pass.
+Expected: 8 tests pass.
 
 - [ ] **Step 6: Final commit**
 
@@ -1081,7 +1084,7 @@ git commit -m "feat: HUD (HP/XP bars, level, timer) + grid background"
 
 ## Completion Checklist
 
-- [ ] All 6 unit tests pass (`npm test -- --run`)
+- [ ] All 8 unit tests pass (`npm test -- --run`)
 - [ ] Game runs without console errors (`npm run dev`)
 - [ ] All 9 success criteria verified (Task 7 Step 4)
 - [ ] No file exceeds 150 lines
