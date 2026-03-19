@@ -138,7 +138,7 @@ export default class GameScene extends Phaser.Scene {
       const { x, y } = randomEdgePoint(CFG.WORLD_WIDTH, CFG.WORLD_HEIGHT)
       let enemy = this._enemies.getFirstDead(false)
       if (!enemy) {
-        enemy = this._enemies.create(x, y, 'enemy-tex')
+        enemy = this._enemies.create(x, y, 'kisotsu-run', 0)
         enemy.setDepth(5)
       }
       Enemy.activate(enemy, x, y)

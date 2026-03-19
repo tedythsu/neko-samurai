@@ -6,17 +6,17 @@ export default class Enemy {
    * Call once per scene to register the 'enemy-tex' texture.
    * Must be called in GameScene.create() before creating the group.
    */
+  // Slice the kisotsu-run spritesheet (6×6 grid) into numbered frames.
   static createTexture(scene) {
-    if (scene.textures.exists('enemy-tex')) return
-    const rt = scene.add.renderTexture(0, 0, 40, 40)
-    rt.fill(0xcc2222)
-    const lbl = scene.add.text(0, 0, '鬼', {
-      fontSize: '20px', color: '#ffffff', fontStyle: 'bold'
-    })
-    rt.draw(lbl, 8, 8)
-    rt.saveTexture('enemy-tex')
-    lbl.destroy()
-    rt.destroy()
+    const tex = scene.textures.get('kisotsu-run')
+    if (tex.has(0)) return   // already sliced (guard for scene restart)
+    const src = tex.source[0]
+    const fw  = Math.floor(src.width  / 6)
+    const fh  = Math.floor(src.height / 6)
+    let idx = 0
+    for (let r = 0; r < 6; r++)
+      for (let c = 0; c < 6; c++)
+        tex.add(idx++, 0, c * fw, r * fh, fw, fh)
   }
 
   /**
@@ -25,8 +25,15 @@ export default class Enemy {
    */
   static activate(sprite, x, y) {
     sprite.enableBody(true, x, y, true, true)
-    sprite.hp         = CFG.ENEMY_HP
-    sprite.damageCd   = 0     // cooldown timer ms
+    sprite.hp       = CFG.ENEMY_HP
+    sprite.damageCd = 0
+    sprite._frame   = 0
+    sprite._timer   = 0
+    const frame0 = sprite.scene.textures.get('kisotsu-run').frames[0]
+    const dH = 100   // display height px
+    const dW = Math.round(dH * frame0.realWidth / frame0.realHeight)
+    sprite.setTexture('kisotsu-run', 0).setDisplaySize(dW, dH)
+    sprite.body.setSize(40, 60)
   }
 
   /**
@@ -35,7 +42,16 @@ export default class Enemy {
   static update(sprite, player, delta) {
     if (!sprite.active) return
     sprite.scene.physics.moveToObject(sprite, player.sprite, CFG.ENEMY_SPEED)
+    sprite.setFlipX(player.x < sprite.x)
     if (sprite.damageCd > 0) sprite.damageCd -= delta
+
+    // Advance run animation (~12 fps, 36 frames)
+    sprite._timer += delta
+    while (sprite._timer >= 1000 / 12) {
+      sprite._timer -= 1000 / 12
+      sprite._frame  = (sprite._frame + 1) % 36
+      sprite.setFrame(sprite._frame)
+    }
   }
 
   /**
