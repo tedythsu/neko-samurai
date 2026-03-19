@@ -155,7 +155,7 @@ cd /Users/tedhsumbp2024/Documents/workspace/neko-samurai
 npm test -- --run
 ```
 
-Expected: 8 tests pass.
+Expected: 7 tests pass.
 
 - [ ] **Step 5: Commit**
 
@@ -1071,7 +1071,7 @@ Verify all success criteria:
 npm test -- --run
 ```
 
-Expected: 8 tests pass.
+Expected: 7 tests pass.
 
 - [ ] **Step 6: Final commit**
 
@@ -1084,7 +1084,7 @@ git commit -m "feat: HUD (HP/XP bars, level, timer) + grid background"
 
 ## Completion Checklist
 
-- [ ] All 8 unit tests pass (`npm test -- --run`)
+- [ ] All 7 unit tests pass (`npm test -- --run`)
 - [ ] Game runs without console errors (`npm run dev`)
 - [ ] All 9 success criteria verified (Task 7 Step 4)
 - [ ] No file exceeds 150 lines
