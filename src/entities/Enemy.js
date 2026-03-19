@@ -212,11 +212,21 @@ export default class Enemy {
   /**
    * Reduce enemy HP. Returns true if enemy died.
    */
-  static takeDamage(sprite, amount, fromX, fromY /* TODO Task 5: add affixes = [] param */) {
+  static takeDamage(sprite, amount, fromX, fromY, affixes = []) {
     if (sprite.dying) return false
 
-    const isCrit   = Math.random() < CFG.CRIT_CHANCE
-    const damage   = isCrit ? Math.round(amount * CFG.CRIT_MULTIPLIER) : amount
+    const se = sprite._statusEffects
+
+    // Lucky affix: passive crit boost (handle before damage calc)
+    const luckyCount = affixes.filter(a => a.id === 'lucky').length
+    const critChance = Math.min(1.0, CFG.CRIT_CHANCE + luckyCount * 0.15)
+    const critMult   = CFG.CRIT_MULTIPLIER + luckyCount * 0.5
+    const isCrit     = Math.random() < critChance
+
+    // Curse: +25% damage if target is cursed
+    const curseMult = (se && se.curse.active) ? 1.25 : 1.0
+
+    const damage = Math.round(amount * curseMult * (isCrit ? critMult : 1))
     sprite.hp -= damage
 
     // Floating damage number
@@ -269,6 +279,11 @@ export default class Enemy {
     sparks.setDepth(9)
     sparks.explode(8)
     sprite.scene.time.delayedCall(400, () => sparks.destroy())
+
+    // Affix pipeline
+    for (const affix of affixes) {
+      if (affix.id !== 'lucky') affix.onHit(sprite, damage, sprite.scene)
+    }
 
     if (sprite.hp <= 0) {
       Enemy._triggerDeath(sprite)
