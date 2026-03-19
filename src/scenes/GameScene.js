@@ -309,7 +309,7 @@ export default class GameScene extends Phaser.Scene {
 
     // Weapon-specific upgrades for all active weapons
     for (const entry of this._weapons)
-      pool.push(...entry.weapon.upgrades.map(u => ({
+      pool.push(...(entry.weapon.upgrades ?? []).map(u => ({
         ...u,
         target:   'weapon',
         weaponId: entry.weapon.id,
@@ -336,7 +336,7 @@ export default class GameScene extends Phaser.Scene {
         })
     }
 
-    // Player upgrades
+    // Player upgrades (always present — prevents empty-pool deadlock if affix/weapon pools are empty)
     pool.push(...PLAYER_UPGRADES.map(u => ({ ...u, target: 'player' })))
 
     return Phaser.Utils.Array.Shuffle(pool).slice(0, 3)
@@ -358,6 +358,7 @@ export default class GameScene extends Phaser.Scene {
           entry.stats.range = (entry.stats.range || 100) * 1.15
       }
     } else if (mechanical.id === 'piercing') {
+      // Only weapons that declare `penetrate` in baseStats support piercing (opt-in by design)
       for (const entry of this._weapons) {
         if (entry.stats.penetrate !== undefined)
           entry.stats.penetrate = true
