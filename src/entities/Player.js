@@ -2,7 +2,6 @@
 import { CFG } from '../config.js'
 
 const CHAR_H  = 120   // display height px
-const ATK_FPS = 24
 const RUN_FPS = 24
 const IDL_FPS = 12
 
@@ -20,13 +19,11 @@ export default class Player {
     // Slice frames into each texture
     _sliceSheet(scene, 'idle',   6, 6)
     _sliceSheet(scene, 'run',    6, 6)
-    _sliceSheet(scene, 'attack', 6, 6)
 
     // Precompute display widths (aspect-correct per sheet)
     this._dW = {
       idle:   _frameAspectW(scene, 'idle',   CHAR_H),
       run:    _frameAspectW(scene, 'run',    CHAR_H),
-      attack: _frameAspectW(scene, 'attack', CHAR_H),
     }
 
     // Physics sprite
@@ -48,10 +45,8 @@ export default class Player {
 
     // Animation state
     this._state          = 'idle'
-    this._frame          = { idle: 0, run: 0, attack: 0 }
-    this._timer          = { idle: 0, run: 0, attack: 0 }
-    this._attacking      = false
-    this._attackElapsed  = 0   // raw ms since last startAttack() — not modulo'd
+    this._frame          = { idle: 0, run: 0 }
+    this._timer          = { idle: 0, run: 0 }
     this._dead           = false
   }
 
@@ -64,14 +59,6 @@ export default class Player {
     if (this._dead) return
     this._move(delta)
     this._animateTick(delta)
-  }
-
-  startAttack() {
-    if (this._attacking) return
-    this._attacking      = true
-    this._frame.attack   = 0
-    this._timer.attack   = 0
-    this._attackElapsed  = 0   // raw ms accumulator (not modulo'd)
   }
 
   takeDamage(amount) {
@@ -122,32 +109,19 @@ export default class Player {
     else if (vx < -0.05) this.sprite.setFlipX(true)
 
     const moving = len > 0.1
-    if (!this._attacking) this._state = moving ? 'run' : 'idle'
+    this._state = moving ? 'run' : 'idle'
   }
 
   _animateTick(delta) {
-    let key, fps, count
-
-    if (this._attacking) {
-      key = 'attack'; fps = ATK_FPS; count = 36
-    } else if (this._state === 'run') {
-      key = 'run';    fps = RUN_FPS; count = 36
-    } else {
-      key = 'idle';   fps = IDL_FPS; count = 9
-    }
+    const key   = this._state === 'run' ? 'run' : 'idle'
+    const fps   = this._state === 'run' ? RUN_FPS : IDL_FPS
+    const count = this._state === 'run' ? 36 : 9
 
     this._timer[key] += delta
     const interval = 1000 / fps
     while (this._timer[key] >= interval) {
       this._timer[key] -= interval
       this._frame[key]  = (this._frame[key] + 1) % count
-    }
-
-    // Attack completion: use raw accumulator (never modulo'd) so the threshold is reachable.
-    // _frame.attack loops via % 36, so elapsed-from-frame would always be < 36 intervals.
-    if (this._attacking) {
-      this._attackElapsed += delta
-      if (this._attackElapsed >= 36 * (1000 / ATK_FPS)) this._attacking = false
     }
 
     this.sprite

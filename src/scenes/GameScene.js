@@ -94,18 +94,14 @@ export default class GameScene extends Phaser.Scene {
     this._fireTimer += delta
     if (this._fireTimer >= this._player.fireRate) {
       this._fireTimer = 0
-      if (this._enemies.countActive() > 0) {
-        this._player.startAttack()
-        Shuriken.fire(
-          this,
-          this._shurikens,
-          this._player.x,
-          this._player.y,
-          this._enemies,
-          this._player.projectileCount,
-          this._player.damage
-        )
-      }
+      Shuriken.fire(
+        this,
+        this._shurikens,
+        this._player.x,
+        this._player.y,
+        this._player.projectileCount,
+        this._player.damage
+      )
     }
     this._shurikens.getChildren().forEach(s => Shuriken.update(s))
 

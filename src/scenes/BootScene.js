@@ -19,7 +19,6 @@ export default class BootScene extends Phaser.Scene {
 
     this.load.image('idle',   `${CHAR}/idle.png`)
     this.load.image('run',    `${CHAR}/run.png`)
-    this.load.image('attack', `${CHAR}/attack.png`)
   }
 
   create() {

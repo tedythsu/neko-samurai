@@ -12,11 +12,12 @@ export default class Shuriken {
   }
 
   /**
-   * Fire `count` shurikens from (fromX, fromY) toward the `count` nearest enemies.
+   * Fire `count` shurikens in evenly-spaced angles around the player.
+   * Each shuriken deactivates after travelling CFG.SHURIKEN_RANGE px.
    */
-  static fire(scene, pool, fromX, fromY, enemies, count, damage) {
-    const targets = Shuriken._nearestEnemies(enemies, fromX, fromY, count)
-    targets.forEach(target => {
+  static fire(scene, pool, fromX, fromY, count, damage) {
+    const baseAngle = Phaser.Math.Between(0, 359)  // random starting angle each burst
+    for (let i = 0; i < count; i++) {
       let s = pool.getFirstDead(false)
       if (!s) {
         s = pool.create(fromX, fromY, 'shuriken-tex')
@@ -24,29 +25,22 @@ export default class Shuriken {
         s.body.onWorldBounds = true
       }
       s.enableBody(true, fromX, fromY, true, true)
-      s.damage = damage
-      s.hitSet = new Set()  // enemies already hit by this shuriken
+      s.damage  = damage
+      s.hitSet  = new Set()
+      s.spawnX  = fromX
+      s.spawnY  = fromY
 
-      const angle = Phaser.Math.Angle.Between(fromX, fromY, target.x, target.y)
-      scene.physics.velocityFromAngle(
-        Phaser.Math.RadToDeg(angle), CFG.SHURIKEN_SPEED, s.body.velocity
-      )
-    })
+      const deg = baseAngle + (360 / count) * i
+      scene.physics.velocityFromAngle(deg, CFG.SHURIKEN_SPEED, s.body.velocity)
+    }
   }
 
   static update(sprite) {
     if (!sprite.active) return
     sprite.angle += 8
-  }
-
-  static _nearestEnemies(enemies, x, y, count) {
-    return enemies
-      .getChildren()
-      .filter(e => e.active)
-      .sort((a, b) =>
-        Phaser.Math.Distance.Between(x, y, a.x, a.y) -
-        Phaser.Math.Distance.Between(x, y, b.x, b.y)
-      )
-      .slice(0, count)
+    // Deactivate once range exceeded
+    if (Phaser.Math.Distance.Between(sprite.spawnX, sprite.spawnY, sprite.x, sprite.y) >= CFG.SHURIKEN_RANGE) {
+      sprite.disableBody(true, true)
+    }
   }
 }

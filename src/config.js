@@ -15,6 +15,7 @@ export const CFG = {
   // Shuriken
   SHURIKEN_SPEED:          400,
   SHURIKEN_SIZE:            12,
+  SHURIKEN_RANGE:          300,   // px before shuriken deactivates
 
   // Enemy
   ENEMY_SPEED:              80,
