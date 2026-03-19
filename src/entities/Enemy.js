@@ -150,7 +150,7 @@ export default class Enemy {
       scene._enemies.getChildren()
         .filter(e => e.active && !e.dying && e !== sprite &&
           Phaser.Math.Distance.Between(x, y, e.x, e.y) < 60)
-        .forEach(e => Enemy.takeDamage(e, CFG.ENEMY_HP * 0.3, x, y, []))
+        .forEach(e => Enemy.takeDamage(e, CFG.ENEMY_HP * 0.3, x, y, scene._affixes || []))
     }
 
     // Resonance: dark_harvest — cursed enemies explode on death + heal
@@ -159,7 +159,7 @@ export default class Enemy {
       scene._enemies.getChildren()
         .filter(e => e.active && !e.dying && e !== sprite &&
           Phaser.Math.Distance.Between(x, y, e.x, e.y) < 50)
-        .forEach(e => Enemy.takeDamage(e, 15, x, y, []))
+        .forEach(e => Enemy.takeDamage(e, 15, x, y, scene._affixes || []))
       if (scene._player) scene._player.heal(5)
     }
 
