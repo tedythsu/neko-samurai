@@ -1,278 +1,238 @@
 import Phaser from 'phaser'
-import Player from '../entities/Player.js'
-import Enemy from '../entities/Enemy.js'
-import Kunai from '../entities/weapons/Kunai.js'
-import Tachi from '../entities/weapons/Tachi.js'
-import Shikigami from '../entities/weapons/Shikigami.js'
-import WaveManager from '../systems/WaveManager.js'
-import UpgradeSystem from '../systems/UpgradeSystem.js'
-import VFX from '../systems/VFX.js'
-import MetaProgress from '../systems/MetaProgress.js'
-import { MAPS } from '../data/maps.js'
-import { CHARACTERS } from '../data/characters.js'
-import { ENEMIES } from '../data/enemies.js'
 
-const WEAPON_CLASSES = { kunai: Kunai, tachi: Tachi, shikigami: Shikigami }
-const MAX_ENEMIES = 300
+const SPEED = 200
+const RUN_COLS  = 6, RUN_ROWS  = 6   // 6×6 = 36 frames
+const IDLE_COLS = 6, IDLE_ROWS = 6   // 6×6 grid（只用前9格）
+const AURA_COLS = 6, AURA_ROWS = 6   // 6×6 = 36 frames
+const RUN_FRAME_COUNT  = RUN_COLS  * RUN_ROWS
+const IDLE_FRAME_COUNT = 9
+const AURA_FRAME_COUNT = AURA_COLS * AURA_ROWS
+const RUN_FPS  = 24
+const IDLE_FPS = 12
+const AURA_FPS = 36
+const CHAR_HEIGHT    = 120   // 角色顯示高度（px）
+const AURA_SCALE     = 1.5   // 劍氣相對角色的大小倍率
+const AURA_INTERVAL  = 3000  // 劍氣出現間隔（ms）
+const AURA_DURATION  = 300   // 劍氣顯示持續時間（ms）
+const AURA_FADE      = 60    // 淡入 / 淡出時間（ms）
+const CHAR_PATH = 'assets/sprites/potemaru'
 
 export default class GameScene extends Phaser.Scene {
   constructor() { super('GameScene') }
 
-  create(data) {
+  // ─── Preload ───────────────────────────────────────────────────────────────
+
+  preload() {
+    this.load.image('run',  `${CHAR_PATH}/run.png`)
+    this.load.image('idle', `${CHAR_PATH}/idle.png`)
+    this.load.image('aura', `${CHAR_PATH}/aura.png`)
+  }
+
+  // ─── Create ────────────────────────────────────────────────────────────────
+
+  create() {
+    this._sliceSheet('run',  RUN_COLS,  RUN_ROWS)
+    this._sliceSheet('idle', IDLE_COLS, IDLE_ROWS)
+    this._sliceSheet('aura', AURA_COLS, AURA_ROWS)
+
+    // 每個動畫各自計算顯示寬度（高度統一為 CHAR_HEIGHT）
+    this._dH = CHAR_HEIGHT
+    this._dW = {
+      run:  this._frameAspectW('run'),
+      idle: this._frameAspectW('idle'),
+      aura: this._frameAspectW('aura'),
+    }
+
+    this._spawnCharacter()
+    this._setupKeyboard()
+    this._setupTouch()
+
+    // Animation state
+    this._runFrame  = 0;  this._runTimer  = 0
+    this._idleFrame = 0;  this._idleTimer = 0
+    this._auraFrame = 0;  this._auraTimer = 0
+    this._auraActive = false
+
+    // 定時觸發劍氣
+    this.time.addEvent({ delay: AURA_INTERVAL, loop: true, callback: this._triggerAura, callbackScope: this })
+
+    this._state  = 'idle'
+    this._facing = 1
+    this._setState('idle')
+  }
+
+  // ─── Frame helpers ─────────────────────────────────────────────────────────
+
+  _frameAspectW(key) {
+    const f = this.textures.get(key).frames[0]
+    const aspect = f.realWidth > 0 ? f.realWidth / f.realHeight : 1
+    return Math.round(CHAR_HEIGHT * aspect)
+  }
+
+  // ─── Sprite sheet slicer ───────────────────────────────────────────────────
+
+  _sliceSheet(key, cols, rows) {
+    const tex = this.textures.get(key)
+    const src = tex.source[0]
+    const fw  = Math.floor(src.width  / cols)
+    const fh  = Math.floor(src.height / rows)
+    let idx = 0
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        tex.add(idx++, 0, c * fw, r * fh, fw, fh)
+      }
+    }
+  }
+
+  // ─── Character ─────────────────────────────────────────────────────────────
+
+  _spawnCharacter() {
     const { width: W, height: H } = this.scale
-    this._charId = data.charId || 'mikenomaru'
-    this._mapId  = data.mapId  || 'bamboo_village'
-    const mapDef = MAPS[this._mapId]
+    this._pos = { x: W / 2, y: H / 2 }
 
-    this._mp = new MetaProgress()
-    const bonuses = this._mp.getStatBonuses()
+    // 劍氣（在角色下層，預設隱藏）
+    this._aura = this.add.image(W / 2, H / 2, 'aura', 0)
+      .setDisplaySize(this._dW.aura * AURA_SCALE, this._dH * AURA_SCALE)
+      .setDepth(9)
+      .setAlpha(0)
 
-    // Tilemap background (tiled)
-    for (let tx = 0; tx < W; tx += 16)
-      for (let ty = 0; ty < H; ty += 16)
-        this.add.image(tx, ty, 'tile_grass').setOrigin(0).setDepth(0)
+    // 角色（在劍氣上層）
+    this._sprite = this.add.image(W / 2, H / 2, 'idle', 0)
+      .setDisplaySize(this._dW.idle, this._dH)
+      .setDepth(10)
+  }
 
-    // Player
-    this._player = new Player(this, W/2, H/2, this._charId, bonuses)
+  // ─── Input ─────────────────────────────────────────────────────────────────
 
-    // Enemies pool
-    this._enemies = this.physics.add.group({
-      classType: Enemy, maxSize: MAX_ENEMIES, runChildUpdate: false,
+  _setupKeyboard() {
+    this._keys = this.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT')
+  }
+
+  _setupTouch() {
+    this._touch = { active: false, startX: 0, startY: 0, dx: 0, dy: 0 }
+    this._joyBase = this.add.circle(0, 0, 55, 0x000000, 0.15).setDepth(100).setVisible(false)
+    this._joyKnob = this.add.circle(0, 0, 28, 0x000000, 0.30).setDepth(101).setVisible(false)
+
+    this.input.on('pointerdown', (p) => {
+      this._touch.active = true
+      this._touch.startX = p.x; this._touch.startY = p.y
+      this._touch.dx = 0; this._touch.dy = 0
+      this._joyBase.setPosition(p.x, p.y).setVisible(true)
+      this._joyKnob.setPosition(p.x, p.y).setVisible(true)
     })
-    for (let i = 0; i < MAX_ENEMIES; i++) this._enemies.add(new Enemy(this, 0, 0), true)
-
-    // Weapons
-    const charDef = CHARACTERS[this._charId]
-    this._weapons = [ new WEAPON_CLASSES[charDef.startWeapon](this, this._player) ]
-
-    // Systems
-    this._wave    = new WaveManager(mapDef)
-    this._upgrade = new UpgradeSystem()
-    this._vfx     = new VFX(this)
-
-    // HUD
-    this._buildHUD(W, H)
-
-    // Physics: enemies damage player
-    this.physics.add.overlap(this._player, this._enemies, (player, enemy) => {
-      if (!enemy.active) return
-      player.takeDamage(enemy.damage, this._enemies, this)
-      this._updateHpBar()
+    this.input.on('pointermove', (p) => {
+      if (!this._touch.active) return
+      const dx = p.x - this._touch.startX
+      const dy = p.y - this._touch.startY
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      const maxR = 55, ratio = dist > maxR ? maxR / dist : 1
+      this._touch.dx = (dx / maxR) * ratio
+      this._touch.dy = (dy / maxR) * ratio
+      this._joyKnob.setPosition(this._touch.startX + dx * ratio, this._touch.startY + dy * ratio)
     })
-
-    // Spawn timer
-    this._spawnTimer = 0
-    this._elapsed    = 0  // seconds
-    this._kills      = 0
-    this._souls      = 0
-    this._paused     = false
-    this._gameOver   = false
-    this._upgradePending = 0
-
-    // Pause key
-    this.input.keyboard.on('keydown-P', () => this._togglePause())
-    this.input.keyboard.on('keydown-ESC', () => this._togglePause())
+    this.input.on('pointerup', () => {
+      this._touch.active = false; this._touch.dx = 0; this._touch.dy = 0
+      this._joyBase.setVisible(false); this._joyKnob.setVisible(false)
+    })
   }
 
-  _buildHUD(W, H) {
-    // HP bar
-    this._hpBarBg   = this.add.rectangle(60, 8, 100, 7, 0x333333).setOrigin(0, 0.5).setDepth(50).setScrollFactor(0)
-    this._hpBarFill = this.add.rectangle(60, 8, 100, 7, 0xe03030).setOrigin(0, 0.5).setDepth(51).setScrollFactor(0)
-    this.add.text(10, 4, '❤', { fontSize: '8px' }).setDepth(52).setScrollFactor(0)
+  // ─── State machine ─────────────────────────────────────────────────────────
 
-    // XP bar
-    this._xpBarBg   = this.add.rectangle(0, H, W, 3, 0x333333).setOrigin(0, 1).setDepth(50).setScrollFactor(0)
-    this._xpBarFill = this.add.rectangle(0, H, 0, 3, 0x4080ff).setOrigin(0, 1).setDepth(51).setScrollFactor(0)
-
-    // Timer
-    this._timerTxt = this.add.text(W/2, 6, '00:00', {
-      fontSize: '8px', color: '#f0d040', fontFamily: 'monospace'
-    }).setOrigin(0.5, 0).setDepth(52).setScrollFactor(0)
-
-    // Level
-    this._levelTxt = this.add.text(W - 8, 6, 'Lv.1', {
-      fontSize: '7px', color: '#f0d040', fontFamily: 'monospace'
-    }).setOrigin(1, 0).setDepth(52).setScrollFactor(0)
-
-    // Weapon slots
-    this._weaponSlots = []
-    for (let i = 0; i < 6; i++) {
-      const slot = this.add.rectangle(8 + i * 20, H - 14, 16, 16, 0x1a1a2e)
-        .setOrigin(0, 0.5).setDepth(50).setScrollFactor(0)
-      this._weaponSlots.push(slot)
-    }
+  _setState(next) {
+    if (this._state === next) return
+    this._state = next
+    if (next === 'idle') { this._idleFrame = 0; this._idleTimer = 0 }
+    if (next === 'run')  { this._runFrame  = 0; this._runTimer  = 0 }
   }
 
-  _updateHpBar() {
-    const pct = this._player.hp / this._player.maxHp
-    this._hpBarFill.width = 100 * pct
+  _triggerAura() {
+    this._auraActive = true
+    this._auraFrame  = 0
+    this._auraTimer  = 0
+    this.tweens.killTweensOf(this._aura)
+    // 淡入 → 停留 → 淡出
+    this.tweens.chain({
+      targets: this._aura,
+      tweens: [
+        { alpha: 1, duration: AURA_FADE, ease: 'Sine.In' },
+        { alpha: 1, duration: AURA_DURATION - AURA_FADE * 2 },
+        { alpha: 0, duration: AURA_FADE, ease: 'Sine.Out',
+          onComplete: () => { this._auraActive = false } },
+      ],
+    })
   }
 
-  _updateXpBar() {
-    const pct = this._player.xp / this._player.xpToNext
-    this._xpBarFill.width = this.scale.width * pct
+  _isMoving() {
+    const k = this._keys
+    return k.W.isDown || k.A.isDown || k.S.isDown || k.D.isDown ||
+           k.UP.isDown || k.DOWN.isDown || k.LEFT.isDown || k.RIGHT.isDown ||
+           (this._touch.active && (Math.abs(this._touch.dx) > 0.1 || Math.abs(this._touch.dy) > 0.1))
   }
 
-  _spawnEnemy(enemyId, hpOverride) {
+  // ─── Update ────────────────────────────────────────────────────────────────
+
+  update(_, delta) {
+    const dt = delta / 1000
     const { width: W, height: H } = this.scale
-    const side = Phaser.Math.Between(0, 3)
-    let x, y
-    if (side === 0)      { x = Phaser.Math.Between(0, W); y = -20 }
-    else if (side === 1) { x = W + 20; y = Phaser.Math.Between(0, H) }
-    else if (side === 2) { x = Phaser.Math.Between(0, W); y = H + 20 }
-    else                 { x = -20; y = Phaser.Math.Between(0, H) }
+    const k = this._keys
 
-    const enemy = this._enemies.getFirstDead(false)
-    if (enemy) {
-      const baseHp = ENEMIES[enemyId]?.hp ?? 300
-      const actualHp = hpOverride != null ? baseHp * hpOverride : undefined
-      enemy.spawn(x, y, enemyId || 'oni_soldier', actualHp)
+    // Input
+    let vx = 0, vy = 0
+    if (k.A.isDown || k.LEFT.isDown)  vx -= 1
+    if (k.D.isDown || k.RIGHT.isDown) vx += 1
+    if (k.W.isDown || k.UP.isDown)    vy -= 1
+    if (k.S.isDown || k.DOWN.isDown)  vy += 1
+    if (this._touch.active) { vx += this._touch.dx; vy += this._touch.dy }
+    const len = Math.sqrt(vx * vx + vy * vy)
+    if (len > 1) { vx /= len; vy /= len }
+
+    // Move
+    const half = 48
+    this._pos.x = Phaser.Math.Clamp(this._pos.x + vx * SPEED * dt, half, W - half)
+    this._pos.y = Phaser.Math.Clamp(this._pos.y + vy * SPEED * dt, half, H - half)
+
+    // Flip
+    if (vx > 0.05)       { this._facing = 1;  this._sprite.setFlipX(false) }
+    else if (vx < -0.05) { this._facing = -1; this._sprite.setFlipX(true)  }
+
+    // State transitions
+    this._setState(this._isMoving() ? 'run' : 'idle')
+
+    // Advance frames
+    let sheetKey, frameIdx
+    if (this._state === 'run') {
+      this._runTimer += delta
+      if (this._runTimer >= 1000 / RUN_FPS) {
+        this._runTimer -= 1000 / RUN_FPS
+        this._runFrame = (this._runFrame + 1) % RUN_FRAME_COUNT
+      }
+      sheetKey = 'run'; frameIdx = this._runFrame
+    } else {
+      this._idleTimer += delta
+      if (this._idleTimer >= 1000 / IDLE_FPS) {
+        this._idleTimer -= 1000 / IDLE_FPS
+        this._idleFrame = (this._idleFrame + 1) % IDLE_FRAME_COUNT
+      }
+      sheetKey = 'idle'; frameIdx = this._idleFrame
     }
-  }
 
-  _togglePause() {
-    if (this._gameOver) return
-    this._paused = !this._paused
-    if (this._paused) this.scene.launch('PauseScene', { gameScene: this })
-    else this.scene.stop('PauseScene')
-  }
-
-  update(time, delta) {
-    if (this._paused) return
-    if (this._player.isDead && !this._gameOver) { this._onDeath(); return }
-
-    this._player.update()
-
-    const dt = delta
-    this._elapsed += delta / 1000
-
-    // Wave boss check (every second)
-    const elapsedInt = Math.floor(this._elapsed)
-    const bossEntry = this._wave.checkAndTrigger(elapsedInt)
-    if (bossEntry && !this._wave.activeBoss) {
-      const count = bossEntry.count || 1
-      for (let i = 0; i < count; i++) this._spawnEnemy(bossEntry.boss, bossEntry.hpMult)
-      this._wave.activeBoss = bossEntry
-    }
-
-    // Regular spawn
-    if (!this._wave.isFinalBossActive) {
-      this._spawnTimer += delta
-      const activeCount = this._enemies.countActive()
-      if (this._spawnTimer >= this._wave.currentSpawnInterval && activeCount < MAX_ENEMIES) {
-        this._spawnTimer = 0
-        const mapDef = MAPS[this._mapId]
-        const id = mapDef.enemies[Phaser.Math.Between(0, mapDef.enemies.length - 1)]
-        this._spawnEnemy(id)
+    // Advance aura frames（只在顯示期間推進）
+    if (this._auraActive) {
+      this._auraTimer += delta
+      if (this._auraTimer >= 1000 / AURA_FPS) {
+        this._auraTimer -= 1000 / AURA_FPS
+        this._auraFrame = (this._auraFrame + 1) % AURA_FRAME_COUNT
       }
     }
 
-    // Update enemies
-    this._enemies.getChildren().forEach(e => { if (e.active) e.update(this._player, dt) })
-
-    // Update weapons
-    this._weapons.forEach(w => {
-      if (w.update) w.update(dt, this._enemies)
-      // Check kunai hits
-      if (w.group) {
-        this.physics.overlap(w.group, this._enemies, (proj, enemy) => {
-          if (!proj.active || !enemy.active) return
-          if (proj._hit?.has(enemy)) return
-          proj._hit?.add(enemy)
-          const killed = enemy.takeDamage(proj._damage || 10)
-          this._vfx.weaponHit(enemy.x, enemy.y)
-          if (killed) this._onEnemyKilled(enemy)
-          proj._pierce = (proj._pierce || 1) - 1
-          if (proj._pierce <= 0) { proj.setActive(false).setVisible(false) }
-        })
-      }
-    })
-
-    // Check boss killed
-    if (this._wave.activeBoss) {
-      const bossAlive = this._enemies.getChildren().some(e => e.active && e._isBoss)
-      if (!bossAlive) {
-        const wasFinal = this._wave.isFinalBossActive
-        this._wave.onBossKilled()
-        if (wasFinal && !this._gameOver) this._endRun(true)
-      }
-    }
-
-    // Timer HUD
-    const mins = Math.floor(this._elapsed / 60).toString().padStart(2, '0')
-    const secs = Math.floor(this._elapsed % 60).toString().padStart(2, '0')
-    this._timerTxt.setText(`${mins}:${secs}`)
-    this._levelTxt.setText(`Lv.${this._player.level}`)
-    this._updateXpBar()
-  }
-
-  _onEnemyKilled(enemy) {
-    this._kills++
-    this._souls += enemy.enemyDef?.souls || 1
-    this._vfx.enemyDeath(enemy.x, enemy.y, enemy._isBoss)
-
-    const leveled = this._player.gainXp(enemy.enemyDef?.xp || 5)
-    if (leveled) {
-      this._vfx.levelUp(this._player.x, this._player.y)
-      this._levelTxt.setText(`Lv.${this._player.level}`)
-      this._upgradePending++
-      if (this._upgradePending === 1) this._openUpgrade()
-    }
-    this._updateHpBar()
-  }
-
-  _openUpgrade() {
-    this._paused = true
-    const cards = this._upgrade.drawCards({
-      luck: this._player.luck,
-      weapons: this._weapons.map(w => ({ id: w.id, level: w.level })),
-    })
-    this.scene.launch('UpgradeScene', {
-      cards,
-      onChoice: (card) => {
-        this._applyUpgrade(card)
-        this._upgradePending--
-        if (this._upgradePending > 0) {
-          this._openUpgrade()
-        } else {
-          this._paused = false
-          this.scene.stop('UpgradeScene')
-        }
-      },
-    })
-  }
-
-  _applyUpgrade(card) {
-    if (card.type === 'weapon') {
-      const existing = this._weapons.find(w => w.id === card.id)
-      if (existing) { existing.levelUp(); return }
-      const WeaponClass = WEAPON_CLASSES[card.id]
-      if (WeaponClass) this._weapons.push(new WeaponClass(this, this._player))
-    }
-    if (card.type === 'passive' && card.effect) {
-      const e = card.effect
-      if (e.type === 'hp')    { this._player.maxHp += e.value; this._player.hp = Math.min(this._player.hp + e.value, this._player.maxHp) }
-      if (e.type === 'speed') this._player.speed += e.value
-      if (e.type === 'atk')   this._player.atkMult += e.value
-      if (e.type === 'luck')  this._player.luck += e.value
-      if (e.type === 'cd')    this._weapons.forEach(w => { if (typeof w.cooldown === 'number') w.cooldown *= (1 - e.value) })
-    }
-    this._updateHpBar()
-  }
-
-  _onDeath() {
-    this._endRun(false)
-  }
-
-  _endRun(survived) {
-    this._gameOver = true
-    this._mp.addSouls(this._souls)
-    this._mp.data.stats.totalRuns++
-    this._mp.data.stats.totalKills += this._kills
-    if (this._elapsed > this._mp.data.stats.bestTime) this._mp.data.stats.bestTime = Math.floor(this._elapsed)
-    this._mp.save()
-    this.scene.start('ResultScene', {
-      survived, elapsed: Math.floor(this._elapsed), kills: this._kills, souls: this._souls,
-    })
+    // Apply every frame (single source of truth)
+    this._aura
+      .setTexture('aura', this._auraFrame)
+      .setDisplaySize(this._dW.aura * AURA_SCALE, this._dH * AURA_SCALE)
+      .setPosition(this._pos.x, this._pos.y)
+    this._sprite
+      .setTexture(sheetKey, frameIdx)
+      .setDisplaySize(this._dW[sheetKey], this._dH)
+      .setPosition(this._pos.x, this._pos.y)
   }
 }
