@@ -180,19 +180,24 @@ export default class GameScene extends Phaser.Scene {
 
     // Orbit shields (mechanical affix)
     if (this._orbitShields.length > 0) {
+      const RING_RADIUS = 60
       const now = this.time.now
       for (const shield of this._orbitShields) {
-        shield.angle = (shield.angle + 2 * delta / 16) % 360
-        const rad = Phaser.Math.DegToRad(shield.angle)
-        const sx  = px + Math.cos(rad) * 60
-        const sy  = py + Math.sin(rad) * 60
-        shield.gfx.setPosition(sx, sy)
+        // Redraw ring each frame centered on player
+        shield.gfx.clear()
+        shield.gfx.lineStyle(3, 0xffdd44, 1)
+        shield.gfx.strokeCircle(px, py, RING_RADIUS)
+        // Inner glow fill
+        shield.gfx.fillStyle(0xffdd44, 0.08)
+        shield.gfx.fillCircle(px, py, RING_RADIUS)
+
+        // Damage any enemy within ring radius
         this._enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
-          if (Phaser.Math.Distance.Between(sx, sy, e.x, e.y) < 18) {
+          if (Phaser.Math.Distance.Between(px, py, e.x, e.y) < RING_RADIUS + 8) {
             const last = shield.damageCd.get(e) || 0
             if (now - last >= 200) {
               shield.damageCd.set(e, now)
-              Enemy.takeDamage(e, 1.2, sx, sy, this._affixes)
+              Enemy.takeDamage(e, 1.2, px, py, this._affixes)
             }
           }
         })
@@ -432,11 +437,19 @@ export default class GameScene extends Phaser.Scene {
   }
 
   _addOrbitShield() {
-    const offset = this._orbitShields.length * 120
+    const ring = this.add.graphics().setDepth(7)
+    // Pulse alpha 0.3 ↔ 0.9 continuously
+    this.tweens.add({
+      targets: ring,
+      alpha: { from: 0.3, to: 0.9 },
+      yoyo: true,
+      repeat: -1,
+      duration: 600,
+      ease: 'Sine.easeInOut',
+    })
     this._orbitShields.push({
-      angle:    offset,
+      gfx:      ring,
       damageCd: new Map(),
-      gfx:      this.add.circle(0, 0, 10, 0x88ccff, 0.9).setDepth(7),
     })
   }
 
