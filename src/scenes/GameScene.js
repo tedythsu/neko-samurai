@@ -49,7 +49,7 @@ export default class GameScene extends Phaser.Scene {
       (proj, enemy) => {
         if (proj.hitSet.has(enemy)) return
         proj.hitSet.add(enemy)
-        Enemy.takeDamage(enemy, proj.damage)
+        Enemy.takeDamage(enemy, proj.damage, proj.x, proj.y)
         if (!proj.penetrate) proj.disableBody(true, true)
       }
     )

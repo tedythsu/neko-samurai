@@ -65,7 +65,7 @@ export default {
 function _nearestEnemies(enemies, x, y, count) {
   return enemies
     .getChildren()
-    .filter(e => e.active)
+    .filter(e => e.active && !e.dying)
     .sort((a, b) =>
       Phaser.Math.Distance.Between(x, y, a.x, a.y) -
       Phaser.Math.Distance.Between(x, y, b.x, b.y)
