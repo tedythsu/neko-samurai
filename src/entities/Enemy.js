@@ -64,18 +64,23 @@ export default class Enemy {
       const frozen  = sprite._statusEffects && sprite._statusEffects.frozen.active
       const chilled = sprite._statusEffects && sprite._statusEffects.chill.active
       const speed   = frozen ? 0 : (chilled ? CFG.ENEMY_SPEED * 0.5 : CFG.ENEMY_SPEED)
-      sprite.scene.physics.moveToObject(sprite, player.sprite, speed)
+      // Frozen: skip moveToObject (avoids unnecessary physics call each frame).
+      // Note: knockback impulses still apply to frozen enemies by design.
+      if (speed > 0) sprite.scene.physics.moveToObject(sprite, player.sprite, speed)
     }
 
     sprite.setFlipX(player.x < sprite.x)
     if (sprite.damageCd > 0) sprite.damageCd -= delta
     Enemy.updateStatus(sprite, delta)
 
-    sprite._timer += delta
-    while (sprite._timer >= 1000 / 12) {
-      sprite._timer -= 1000 / 12
-      sprite._frame  = (sprite._frame + 1) % 36
-      sprite.setFrame(sprite._frame)
+    const frozen = sprite._statusEffects && sprite._statusEffects.frozen.active
+    if (!frozen) {
+      sprite._timer += delta
+      while (sprite._timer >= 1000 / 12) {
+        sprite._timer -= 1000 / 12
+        sprite._frame  = (sprite._frame + 1) % 36
+        sprite.setFrame(sprite._frame)
+      }
     }
   }
 
