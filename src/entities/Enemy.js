@@ -38,6 +38,12 @@ export default class Enemy {
     sprite._frame         = 0
     sprite._timer         = 0
     sprite.setAlpha(1).clearTint()
+    sprite._statusEffects = {
+      burn:   { stacks: 0, timer: 0, dps: 5 },
+      poison: { stacks: 0, timer: 0 },
+      chill:  { active: false, timer: 0 },
+      curse:  { active: false, timer: 0 },
+    }
     const frame0 = sprite.scene.textures.get('kisotsu-run').frames[0]
     const dH = 64
     const dW = Math.round(dH * frame0.realWidth / frame0.realHeight)
@@ -54,11 +60,13 @@ export default class Enemy {
     if (sprite.knockbackTimer > 0) {
       sprite.knockbackTimer -= delta
     } else {
-      sprite.scene.physics.moveToObject(sprite, player.sprite, CFG.ENEMY_SPEED)
+      const chilled = sprite._statusEffects && sprite._statusEffects.chill.active
+      sprite.scene.physics.moveToObject(sprite, player.sprite, chilled ? CFG.ENEMY_SPEED * 0.5 : CFG.ENEMY_SPEED)
     }
 
     sprite.setFlipX(player.x < sprite.x)
     if (sprite.damageCd > 0) sprite.damageCd -= delta
+    Enemy.updateStatus(sprite, delta)
 
     sprite._timer += delta
     while (sprite._timer >= 1000 / 12) {
@@ -66,6 +74,128 @@ export default class Enemy {
       sprite._frame  = (sprite._frame + 1) % 36
       sprite.setFrame(sprite._frame)
     }
+  }
+
+  static updateStatus(sprite, delta) {
+    const se = sprite._statusEffects
+    if (!se) return
+
+    const scene      = sprite.scene
+    const corrosion  = scene._resonances && scene._resonances.has('corrosion')
+    const corrMult   = corrosion ? 1.5 : 1.0
+
+    // Burn DoT
+    if (se.burn.stacks > 0 && se.burn.timer > 0) {
+      se.burn.timer -= delta
+      sprite.hp     -= (se.burn.dps || 5) * corrMult * (delta / 1000)
+      if (se.burn.timer <= 0) se.burn.stacks = 0
+      if (sprite.hp <= 0 && !sprite.dying) Enemy._triggerDeath(sprite)
+    }
+
+    // Poison DoT
+    if (se.poison.stacks > 0 && se.poison.timer > 0) {
+      se.poison.timer -= delta
+      sprite.hp       -= 3 * se.poison.stacks * corrMult * (delta / 1000)
+      if (se.poison.timer <= 0) se.poison.stacks = 0
+      if (sprite.hp <= 0 && !sprite.dying) Enemy._triggerDeath(sprite)
+    }
+
+    // Chill timer
+    if (se.chill.active) {
+      se.chill.timer -= delta
+      if (se.chill.timer <= 0) se.chill.active = false
+    }
+
+    // Curse timer
+    if (se.curse.active) {
+      se.curse.timer -= delta
+      if (se.curse.timer <= 0) se.curse.active = false
+    }
+
+    // Update visible tint based on status priority
+    Enemy._applyStatusTint(sprite)
+  }
+
+  static _applyStatusTint(sprite) {
+    if (sprite.dying)                                    { sprite.clearTint(); return }
+    const se = sprite._statusEffects
+    if (!se)                                             return
+    if (se.burn.stacks > 0 && se.burn.timer > 0)        { sprite.setTint(0xff6600); return }
+    if (se.poison.stacks > 0 && se.poison.timer > 0)    { sprite.setTint(0x44cc44); return }
+    if (se.chill.active)                                 { sprite.setTint(0x88ccff); return }
+    if (se.curse.active)                                 { sprite.setTint(0xaa44aa); return }
+    sprite.clearTint()
+  }
+
+  static _hasStatusTint(sprite) {
+    const se = sprite._statusEffects
+    if (!se) return false
+    return (se.burn.stacks > 0 && se.burn.timer > 0)   ||
+           (se.poison.stacks > 0 && se.poison.timer > 0) ||
+           se.chill.active || se.curse.active
+  }
+
+  static _triggerDeath(sprite) {
+    if (sprite.dying) return
+    const { x, y } = sprite
+    const scene     = sprite.scene
+
+    scene.events.emit('enemy-died', { x, y })
+    sprite.dying = true
+    sprite.clearTint()
+
+    // Resonance: explode_burn — burning enemies explode on death
+    if (scene._resonances && scene._resonances.has('explode_burn') &&
+        sprite._statusEffects && sprite._statusEffects.burn.stacks > 0) {
+      scene._enemies.getChildren()
+        .filter(e => e.active && !e.dying && e !== sprite &&
+          Phaser.Math.Distance.Between(x, y, e.x, e.y) < 60)
+        .forEach(e => Enemy.takeDamage(e, CFG.ENEMY_HP * 0.3, x, y, []))
+    }
+
+    // Resonance: dark_harvest — cursed enemies explode on death + heal
+    if (scene._resonances && scene._resonances.has('dark_harvest') &&
+        sprite._statusEffects && sprite._statusEffects.curse.active) {
+      scene._enemies.getChildren()
+        .filter(e => e.active && !e.dying && e !== sprite &&
+          Phaser.Math.Distance.Between(x, y, e.x, e.y) < 50)
+        .forEach(e => Enemy.takeDamage(e, 15, x, y, []))
+      if (scene._player) scene._player.heal(5)
+    }
+
+    // Delay physics disable so knockback plays out
+    scene.time.delayedCall(150, () => {
+      if (sprite.dying) sprite.body.enable = false
+    })
+
+    // Dust particle burst
+    const emitter = scene.add.particles(x, y, 'dust-particle', {
+      speed:    { min: 60, max: 220 },
+      angle:    { min: 0, max: 360 },
+      scale:    { start: 1.2, end: 0 },
+      alpha:    { start: 1,   end: 0 },
+      lifespan: 500,
+      quantity: 12,
+      tint:     [0x9B8765, 0x7A6245, 0x5C4033, 0xC8A87A],
+      emitting: false,
+    })
+    emitter.setDepth(7)
+    emitter.explode(12)
+    scene.time.delayedCall(600, () => emitter.destroy())
+
+    // Fade out then return to pool
+    scene.tweens.add({
+      targets:  sprite,
+      alpha:    0,
+      duration: 100,
+      ease:     'Linear',
+      onComplete: () => {
+        if (sprite._statusEffects) sprite._statusEffects.poison.stacks = 0
+        sprite.dying = false
+        sprite.setAlpha(1)
+        sprite.disableBody(true, true)
+      },
+    })
   }
 
   /**
@@ -107,10 +237,12 @@ export default class Enemy {
     }
 
     // Hit flash (red tint, 120ms)
-    sprite.setTint(0xff4444)
-    sprite.scene.time.delayedCall(120, () => {
-      if (sprite.active && !sprite.dying) sprite.clearTint()
-    })
+    if (!Enemy._hasStatusTint(sprite)) {
+      sprite.setTint(0xff4444)
+      sprite.scene.time.delayedCall(120, () => {
+        if (sprite.active && !sprite.dying) Enemy._applyStatusTint(sprite)
+      })
+    }
 
     // Hit spark burst
     const sparks = sprite.scene.add.particles(sprite.x, sprite.y, 'dust-particle', {
@@ -128,43 +260,7 @@ export default class Enemy {
     sprite.scene.time.delayedCall(400, () => sparks.destroy())
 
     if (sprite.hp <= 0) {
-      const { x, y } = sprite
-      sprite.scene.events.emit('enemy-died', { x, y })
-      sprite.dying = true
-      sprite.clearTint()
-
-      // Delay physics disable so knockback velocity plays out first
-      sprite.scene.time.delayedCall(150, () => {
-        if (sprite.dying) sprite.body.enable = false
-      })
-
-      // Dust particle burst
-      const emitter = sprite.scene.add.particles(x, y, 'dust-particle', {
-        speed:    { min: 60, max: 220 },
-        angle:    { min: 0, max: 360 },
-        scale:    { start: 1.2, end: 0 },
-        alpha:    { start: 1,   end: 0 },
-        lifespan: 500,
-        quantity: 12,
-        tint:     [0x9B8765, 0x7A6245, 0x5C4033, 0xC8A87A],
-        emitting: false,
-      })
-      emitter.setDepth(7)
-      emitter.explode(12)
-      sprite.scene.time.delayedCall(600, () => emitter.destroy())
-
-      // Quick sprite fade-out (100ms) then return to pool
-      sprite.scene.tweens.add({
-        targets:  sprite,
-        alpha:    0,
-        duration: 100,
-        ease:     'Linear',
-        onComplete: () => {
-          sprite.dying = false
-          sprite.setAlpha(1)
-          sprite.disableBody(true, true)
-        },
-      })
+      Enemy._triggerDeath(sprite)
       return true
     }
     return false
