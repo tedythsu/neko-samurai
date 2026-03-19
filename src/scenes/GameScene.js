@@ -422,15 +422,29 @@ export default class GameScene extends Phaser.Scene {
       .filter(u => !u.oneTime || !this._playerUpgradesOwned.has(u.id))
       .map(u => ({ ...u, target: 'player' })))
 
-    // Safety: if somehow pool is still empty, force add repeatable weapon upgrades
-    // (prevents infinite _upgrading state)
-    if (pool.length === 0) {
-      pool.push(...PLAYER_UPGRADES
+    // NOTE: Tier-1 elemental affixes are now one-time only (filtered above). This intentionally
+    // removes stacking for all tier-1 affixes including `lucky`. Tier-2 affixes (e.g. lucky2,
+    // burn2) provide the next power step. Dead stacking branches in affix files are harmless.
+
+    // Deduplicate by id+weaponId before shuffling to prevent duplicate choices
+    const seen    = new Set()
+    const deduped = pool.filter(u => {
+      const key = u.id + (u.weaponId ?? '')
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+
+    // Safety: pool should never be empty with current upgrade definitions, but
+    // if it somehow is, fall back to repeatable player upgrades
+    if (deduped.length === 0) {
+      return PLAYER_UPGRADES
         .filter(u => !u.oneTime)
-        .map(u => ({ ...u, target: 'player' })))
+        .map(u => ({ ...u, target: 'player' }))
+        .slice(0, 3)
     }
 
-    return Phaser.Utils.Array.Shuffle(pool).slice(0, 3)
+    return Phaser.Utils.Array.Shuffle(deduped).slice(0, 3)
   }
 
   _applyAffix(affix) {
