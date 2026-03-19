@@ -104,13 +104,13 @@ export default class GameScene extends Phaser.Scene {
       (proj, enemy) => {
         if (proj.hitSet.has(enemy)) return
         proj.hitSet.add(enemy)
-        Enemy.takeDamage(enemy, proj.damage, proj.x, proj.y, this._affixes)
+        Enemy.takeDamage(enemy, proj.damage, proj.x, proj.y, this._affixes) // TODO Task 5: receiver will consume affixes
         // Explosive projectiles (Ofuda, Homura)
         if (proj._explodeRadius) {
           this._enemies.getChildren()
             .filter(e => e.active && !e.dying && e !== enemy &&
               Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y) < proj._explodeRadius)
-            .forEach(e => Enemy.takeDamage(e, proj.damage * (proj._explodeMult || 1), proj.x, proj.y, this._affixes))
+            .forEach(e => Enemy.takeDamage(e, proj.damage * (proj._explodeMult || 1), proj.x, proj.y, this._affixes)) // TODO Task 5
         }
         if (!proj.penetrate) proj._spent = true
       }
@@ -166,7 +166,7 @@ export default class GameScene extends Phaser.Scene {
             const last = shield.damageCd.get(e) || 0
             if (now - last >= 200) {
               shield.damageCd.set(e, now)
-              Enemy.takeDamage(e, 1.2, sx, sy, this._affixes)
+              Enemy.takeDamage(e, 1.2, sx, sy, this._affixes) // TODO Task 5
             }
           }
         })
@@ -281,11 +281,13 @@ export default class GameScene extends Phaser.Scene {
       this._xpToNext = xpThreshold(this._level)
       this._upgrading = true
       this.events.once('upgrade-chosen', (upgrade) => {
-        if (upgrade.target === 'weapon') upgrade.apply(this._weapons[0].stats)
+        // TODO Task 3: route by weaponId, _applyAffix(), _applyMechanical(), new_weapon target
+      if (upgrade.target === 'weapon') upgrade.apply(this._weapons[0].stats)
         else upgrade.apply(this._player, this)
         this._upgrading = false
         this.scene.resume('GameScene')
       })
+      // TODO Task 3: replace with _buildUpgradePool() for multi-weapon + affix pool
       const weaponUps = this._weapons[0].weapon.upgrades.map(u => ({ ...u, target: 'weapon', weaponId: this._weapons[0].weapon.id }))
       const playerUps = PLAYER_UPGRADES.map(u => ({ ...u, target: 'player' }))
       const pool = Phaser.Utils.Array.Shuffle([...weaponUps, ...playerUps])
