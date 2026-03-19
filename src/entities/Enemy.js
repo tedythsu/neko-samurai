@@ -87,7 +87,7 @@ export default class Enemy {
     // Burn DoT
     if (se.burn.stacks > 0 && se.burn.timer > 0) {
       se.burn.timer -= delta
-      sprite.hp     -= (se.burn.dps || 5) * corrMult * (delta / 1000)
+      sprite.hp     -= se.burn.dps * corrMult * (delta / 1000)
       if (se.burn.timer <= 0) se.burn.stacks = 0
       if (sprite.hp <= 0 && !sprite.dying) Enemy._triggerDeath(sprite)
     }
@@ -190,7 +190,14 @@ export default class Enemy {
       duration: 100,
       ease:     'Linear',
       onComplete: () => {
-        if (sprite._statusEffects) sprite._statusEffects.poison.stacks = 0
+        // Full reset — activate() will re-initialize on next spawn, but clear here
+        // to prevent stale state if any code path bypasses activate()
+        if (sprite._statusEffects) {
+          sprite._statusEffects.burn.stacks   = 0
+          sprite._statusEffects.poison.stacks = 0
+          sprite._statusEffects.chill.active  = false
+          sprite._statusEffects.curse.active  = false
+        }
         sprite.dying = false
         sprite.setAlpha(1)
         sprite.disableBody(true, true)
