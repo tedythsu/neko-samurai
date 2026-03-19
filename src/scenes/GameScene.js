@@ -188,7 +188,7 @@ export default class GameScene extends Phaser.Scene {
             const last = shield.damageCd.get(e) || 0
             if (now - last >= 200) {
               shield.damageCd.set(e, now)
-              Enemy.takeDamage(e, 1.2, sx, sy, this._affixes) // TODO Task 5
+              Enemy.takeDamage(e, 1.2, sx, sy, this._affixes)
             }
           }
         })
