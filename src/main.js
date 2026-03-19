@@ -1,14 +1,18 @@
 import Phaser from 'phaser'
-import GameScene from './scenes/GameScene.js'
+import BootScene     from './scenes/BootScene.js'
+import GameScene     from './scenes/GameScene.js'
+import UpgradeScene  from './scenes/UpgradeScene.js'
 
-const config = {
+new Phaser.Game({
   type: Phaser.AUTO,
-  backgroundColor: '#ffffff',
+  backgroundColor: '#1a1a2e',
+  physics: {
+    default: 'arcade',
+    arcade: { gravity: { y: 0 }, debug: false },
+  },
   scale: {
     mode: Phaser.Scale.RESIZE,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [GameScene],
-}
-
-export default new Phaser.Game(config)
+  scene: [BootScene, GameScene, UpgradeScene],
+})
