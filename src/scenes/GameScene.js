@@ -3,7 +3,7 @@ import Phaser from 'phaser'
 import Player   from '../entities/Player.js'
 import Enemy    from '../entities/Enemy.js'
 import { CFG, randomEdgePoint, xpThreshold, PLAYER_UPGRADES } from '../config.js'
-import { ALL_AFFIXES, ALL_MECHANICAL, checkResonances } from '../affixes/index.js'
+import { ALL_AFFIXES, ALL_MECHANICAL, ALL_TIER2_AFFIXES, checkResonances } from '../affixes/index.js'
 import { ALL_WEAPONS } from '../weapons/index.js'
 
 export default class GameScene extends Phaser.Scene {
@@ -101,13 +101,13 @@ export default class GameScene extends Phaser.Scene {
     this._hudWeaponIcons  = []
     this._lastWeaponCount = 0
 
-    // Affix dot row (pre-create up to 8 slots)
-    this._hudAffixDots = Array.from({ length: 8 }, (_, i) =>
-      this.add.rectangle(16 + i * 20, 72, 14, 14, 0x444466)
+    // Affix dot row (pre-create up to 16 slots)
+    this._hudAffixDots = Array.from({ length: 16 }, (_, i) =>
+      this.add.rectangle(16 + i * 18, 72, 12, 12, 0x444466)
         .setScrollFactor(0).setDepth(200).setAlpha(0)
     )
-    this._hudAffixLabels = Array.from({ length: 8 }, (_, i) =>
-      this.add.text(16 + i * 20, 72, '', { fontSize: '9px', color: '#ffffff' })
+    this._hudAffixLabels = Array.from({ length: 16 }, (_, i) =>
+      this.add.text(16 + i * 18, 72, '', { fontSize: '8px', color: '#ffffff' })
         .setScrollFactor(0).setDepth(201).setOrigin(0.5)
         .setAlpha(0)
     )
@@ -272,14 +272,20 @@ export default class GameScene extends Phaser.Scene {
 
     // Affix dot row
     const affixIds   = [...this._affixCounts.keys()]
-    const affixColor = { burn: 0xff6600, poison: 0x44cc44, chain: 0xffff00,
-                         chill: 0x88ccff, curse: 0xaa44aa, leech: 0xff4488,
-                         burst: 0xff4400, lucky: 0xffdd88 }
+    const affixColor = {
+      burn: 0xff6600, poison: 0x44cc44, chain: 0xffff00,
+      chill: 0x88ccff, curse: 0xaa44aa, leech: 0xff4488,
+      burst: 0xff4400, lucky: 0xffdd88,
+      // Tier-2 — brighter/more saturated versions of parent
+      burn2: 0xff3300, poison2: 0x00ff44, chain2: 0xffff00,
+      chill2: 0x44aaff, curse2: 0xcc00cc, leech2: 0xff0066,
+      burst2: 0xff6600, lucky2: 0xffaa00,
+    }
     this._hudAffixDots.forEach((dot, i) => {
       if (i < affixIds.length) {
         const id = affixIds[i]
         dot.setFillStyle(affixColor[id] || 0x888888).setAlpha(1)
-        this._hudAffixLabels[i].setText(`${this._affixCounts.get(id)}`).setAlpha(1).setPosition(16 + i * 20, 72)
+        this._hudAffixLabels[i].setText(`${this._affixCounts.get(id)}`).setAlpha(1).setPosition(16 + i * 18, 72)
       } else {
         dot.setAlpha(0); this._hudAffixLabels[i].setAlpha(0)
       }
@@ -377,19 +383,26 @@ export default class GameScene extends Phaser.Scene {
   _buildUpgradePool() {
     const pool = []
 
-    // Weapon-specific upgrades for all active weapons
+    // Weapon-specific upgrades (always repeatable)
     for (const entry of this._weapons)
       pool.push(...(entry.weapon.upgrades ?? []).map(u => ({
-        ...u,
-        target:   'weapon',
-        weaponId: entry.weapon.id,
+        ...u, target: 'weapon', weaponId: entry.weapon.id,
       })))
 
-    // Elemental affixes
-    pool.push(...ALL_AFFIXES.map(a => ({ id: a.id, name: a.name, desc: a.desc, target: 'affix', affix: a })))
+    // Tier-1 elemental affixes — only show if not yet owned
+    pool.push(...ALL_AFFIXES
+      .filter(a => !this._affixCounts.has(a.id))
+      .map(a => ({ id: a.id, name: a.name, desc: a.desc, target: 'affix', affix: a })))
 
-    // Mechanical affixes
-    pool.push(...ALL_MECHANICAL.map(m => ({ ...m, target: 'mechanical' })))
+    // Tier-2 elemental affixes — only if parent owned AND tier-2 not yet owned
+    pool.push(...ALL_TIER2_AFFIXES
+      .filter(a => this._affixCounts.has(a.requires) && !this._affixCounts.has(a.id))
+      .map(a => ({ id: a.id, name: a.name, desc: a.desc, target: 'affix', affix: a })))
+
+    // Mechanical affixes — only if not yet owned
+    pool.push(...ALL_MECHANICAL
+      .filter(m => !this._mechanicalsOwned.has(m.id))
+      .map(m => ({ ...m, target: 'mechanical' })))
 
     // New weapon (if next slot is available)
     const nextSlotLevel = CFG.WEAPON_SLOT_LEVELS[this._weapons.length - 1]
@@ -404,8 +417,18 @@ export default class GameScene extends Phaser.Scene {
         })
     }
 
-    // Player upgrades (always present — prevents empty-pool deadlock if affix/weapon pools are empty)
-    pool.push(...PLAYER_UPGRADES.map(u => ({ ...u, target: 'player' })))
+    // Player upgrades — filter out already-owned one-time upgrades; non-one-time always present
+    pool.push(...PLAYER_UPGRADES
+      .filter(u => !u.oneTime || !this._playerUpgradesOwned.has(u.id))
+      .map(u => ({ ...u, target: 'player' })))
+
+    // Safety: if somehow pool is still empty, force add repeatable weapon upgrades
+    // (prevents infinite _upgrading state)
+    if (pool.length === 0) {
+      pool.push(...PLAYER_UPGRADES
+        .filter(u => !u.oneTime)
+        .map(u => ({ ...u, target: 'player' })))
+    }
 
     return Phaser.Utils.Array.Shuffle(pool).slice(0, 3)
   }
@@ -418,6 +441,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   _applyMechanical(mechanical) {
+    this._mechanicalsOwned.add(mechanical.id)
     if (mechanical.id === 'multishot') {
       for (const entry of this._weapons) {
         if (entry.stats.projectileCount !== undefined)
