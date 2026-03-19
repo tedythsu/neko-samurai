@@ -24,7 +24,18 @@ export default {
   fire(scene, _pool, fromX, fromY, stats, enemies, player, affixes = []) {
     const hitSet = new Set()
     let elapsed  = 0
-    const facingDeg = player.sprite.flipX ? 180 : 0
+    const activeEnemies = enemies.getChildren().filter(e => e.active && !e.dying)
+    let facingDeg
+    if (activeEnemies.length > 0) {
+      const nearest = activeEnemies.reduce((best, e) => {
+        const d = Phaser.Math.Distance.Between(fromX, fromY, e.x, e.y)
+        return d < best.d ? { e, d } : best
+      }, { e: null, d: Infinity }).e
+      facingDeg = Phaser.Math.RadToDeg(
+        Phaser.Math.Angle.Between(fromX, fromY, nearest.x, nearest.y))
+    } else {
+      facingDeg = player.sprite.flipX ? 180 : 0
+    }
 
     // Fan arc Graphics object
     const g = scene.add.graphics().setDepth(6)

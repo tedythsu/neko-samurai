@@ -42,7 +42,7 @@ export default {
       s.spawnX        = fromX
       s.spawnY        = fromY
       s.range         = stats.range
-      s.penetrate     = false
+      s.penetrate     = stats.penetrate ?? false
       s._target       = target
       s._explodeRadius = 60
       s._explodeMult   = 1.5
