@@ -9,8 +9,8 @@ export default {
 
   onHit(enemy, damage, scene) {
     if (Math.random() > 0.25) return
-    const count   = scene._affixCounts ? (scene._affixCounts.get('chain') || 1) : 1
-    const bounces = count   // 1/2/3 bounces for stacks 1/2/3
+    const hasChain2 = scene._affixCounts?.has('chain2')
+    const bounces   = hasChain2 ? 3 : (scene._affixCounts ? (scene._affixCounts.get('chain') || 1) : 1)
 
     const visited = [enemy]
     for (let b = 0; b < bounces; b++) {
