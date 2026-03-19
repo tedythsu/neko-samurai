@@ -3,12 +3,8 @@ import Phaser from 'phaser'
 import { CFG } from '../config.js'
 
 export default class Enemy {
-  /**
-   * Call once per scene to register the 'enemy-tex' texture.
-   * Must be called in GameScene.create() before creating the group.
-   */
-  // Slice the kisotsu-run spritesheet (6×6 grid) into numbered frames.
-  // Also generates the dust-particle texture used by the death effect.
+  // Slice kisotsu-run (6×6) into numbered frames and generate dust-particle texture.
+  // Call once in GameScene.create() before creating the enemy group.
   static createTexture(scene) {
     const tex = scene.textures.get('kisotsu-run')
     if (tex.has(0)) return   // already sliced (guard for scene restart)

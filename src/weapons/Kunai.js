@@ -66,9 +66,8 @@ function _nearestEnemies(enemies, x, y, count) {
   return enemies
     .getChildren()
     .filter(e => e.active && !e.dying)
-    .sort((a, b) =>
-      Phaser.Math.Distance.Between(x, y, a.x, a.y) -
-      Phaser.Math.Distance.Between(x, y, b.x, b.y)
-    )
+    .map(e => ({ e, d: Phaser.Math.Distance.Between(x, y, e.x, e.y) }))
+    .sort((a, b) => a.d - b.d)
     .slice(0, count)
+    .map(({ e }) => e)
 }

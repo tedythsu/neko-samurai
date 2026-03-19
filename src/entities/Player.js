@@ -34,8 +34,8 @@ export default class Player {
 
     // Touch joystick
     this._touch   = { active: false, startX: 0, startY: 0, dx: 0, dy: 0 }
-    this._joyBase = scene.add.circle(0, 0, 55, 0x000000, 0.15).setDepth(100).setVisible(false)
-    this._joyKnob = scene.add.circle(0, 0, 28, 0x000000, 0.30).setDepth(101).setVisible(false)
+    this._joyBase = scene.add.circle(0, 0, 55, 0x000000, 0.15).setDepth(100).setScrollFactor(0).setVisible(false)
+    this._joyKnob = scene.add.circle(0, 0, 28, 0x000000, 0.30).setDepth(101).setScrollFactor(0).setVisible(false)
     scene.input.on('pointerdown',  p  => this._onDown(p))
     scene.input.on('pointermove',  p  => this._onMove(p))
     scene.input.on('pointerup',    ()  => this._onUp())

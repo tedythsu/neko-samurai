@@ -35,12 +35,13 @@ export default class WeaponSelectScene extends Phaser.Scene {
       }).setOrigin(0.5)
 
       const s = weapon.baseStats
-      ;[
-        [`傷害  ${s.damage}`,            '#ff8888'],
-        [`射速  ${s.fireRate}ms`,        '#88ff88'],
-        [`彈數  ${s.projectileCount}`,   '#ffff88'],
-        [`射程  ${s.range}px`,           '#88ddff'],
-      ].forEach(([label, color], j) => {
+      const statLines = [
+        [`傷害  ${s.damage}`,                    '#ff8888'],
+        [`射速  ${s.fireRate}ms`,                '#88ff88'],
+        ...(s.projectileCount != null ? [[`彈數  ${s.projectileCount}`, '#ffff88']] : []),
+        [`射程  ${s.range}px`,                   '#88ddff'],
+      ]
+      statLines.forEach(([label, color], j) => {
         this.add.text(cx, cy - 30 + j * 22, label, { fontSize: '13px', color }).setOrigin(0.5)
       })
 

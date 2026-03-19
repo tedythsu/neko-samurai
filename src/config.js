@@ -48,9 +48,9 @@ export function randomEdgePoint(worldW, worldH, inset = 20) {
 
 export const PLAYER_UPGRADES = [
   { id: 'speed',  name: '疾風',      desc: '移速 +15%',
-    apply: (player /*, scene */) => { player.speed *= 1.15 } },
+    apply: (player) => { player.speed *= 1.15 } },
   { id: 'maxhp',  name: '武者の意志', desc: '最大HP +20%',
-    apply: (player /*, scene */) => { player.maxHp *= 1.20; player.heal(player.maxHp * 0.20) } },
+    apply: (player) => { player.maxHp *= 1.20; player.heal(player.maxHp * 0.20) } },
   { id: 'regen',  name: '忍の回復',  desc: '每5秒回復1 HP',
     apply: (player, scene) => {
       scene.time.addEvent({ delay: 5000, loop: true, callback: () => player.heal(1) })

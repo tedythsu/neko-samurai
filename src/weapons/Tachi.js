@@ -43,7 +43,7 @@ export default {
     const onUpdate = () => {
       slash.setPosition(player.x, player.y)
       enemies.getChildren()
-        .filter(e => e.active && !hitSet.has(e) &&
+        .filter(e => e.active && !e.dying && !hitSet.has(e) &&
           Phaser.Math.Distance.Between(player.x, player.y, e.x, e.y) < stats.range)
         .forEach(e => { hitSet.add(e); Enemy.takeDamage(e, stats.damage, player.x, player.y) })
     }

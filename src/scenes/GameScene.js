@@ -43,6 +43,9 @@ export default class GameScene extends Phaser.Scene {
         repeat:    -1,
       })
     }
+    const orbFrame = this.textures.get('musou').frames[0]
+    this._orbH = 24
+    this._orbW = Math.round(this._orbH * orbFrame.realWidth / orbFrame.realHeight)
 
     Enemy.createTexture(this)
     this._enemies = this.physics.add.group()
@@ -187,11 +190,8 @@ export default class GameScene extends Phaser.Scene {
   }
 
   _spawnOrb(ex, ey) {
-    const frame0 = this.textures.get('musou').frames[0]
-    const orbH   = 24
-    const orbW   = Math.round(orbH * frame0.realWidth / frame0.realHeight)
     const orb = this.add.sprite(ex, ey, 'musou', 0)
-      .setDisplaySize(orbW, orbH)
+      .setDisplaySize(this._orbW, this._orbH)
       .setDepth(4)
     orb.play('musou-spin')
 
