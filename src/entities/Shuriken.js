@@ -16,7 +16,6 @@ export default class Shuriken {
    * Each shuriken deactivates after travelling CFG.SHURIKEN_RANGE px.
    */
   static fire(scene, pool, fromX, fromY, count, damage) {
-    const baseAngle = Phaser.Math.Between(0, 359)  // random starting angle each burst
     for (let i = 0; i < count; i++) {
       let s = pool.getFirstDead(false)
       if (!s) {
@@ -30,7 +29,7 @@ export default class Shuriken {
       s.spawnX  = fromX
       s.spawnY  = fromY
 
-      const deg = baseAngle + (360 / count) * i
+      const deg = (360 / count) * i
       scene.physics.velocityFromAngle(deg, CFG.SHURIKEN_SPEED, s.body.velocity)
     }
   }
