@@ -8,8 +8,7 @@ export default class GameScene extends Phaser.Scene {
   constructor() { super('GameScene') }
 
   init(data) {
-    this._weapon      = data.weapon
-    this._weaponStats = { ...data.weapon.baseStats }
+    this._startWeapon = data.weapon
   }
 
   create() {
@@ -63,27 +62,14 @@ export default class GameScene extends Phaser.Scene {
       callbackScope: this,
     })
 
-    this._weapon.createTexture(this)
-    this._projectiles = this.physics.add.group({ maxSize: 60 })
+    // Multi-weapon state
+    this._weapons       = []
+    this._affixes       = []              // active affix objects (may have duplicates for stacks)
+    this._affixCounts   = new Map()       // id → pick count
+    this._resonances    = new Set()       // active resonance IDs
+    this._orbitShields  = []              // orbit_shield mechanical affix entries
 
-    this.physics.add.overlap(
-      this._projectiles,
-      this._enemies,
-      (proj, enemy) => {
-        if (proj.hitSet.has(enemy)) return
-        proj.hitSet.add(enemy)
-        Enemy.takeDamage(enemy, proj.damage, proj.x, proj.y)
-        if (!proj.penetrate) proj._spent = true   // defer — let all overlaps fire first
-      }
-    )
-
-    this.physics.world.on('worldbounds', (body) => {
-      if (body.gameObject && this._projectiles.contains(body.gameObject)) {
-        body.gameObject.disableBody(true, true)
-      }
-    })
-
-    this._fireTimer = 0
+    this._addWeapon(this._startWeapon)
 
     // XP / level system
     this._xp       = 0
@@ -108,27 +94,90 @@ export default class GameScene extends Phaser.Scene {
     this._elapsed = 0
   }
 
+  _addWeapon(weapon) {
+    weapon.createTexture(this)
+    const projectiles = this.physics.add.group({ maxSize: 60 })
+
+    this.physics.add.overlap(
+      projectiles,
+      this._enemies,
+      (proj, enemy) => {
+        if (proj.hitSet.has(enemy)) return
+        proj.hitSet.add(enemy)
+        Enemy.takeDamage(enemy, proj.damage, proj.x, proj.y, this._affixes)
+        // Explosive projectiles (Ofuda, Homura)
+        if (proj._explodeRadius) {
+          this._enemies.getChildren()
+            .filter(e => e.active && !e.dying && e !== enemy &&
+              Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y) < proj._explodeRadius)
+            .forEach(e => Enemy.takeDamage(e, proj.damage * (proj._explodeMult || 1), proj.x, proj.y, this._affixes))
+        }
+        if (!proj.penetrate) proj._spent = true
+      }
+    )
+
+    // NOTE: each _addWeapon() call stacks one more worldbounds listener.
+    // With up to 4 weapons this is 4 listeners — each checks its own group, so behavior is correct.
+    // On scene.restart() Phaser destroys the scene fully so listeners are cleaned up automatically.
+    this.physics.world.on('worldbounds', (body) => {
+      if (body.gameObject && projectiles.contains(body.gameObject)) {
+        body.gameObject.disableBody(true, true)
+      }
+    })
+
+    this._weapons.push({ weapon, stats: { ...weapon.baseStats }, timer: 0, projectiles })
+  }
+
   update(_, delta) {
     this._player.update(delta)
     this._enemies.getChildren().forEach(e => Enemy.update(e, this._player, delta))
 
-    this._fireTimer += delta
-    if (this._fireTimer >= this._weaponStats.fireRate) {
-      this._fireTimer = 0
-      this._weapon.fire(this, this._projectiles, this._player.x, this._player.y, this._weaponStats, this._enemies, this._player)
+    const px = this._player.x
+    const py = this._player.y
+
+    for (const entry of this._weapons) {
+      if (entry.stats.fireRate > 0) {
+        entry.timer += delta
+        if (entry.timer >= entry.stats.fireRate) {
+          entry.timer = 0
+          entry.weapon.fire(this, entry.projectiles, px, py, entry.stats, this._enemies, this._player, this._affixes)
+        }
+      }
+      entry.projectiles.getChildren().forEach(s => {
+        if (s._spent) { s._spent = false; s.disableBody(true, true); return }
+        entry.weapon.update(s)
+      })
+      if (entry.weapon.updateActive) {
+        entry.weapon.updateActive(entry, this, this._enemies, this._player, this._affixes, delta)
+      }
     }
-    this._projectiles.getChildren().forEach(s => {
-      if (s._spent) { s._spent = false; s.disableBody(true, true); return }
-      this._weapon.update(s)
-    })
+
+    // Orbit shields (mechanical affix)
+    if (this._orbitShields.length > 0) {
+      const now = this.time.now
+      for (const shield of this._orbitShields) {
+        shield.angle = (shield.angle + 2 * delta / 16) % 360
+        const rad = Phaser.Math.DegToRad(shield.angle)
+        const sx  = px + Math.cos(rad) * 60
+        const sy  = py + Math.sin(rad) * 60
+        shield.gfx.setPosition(sx, sy)
+        this._enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
+          if (Phaser.Math.Distance.Between(sx, sy, e.x, e.y) < 18) {
+            const last = shield.damageCd.get(e) || 0
+            if (now - last >= 200) {
+              shield.damageCd.set(e, now)
+              Enemy.takeDamage(e, 1.2, sx, sy, this._affixes)
+            }
+          }
+        })
+      }
+    }
 
     this._elapsed += delta
     this._hudTimer.setText(`${Math.floor(this._elapsed / 1000)}s`)
     this._drawHud()
 
     // Orb attract & collect
-    const px = this._player.x
-    const py = this._player.y
     for (let i = this._orbs.length - 1; i >= 0; i--) {
       const orb  = this._orbs[i]
       const dist = Phaser.Math.Distance.Between(px, py, orb.x, orb.y)
@@ -232,12 +281,12 @@ export default class GameScene extends Phaser.Scene {
       this._xpToNext = xpThreshold(this._level)
       this._upgrading = true
       this.events.once('upgrade-chosen', (upgrade) => {
-        if (upgrade.target === 'weapon') upgrade.apply(this._weaponStats)
+        if (upgrade.target === 'weapon') upgrade.apply(this._weapons[0].stats)
         else upgrade.apply(this._player, this)
         this._upgrading = false
         this.scene.resume('GameScene')
       })
-      const weaponUps = this._weapon.upgrades.map(u => ({ ...u, target: 'weapon' }))
+      const weaponUps = this._weapons[0].weapon.upgrades.map(u => ({ ...u, target: 'weapon', weaponId: this._weapons[0].weapon.id }))
       const playerUps = PLAYER_UPGRADES.map(u => ({ ...u, target: 'player' }))
       const pool = Phaser.Utils.Array.Shuffle([...weaponUps, ...playerUps])
       const choices = pool.slice(0, 3)
