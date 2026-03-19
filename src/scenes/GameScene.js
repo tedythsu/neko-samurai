@@ -280,21 +280,100 @@ export default class GameScene extends Phaser.Scene {
       this._level   += 1
       this._xpToNext = xpThreshold(this._level)
       this._upgrading = true
+
       this.events.once('upgrade-chosen', (upgrade) => {
-        // TODO Task 3: route by weaponId, _applyAffix(), _applyMechanical(), new_weapon target
-      if (upgrade.target === 'weapon') upgrade.apply(this._weapons[0].stats)
-        else upgrade.apply(this._player, this)
+        if (upgrade.target === 'weapon') {
+          const entry = this._weapons.find(e => e.weapon.id === upgrade.weaponId)
+          if (entry) upgrade.apply(entry.stats)
+        } else if (upgrade.target === 'affix') {
+          this._applyAffix(upgrade.affix)
+        } else if (upgrade.target === 'mechanical') {
+          this._applyMechanical(upgrade)
+        } else if (upgrade.target === 'new_weapon') {
+          this._addWeapon(upgrade.weapon)
+        } else {
+          upgrade.apply(this._player, this)   // player upgrade
+        }
         this._upgrading = false
         this.scene.resume('GameScene')
       })
-      // TODO Task 3: replace with _buildUpgradePool() for multi-weapon + affix pool
-      const weaponUps = this._weapons[0].weapon.upgrades.map(u => ({ ...u, target: 'weapon', weaponId: this._weapons[0].weapon.id }))
-      const playerUps = PLAYER_UPGRADES.map(u => ({ ...u, target: 'player' }))
-      const pool = Phaser.Utils.Array.Shuffle([...weaponUps, ...playerUps])
-      const choices = pool.slice(0, 3)
+
+      const choices = this._buildUpgradePool()
       this.scene.launch('UpgradeScene', { level: this._level, upgrades: choices })
       this.scene.pause('GameScene')
     }
+  }
+
+  _buildUpgradePool() {
+    const pool = []
+
+    // Weapon-specific upgrades for all active weapons
+    for (const entry of this._weapons)
+      pool.push(...entry.weapon.upgrades.map(u => ({
+        ...u,
+        target:   'weapon',
+        weaponId: entry.weapon.id,
+      })))
+
+    // Elemental affixes (available once src/affixes/index.js exists — Task 6)
+    if (typeof ALL_AFFIXES !== 'undefined')
+      pool.push(...ALL_AFFIXES.map(a => ({ id: a.id, name: a.name, desc: a.desc, target: 'affix', affix: a })))
+
+    // Mechanical affixes
+    if (typeof ALL_MECHANICAL !== 'undefined')
+      pool.push(...ALL_MECHANICAL.map(m => ({ ...m, target: 'mechanical' })))
+
+    // New weapon (if next slot is available)
+    const nextSlotLevel = CFG.WEAPON_SLOT_LEVELS[this._weapons.length - 1]
+    if (this._weapons.length < CFG.MAX_WEAPONS && nextSlotLevel && this._level >= nextSlotLevel) {
+      const owned      = new Set(this._weapons.map(e => e.weapon.id))
+      const candidates = (typeof ALL_WEAPONS !== 'undefined' ? ALL_WEAPONS : []).filter(w => !owned.has(w.id))
+      if (candidates.length)
+        pool.push({
+          id: 'new_weapon', name: '新武器', desc: '獲得一把新武器',
+          target: 'new_weapon',
+          weapon: Phaser.Utils.Array.GetRandom(candidates),
+        })
+    }
+
+    // Player upgrades
+    pool.push(...PLAYER_UPGRADES.map(u => ({ ...u, target: 'player' })))
+
+    return Phaser.Utils.Array.Shuffle(pool).slice(0, 3)
+  }
+
+  _applyAffix(affix) {
+    this._affixes.push(affix)
+    const count = (this._affixCounts.get(affix.id) || 0) + 1
+    this._affixCounts.set(affix.id, count)
+    // TODO Task 6: this._resonances = checkResonances(this._affixCounts)
+  }
+
+  _applyMechanical(mechanical) {
+    if (mechanical.id === 'multishot') {
+      for (const entry of this._weapons) {
+        if (entry.stats.projectileCount !== undefined)
+          entry.stats.projectileCount += 1
+        else
+          entry.stats.range = (entry.stats.range || 100) * 1.15
+      }
+    } else if (mechanical.id === 'piercing') {
+      for (const entry of this._weapons) {
+        if (entry.stats.penetrate !== undefined)
+          entry.stats.penetrate = true
+      }
+    } else if (mechanical.id === 'orbit_shield') {
+      this._addOrbitShield()
+    }
+  }
+
+  _addOrbitShield() {
+    const offset = this._orbitShields.length * 120
+    this._orbitShields.push({
+      angle:    offset,
+      damageCd: new Map(),
+      gfx:      this.add.circle(0, 0, 10, 0x88ccff, 0.9).setDepth(7),
+    })
   }
 
   _onPlayerDead() {
