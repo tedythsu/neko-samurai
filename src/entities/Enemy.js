@@ -61,8 +61,10 @@ export default class Enemy {
     if (sprite.knockbackTimer > 0) {
       sprite.knockbackTimer -= delta
     } else {
+      const frozen  = sprite._statusEffects && sprite._statusEffects.frozen.active
       const chilled = sprite._statusEffects && sprite._statusEffects.chill.active
-      sprite.scene.physics.moveToObject(sprite, player.sprite, chilled ? CFG.ENEMY_SPEED * 0.5 : CFG.ENEMY_SPEED)
+      const speed   = frozen ? 0 : (chilled ? CFG.ENEMY_SPEED * 0.5 : CFG.ENEMY_SPEED)
+      sprite.scene.physics.moveToObject(sprite, player.sprite, speed)
     }
 
     sprite.setFlipX(player.x < sprite.x)
@@ -127,6 +129,12 @@ export default class Enemy {
       if (se.curse.timer <= 0) se.curse.active = false
     }
 
+    // Frozen timer (chill2)
+    if (se.frozen.active) {
+      se.frozen.timer -= delta
+      if (se.frozen.timer <= 0) se.frozen.active = false
+    }
+
     // Update visible tint based on status priority
     Enemy._applyStatusTint(sprite)
   }
@@ -137,7 +145,7 @@ export default class Enemy {
     if (!se)                                             return
     if (se.burn.stacks > 0 && se.burn.timer > 0)        { sprite.setTint(0xff6600); return }
     if (se.poison.stacks > 0 && se.poison.timer > 0)    { sprite.setTint(0x44cc44); return }
-    if (se.chill.active)                                 { sprite.setTint(0x88ccff); return }
+    if (se.chill.active || se.frozen.active)            { sprite.setTint(0x88ccff); return }
     if (se.curse.active)                                 { sprite.setTint(0xaa44aa); return }
     sprite.clearTint()
   }
@@ -145,9 +153,9 @@ export default class Enemy {
   static _hasStatusTint(sprite) {
     const se = sprite._statusEffects
     if (!se) return false
-    return (se.burn.stacks > 0 && se.burn.timer > 0)   ||
+    return (se.burn.stacks > 0 && se.burn.timer > 0)    ||
            (se.poison.stacks > 0 && se.poison.timer > 0) ||
-           se.chill.active || se.curse.active
+           se.chill.active || se.frozen.active || se.curse.active
   }
 
   static _triggerDeath(sprite) {
@@ -176,6 +184,42 @@ export default class Enemy {
           Phaser.Math.Distance.Between(x, y, e.x, e.y) < 50)
         .forEach(e => Enemy.takeDamage(e, 15, x, y, scene._affixes || []))
       if (scene._player) scene._player.heal(5)
+    }
+
+    // Tier-2: poison2 — spread poison to nearby 3 enemies on death
+    if (scene._affixCounts?.has('poison2') &&
+        sprite._statusEffects && sprite._statusEffects.poison.stacks > 0) {
+      const spreadStacks = Math.max(1, Math.floor(sprite._statusEffects.poison.stacks * 0.5))
+      scene._enemies.getChildren()
+        .filter(e => e.active && !e.dying && e !== sprite &&
+          Phaser.Math.Distance.Between(x, y, e.x, e.y) < 100)
+        .sort((ea, eb) =>
+          Phaser.Math.Distance.Between(x, y, ea.x, ea.y) -
+          Phaser.Math.Distance.Between(x, y, eb.x, eb.y))
+        .slice(0, 3)
+        .forEach(e => {
+          if (e._statusEffects) {
+            e._statusEffects.poison.stacks = Math.min(5,
+              e._statusEffects.poison.stacks + spreadStacks)
+            e._statusEffects.poison.timer  = Math.max(
+              e._statusEffects.poison.timer, 3000)
+          }
+        })
+    }
+
+    // Tier-2: curse2 — cursed enemy death causes AoE damage
+    if (scene._affixCounts?.has('curse2') &&
+        sprite._statusEffects && sprite._statusEffects.curse.active) {
+      scene._enemies.getChildren()
+        .filter(e => e.active && !e.dying && e !== sprite &&
+          Phaser.Math.Distance.Between(x, y, e.x, e.y) < 80)
+        .forEach(e => Enemy.takeDamage(e, 15, x, y, scene._affixes || []))
+      // Visual: fear pulse ring
+      const g = scene.add.graphics().setDepth(10)
+      g.lineStyle(2, 0xaa44aa, 0.9)
+      g.strokeCircle(x, y, 80)
+      scene.tweens.add({ targets: g, alpha: 0, scaleX: 1.3, scaleY: 1.3,
+        duration: 300, onComplete: () => g.destroy() })
     }
 
     // Delay physics disable so knockback plays out
@@ -218,6 +262,8 @@ export default class Enemy {
           sprite._statusEffects.chill.timer   = 0
           sprite._statusEffects.curse.active  = false
           sprite._statusEffects.curse.timer   = 0
+          sprite._statusEffects.frozen.active = false
+          sprite._statusEffects.frozen.timer  = 0
         }
         sprite.dying = false
         sprite.setAlpha(1)
