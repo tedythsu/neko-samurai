@@ -19,6 +19,7 @@ export default class BootScene extends Phaser.Scene {
 
     this.load.image('idle',   `${CHAR}/idle.png`)
     this.load.image('run',    `${CHAR}/run.png`)
+    this.load.image('stage',  'assets/sprites/backgrounds/stage.png')
     this.load.spritesheet('tachi-slash', 'assets/sprites/weapons/tachi_slash.png', {
       frameWidth: 166, frameHeight: 166,
     })

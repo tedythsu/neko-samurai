@@ -16,17 +16,10 @@ export default class GameScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, CFG.WORLD_WIDTH, CFG.WORLD_HEIGHT)
     this.cameras.main.setBounds(0, 0, CFG.WORLD_WIDTH, CFG.WORLD_HEIGHT)
 
-    // Grid background
-    const bg = this.add.graphics().setDepth(0)
-    bg.fillStyle(0x1a1a2e).fillRect(0, 0, CFG.WORLD_WIDTH, CFG.WORLD_HEIGHT)
-    bg.lineStyle(1, 0x222244, 0.5)
-    for (let x = 0; x <= CFG.WORLD_WIDTH; x += 100)
-      bg.lineBetween(x, 0, x, CFG.WORLD_HEIGHT)
-    for (let y = 0; y <= CFG.WORLD_HEIGHT; y += 100)
-      bg.lineBetween(0, y, CFG.WORLD_WIDTH, y)
-    // Arena border
-    bg.lineStyle(3, 0x4444aa, 1)
-    bg.strokeRect(0, 0, CFG.WORLD_WIDTH, CFG.WORLD_HEIGHT)
+    // Background
+    this.add.image(CFG.WORLD_WIDTH / 2, CFG.WORLD_HEIGHT / 2, 'stage')
+      .setDisplaySize(CFG.WORLD_WIDTH, CFG.WORLD_HEIGHT)
+      .setDepth(0)
 
     this._player = new Player(this, CFG.WORLD_WIDTH / 2, CFG.WORLD_HEIGHT / 2)
     this.cameras.main.startFollow(this._player.sprite, true, 0.1, 0.1)
