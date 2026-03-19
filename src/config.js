@@ -26,7 +26,7 @@ export const CFG = {
   WAVE_SCALE: 3,  // extra enemy added per N levels
 
   // Combat
-  CRIT_CHANCE:     0.50,  // 50% base crit chance (temp)
+  CRIT_CHANCE:     0.10,  // 10% base crit chance
   CRIT_MULTIPLIER: 2.00,  // crit deals 2× damage
 
   // Weapon slots
@@ -58,5 +58,14 @@ export const PLAYER_UPGRADES = [
   { id: 'regen',  name: '忍の回復',  desc: '每5秒回復1 HP',
     apply: (player, scene) => {
       scene.time.addEvent({ delay: 5000, loop: true, callback: () => player.heal(1) })
+    } },
+  { id: 'crit_rate', name: '武者の眼', desc: '爆擊率 +10%', oneTime: true,
+    apply: (player, scene) => { scene._critBonus = (scene._critBonus || 0) + 0.10 } },
+  { id: 'crit_dmg',  name: '必殺の型', desc: '爆擊傷害 +30%', oneTime: true,
+    apply: (player, scene) => { scene._critDmgBonus = (scene._critDmgBonus || 0) + 0.30 } },
+  { id: 'crit_combo', name: '活殺奥義', desc: '爆擊率+5% 爆擊傷害+20%', oneTime: true,
+    apply: (player, scene) => {
+      scene._critBonus    = (scene._critBonus    || 0) + 0.05
+      scene._critDmgBonus = (scene._critDmgBonus || 0) + 0.20
     } },
 ]

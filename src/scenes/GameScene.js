@@ -70,6 +70,10 @@ export default class GameScene extends Phaser.Scene {
     this._affixCounts   = new Map()       // id → pick count
     this._resonances    = new Set()       // active resonance IDs
     this._orbitShields  = []              // orbit_shield mechanical affix entries
+    this._critBonus    = 0
+    this._critDmgBonus = 0
+    this._mechanicalsOwned    = new Set()
+    this._playerUpgradesOwned = new Set()
 
     this._addWeapon(this._startWeapon)
 
@@ -352,7 +356,8 @@ export default class GameScene extends Phaser.Scene {
         } else if (upgrade.target === 'new_weapon') {
           this._addWeapon(upgrade.weapon)
         } else {
-          upgrade.apply(this._player, this)   // player upgrade
+          upgrade.apply(this._player, this)
+          if (upgrade.oneTime) this._playerUpgradesOwned.add(upgrade.id)
         }
         this._upgrading = false
         this.scene.resume('GameScene')

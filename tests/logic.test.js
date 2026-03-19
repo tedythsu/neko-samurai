@@ -33,7 +33,7 @@ describe('randomEdgePoint', () => {
 })
 
 describe('PLAYER_UPGRADES', () => {
-  it('has 3 entries', () => expect(PLAYER_UPGRADES).toHaveLength(3))
+  it('has 6 entries', () => expect(PLAYER_UPGRADES).toHaveLength(6))
   it('all have id, name, desc', () => {
     PLAYER_UPGRADES.forEach(u => {
       expect(u.id).toBeTruthy()

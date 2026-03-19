@@ -253,9 +253,13 @@ export default class Enemy {
     const se = sprite._statusEffects
 
     // Lucky affix: passive crit boost (handle before damage calc)
-    const luckyCount = affixes.filter(a => a.id === 'lucky').length
-    const critChance = Math.min(1.0, CFG.CRIT_CHANCE + luckyCount * 0.15)
-    const critMult   = CFG.CRIT_MULTIPLIER + luckyCount * 0.5
+    const luckyCount  = affixes.filter(a => a.id === 'lucky').length
+    const lucky2Count = affixes.filter(a => a.id === 'lucky2').length
+    const scene       = sprite.scene
+    const critBonus   = (scene._critBonus    || 0)
+    const critDmgBon  = (scene._critDmgBonus || 0)
+    const critChance  = Math.min(1.0, CFG.CRIT_CHANCE + luckyCount * 0.15 + critBonus)
+    const critMult    = (CFG.CRIT_MULTIPLIER + luckyCount * 0.5 + critDmgBon) * (lucky2Count > 0 ? 1.5 : 1)
     const isCrit     = Math.random() < critChance
 
     // Curse: +25% damage if target is cursed
