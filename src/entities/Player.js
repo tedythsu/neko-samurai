@@ -60,8 +60,22 @@ export default class Player {
 
   takeDamage(amount) {
     this.hp = Math.max(0, this.hp - amount)
+
+    // 1. Sprite red tint flash
+    this.sprite.setTint(0xff3333)
+    this.scene.time.delayedCall(200, () => {
+      if (!this._dead) this.sprite.clearTint()
+    })
+
+    // 2. Camera shake — physical weight
+    this.scene.cameras.main.shake(150, 0.006)
+
+    // 3. Full-screen red flash — unmissable peripheral signal
+    this.scene.cameras.main.flash(250, 255, 20, 20, false)
+
     if (this.hp <= 0 && !this._dead) {
       this._dead = true
+      this.sprite.clearTint()
       this.scene.events.emit('player-dead')
     }
   }
