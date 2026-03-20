@@ -144,6 +144,32 @@ export default class GameScene extends Phaser.Scene {
     this._elapsed = 0
   }
 
+  _createScorchZone(x, y, radius, damage, affixes) {
+    const gz = this.add.graphics().setDepth(4)
+    gz.fillStyle(0xff4400, 0.30)
+    gz.fillCircle(x, y, radius)
+    const damageCd = new Map()
+    const tick = () => {
+      const now = this.time.now
+      this._enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
+        if (Phaser.Math.Distance.Between(x, y, e.x, e.y) < radius) {
+          const last = damageCd.get(e) || 0
+          if (now - last >= 300) {
+            damageCd.set(e, now)
+            Enemy.takeDamage(e, damage * 0.15, x, y, affixes, 0)
+          }
+        }
+      })
+    }
+    this.events.on('update', tick)
+    const cleanup = () => {
+      this.events.off('update', tick)
+      gz.destroy()
+    }
+    this.time.delayedCall(3000, cleanup)
+    this.events.once('shutdown', cleanup)
+  }
+
   _addWeapon(weapon) {
     weapon.createTexture(this)
     const projectiles = this.physics.add.group({ maxSize: 60 })
@@ -157,10 +183,27 @@ export default class GameScene extends Phaser.Scene {
         Enemy.takeDamage(enemy, proj.damage, proj.x, proj.y, this._affixes, proj.knockback ?? 80)
         // Explosive projectiles (Ofuda, Homura) — splash has no knockback
         if (proj._explodeRadius) {
+          const explodeR = proj._evoKaku ? proj._explodeRadius * 2.5 : proj._explodeRadius
           this._enemies.getChildren()
             .filter(e => e.active && !e.dying && e !== enemy &&
-              Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y) < proj._explodeRadius)
+              Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y) < explodeR)
             .forEach(e => Enemy.takeDamage(e, proj.damage * (proj._explodeMult || 1), proj.x, proj.y, this._affixes, 0))
+
+          // 焦土 / 龍炎矢 evo — scorch zone
+          if (proj._scorch) {
+            this._createScorchZone(proj.x, proj.y, explodeR, proj.damage, this._affixes)
+          }
+
+          // 連鎖爆炸 — 25% chance second explosion (depth-guarded)
+          if (proj._chainExplode && proj._chainDepth === 0 && Math.random() < 0.25) {
+            const chainR = proj._explodeRadius
+            this._enemies.getChildren()
+              .filter(e => e.active && !e.dying && e !== enemy &&
+                Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y) < chainR)
+              .forEach(e => Enemy.takeDamage(e, proj.damage * 0.5, proj.x, proj.y, this._affixes, 0))
+          }
+
+          // 核符 evo (kaku) — linger zone handled in Task 8
         }
         if (!proj.penetrate) proj._spent = true
       }

@@ -23,6 +23,8 @@ export default {
     { id: 'dmg',    name: '炎矢 傷害 +25%',    desc: '', apply: s => { s.damage          *= 1.25 } },
     { id: 'radius', name: '炎矢 爆炸範圍 +20px', desc: '', apply: s => { s._explodeRadius = Math.min(140, s._explodeRadius + 20) } },
     { id: 'multi',  name: '炎矢 投射數 +1',     desc: '', apply: s => { s.projectileCount = Math.min(5, s.projectileCount + 1) } },
+    { id: 'scorch',       name: '焦土',    desc: '爆炸後留下3秒燃燒火場（0.15倍傷害/300ms）', apply: s => { s._scorch = true } },
+    { id: 'chainExplode', name: '連鎖爆炸', desc: '25%機率觸發二次爆炸',                      apply: s => { s._chainExplode = true } },
   ],
 
   createTexture(scene) {
@@ -48,6 +50,15 @@ export default {
       s.knockback      = stats.knockback ?? 160
       s._explodeRadius = stats._explodeRadius
       s._explodeMult   = 1.2
+      s._scorch       = stats._scorch || stats._evo === 'ryuen'
+      s._chainExplode = stats._chainExplode
+      s._chainDepth   = 0
+      // 龍炎矢 evo — bigger projectile, more damage, doubled explosion
+      if (stats._evo === 'ryuen') {
+        s.setDisplaySize(72, 72)
+        s.damage *= 1.5
+        s._explodeRadius = s._explodeRadius * 2
+      }
 
       const angle = Phaser.Math.Angle.Between(fromX, fromY, target.x, target.y)
       scene.physics.velocityFromAngle(Phaser.Math.RadToDeg(angle), stats.speed, s.body.velocity)
