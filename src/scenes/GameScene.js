@@ -7,7 +7,7 @@ import { ALL_AFFIXES, ALL_TIER2_AFFIXES, ALL_MECHANICAL, ALL_EVOLUTIONS, checkRe
 import { ALL_WEAPONS } from '../weapons/index.js'
 import { ALL_PROJ_TRAITS, PROJ_WEAPON_IDS }              from '../upgrades/projTraits.js'
 import { ALL_MELEE_TRAITS, MELEE_WEAPON_IDS, SWING_WEAPON_IDS } from '../upgrades/meleeTraits.js'
-import { getOrCreate }                                    from '../weapons/_pool.js'
+import { applyMiniExplosion, applyRicochet }              from '../upgrades/projEffects.js'
 
 export default class GameScene extends Phaser.Scene {
   constructor() { super('GameScene') }
@@ -247,57 +247,18 @@ export default class GameScene extends Phaser.Scene {
               .forEach(e => Enemy.takeDamage(e, proj.damage * 0.4, proj.x, proj.y, this._affixes, 0))
           }
         }
-        // 爆裂弾 — also fires in GameScene for Homura/Ofuda (which have no updateActive)
-        if (proj._miniExplosion) {
-          const r = 40
-          this._enemies.getChildren()
-            .filter(e => e.active && !e.dying && e !== enemy &&
-              Phaser.Math.Distance.Between(enemy.x, enemy.y, e.x, e.y) < r)
-            .forEach(e => Enemy.takeDamage(e, proj.damage * 0.4, enemy.x, enemy.y, this._affixes, 0))
-          const mg = this.add.graphics().setDepth(10)
-          mg.lineStyle(2, 0xff6600, 0.8)
-          mg.strokeCircle(enemy.x, enemy.y, r)
-          this.tweens.add({ targets: mg, alpha: 0, duration: 200, onComplete: () => mg.destroy() })
-        }
-
-        // 彈射 — ricochet for Homura/Ofuda (no updateActive)
-        if (proj._ricochet && (proj._ricochetDepth ?? 0) < 2) {
-          const next = this._enemies.getChildren()
-            .filter(e => e.active && !e.dying && !proj.hitSet.has(e))
-            .sort((a, b) =>
-              Phaser.Math.Distance.Between(enemy.x, enemy.y, a.x, a.y) -
-              Phaser.Math.Distance.Between(enemy.x, enemy.y, b.x, b.y))[0]
-          if (next) {
-            const r2 = getOrCreate(projectiles, enemy.x, enemy.y, proj.texture.key)
-            r2.setDisplaySize(proj.displayWidth, proj.displayHeight)
-            r2.damage         = proj.damage * 0.7
-            r2.hitSet         = new Set([enemy])
-            r2.spawnX         = enemy.x
-            r2.spawnY         = enemy.y
-            r2.range          = 200
-            r2.penetrate      = false
-            r2.knockback      = proj.knockback
-            r2._hitRadius     = proj._hitRadius || 14
-            r2._boomerang     = false
-            r2._scatter       = proj._scatter
-            r2._scatterFired  = false
-            r2._miniExplosion = proj._miniExplosion
-            r2._ricochet      = true
-            r2._ricochetDepth = (proj._ricochetDepth || 0) + 1
-            r2._pool          = projectiles
-            r2._reversed      = false
-            r2._explodeRadius = proj._explodeRadius
-            r2._explodeMult   = proj._explodeMult
-            r2._scorch        = false
-            r2._chainExplode  = false
-            r2._chainDepth    = 99
-            r2._linger        = false
-            r2._evoKaku       = false
-            r2._target        = next
-            r2._speed         = proj._speed
-            this.physics.moveToObject(r2, next, proj._speed || 200)
-          }
-        }
+        // 爆裂弾 / 彈射 — for Homura/Ofuda (no updateActive)
+        applyMiniExplosion(proj, enemy, this, this._enemies, this._affixes)
+        applyRicochet(proj, enemy, this, this._enemies, this._affixes, next => ({
+          _target:      next,           // Ofuda homing
+          _explodeRadius: proj._explodeRadius,
+          _explodeMult:   proj._explodeMult,
+          _scorch:        false,
+          _chainExplode:  false,
+          _chainDepth:    99,
+          _linger:        false,
+          _evoKaku:       false,
+        }))
 
         if (!proj.penetrate) proj._spent = true
       }

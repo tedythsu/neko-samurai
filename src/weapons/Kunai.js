@@ -3,6 +3,7 @@ import Phaser from 'phaser'
 import Enemy  from '../entities/Enemy.js'
 import { getOrCreate } from './_pool.js'
 import { doScatter } from '../upgrades/projTraits.js'
+import { applyMiniExplosion, applyRicochet } from '../upgrades/projEffects.js'
 
 const BASE_H    = 40   // display height in px regardless of source image size
 const HIT_HALF  = 14   // hit radius in px (approx half the visual width)
@@ -91,49 +92,8 @@ export default {
             e._statusEffects.frozen.active = true
             e._statusEffects.frozen.timer  = 2000
           }
-
-          // 爆裂弾
-          if (proj._miniExplosion) {
-            const r = 40
-            enemies.getChildren()
-              .filter(en => en.active && !en.dying && en !== e &&
-                Phaser.Math.Distance.Between(e.x, e.y, en.x, en.y) < r)
-              .forEach(en => Enemy.takeDamage(en, proj.damage * 0.4, e.x, e.y, affixes, 0))
-            const g = scene.add.graphics().setDepth(10)
-            g.lineStyle(2, 0xff6600, 0.8)
-            g.strokeCircle(e.x, e.y, r)
-            scene.tweens.add({ targets: g, alpha: 0, duration: 200, onComplete: () => g.destroy() })
-          }
-
-          // 彈射
-          if (proj._ricochet && proj._ricochetDepth < 2) {
-            const next = enemies.getChildren()
-              .filter(en => en.active && !en.dying && !proj.hitSet.has(en))
-              .sort((a, b) =>
-                Phaser.Math.Distance.Between(e.x, e.y, a.x, a.y) -
-                Phaser.Math.Distance.Between(e.x, e.y, b.x, b.y))[0]
-            if (next) {
-              const r2 = getOrCreate(proj._pool, e.x, e.y, proj.texture.key)
-              r2.setDisplaySize(proj.displayWidth, proj.displayHeight)
-              r2.damage         = proj.damage * 0.7
-              r2.hitSet         = new Set([e])
-              r2.spawnX         = e.x
-              r2.spawnY         = e.y
-              r2.range          = 200
-              r2.penetrate      = false
-              r2.knockback      = proj.knockback
-              r2._hitRadius     = proj._hitRadius
-              r2._boomerang     = false
-              r2._scatter       = proj._scatter
-              r2._scatterFired  = false
-              r2._miniExplosion = proj._miniExplosion
-              r2._ricochet      = true
-              r2._ricochetDepth = proj._ricochetDepth + 1
-              r2._pool          = proj._pool
-              r2._reversed      = false
-              scene.physics.moveToObject(r2, next, 400)
-            }
-          }
+          applyMiniExplosion(proj, e, scene, enemies, affixes)
+          applyRicochet(proj, e, scene, enemies, affixes)
 
           // 氷刃苦無 — pierce frozen enemies (don't expire)
           const shouldPierce = proj.penetrate || (entry.stats._evo === 'koori' && e._statusEffects?.frozen?.active)
