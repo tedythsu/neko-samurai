@@ -5,6 +5,9 @@ import Enemy    from '../entities/Enemy.js'
 import { CFG, randomEdgePoint, xpThreshold, PLAYER_UPGRADES } from '../config.js'
 import { ALL_AFFIXES, ALL_TIER2_AFFIXES, ALL_MECHANICAL, ALL_EVOLUTIONS, checkResonances } from '../affixes/index.js'
 import { ALL_WEAPONS } from '../weapons/index.js'
+import { ALL_PROJ_TRAITS, PROJ_WEAPON_IDS }              from '../upgrades/projTraits.js'
+import { ALL_MELEE_TRAITS, MELEE_WEAPON_IDS, SWING_WEAPON_IDS } from '../upgrades/meleeTraits.js'
+import { getOrCreate }                                    from '../weapons/_pool.js'
 
 export default class GameScene extends Phaser.Scene {
   constructor() { super('GameScene') }
@@ -81,6 +84,8 @@ export default class GameScene extends Phaser.Scene {
     this._mechanicalsOwned    = new Set()
     this._playerUpgradesOwned = new Set()
     this._offeredEvos         = new Set()
+    this._projTraitsOwned  = new Set()
+    this._meleeTraitsOwned = new Set()
 
     this._addWeapon(this._startWeapon)
 
@@ -242,6 +247,58 @@ export default class GameScene extends Phaser.Scene {
               .forEach(e => Enemy.takeDamage(e, proj.damage * 0.4, proj.x, proj.y, this._affixes, 0))
           }
         }
+        // 爆裂弾 — also fires in GameScene for Homura/Ofuda (which have no updateActive)
+        if (proj._miniExplosion) {
+          const r = 40
+          this._enemies.getChildren()
+            .filter(e => e.active && !e.dying && e !== enemy &&
+              Phaser.Math.Distance.Between(enemy.x, enemy.y, e.x, e.y) < r)
+            .forEach(e => Enemy.takeDamage(e, proj.damage * 0.4, enemy.x, enemy.y, this._affixes, 0))
+          const mg = this.add.graphics().setDepth(10)
+          mg.lineStyle(2, 0xff6600, 0.8)
+          mg.strokeCircle(enemy.x, enemy.y, r)
+          this.tweens.add({ targets: mg, alpha: 0, duration: 200, onComplete: () => mg.destroy() })
+        }
+
+        // 彈射 — ricochet for Homura/Ofuda (no updateActive)
+        if (proj._ricochet && (proj._ricochetDepth ?? 0) < 2) {
+          const next = this._enemies.getChildren()
+            .filter(e => e.active && !e.dying && !proj.hitSet.has(e))
+            .sort((a, b) =>
+              Phaser.Math.Distance.Between(enemy.x, enemy.y, a.x, a.y) -
+              Phaser.Math.Distance.Between(enemy.x, enemy.y, b.x, b.y))[0]
+          if (next) {
+            const r2 = getOrCreate(projectiles, enemy.x, enemy.y, proj.texture.key)
+            r2.setDisplaySize(proj.displayWidth, proj.displayHeight)
+            r2.damage         = proj.damage * 0.7
+            r2.hitSet         = new Set([enemy])
+            r2.spawnX         = enemy.x
+            r2.spawnY         = enemy.y
+            r2.range          = 200
+            r2.penetrate      = false
+            r2.knockback      = proj.knockback
+            r2._hitRadius     = proj._hitRadius || 14
+            r2._boomerang     = false
+            r2._scatter       = proj._scatter
+            r2._scatterFired  = false
+            r2._miniExplosion = proj._miniExplosion
+            r2._ricochet      = true
+            r2._ricochetDepth = (proj._ricochetDepth || 0) + 1
+            r2._pool          = projectiles
+            r2._reversed      = false
+            r2._explodeRadius = proj._explodeRadius
+            r2._explodeMult   = proj._explodeMult
+            r2._scorch        = false
+            r2._chainExplode  = false
+            r2._chainDepth    = 99
+            r2._linger        = false
+            r2._evoKaku       = false
+            r2._target        = next
+            r2._speed         = proj._speed
+            this.physics.moveToObject(r2, next, proj._speed || 200)
+          }
+        }
+
         if (!proj.penetrate) proj._spent = true
       }
     )
@@ -255,7 +312,23 @@ export default class GameScene extends Phaser.Scene {
       }
     })
 
-    this._weapons.push({ weapon, stats: { ...weapon.baseStats }, timer: 0, projectiles })
+    const entry = { weapon, stats: { ...weapon.baseStats }, timer: 0, projectiles, takenUpgrades: new Set(), lastTrailTime: 0 }
+
+    // Retroactively apply owned Layer P traits to new weapon
+    if (PROJ_WEAPON_IDS.has(weapon.id)) {
+      for (const trait of ALL_PROJ_TRAITS) {
+        if (this._projTraitsOwned.has(trait.id)) trait.apply(entry.stats)
+      }
+    }
+    // Retroactively apply owned Layer M traits to new weapon
+    if (MELEE_WEAPON_IDS.has(weapon.id)) {
+      for (const trait of ALL_MELEE_TRAITS) {
+        if (!this._meleeTraitsOwned.has(trait.id)) continue
+        if (trait.swingOnly && !SWING_WEAPON_IDS.has(weapon.id)) continue
+        trait.apply(entry.stats)
+      }
+    }
+    this._weapons.push(entry)
   }
 
   update(_, delta) {
@@ -268,6 +341,23 @@ export default class GameScene extends Phaser.Scene {
         this._player.heal(this._player.maxHp * 0.015 * delta / 1000)
       }
     }
+
+    // 命運印記 — deferred explosion check
+    this._enemies.getChildren().forEach(e => {
+      if (!e.active || !e._doomTimer) return
+      if (this.time.now < e._doomTimer) return
+      const radius = e._doomRadius || 60
+      const dmg    = e._doomDamage || 0
+      e._doomTimer = null
+      this._enemies.getChildren()
+        .filter(en => en.active && !en.dying &&
+          Phaser.Math.Distance.Between(e.x, e.y, en.x, en.y) < radius)
+        .forEach(en => Enemy.takeDamage(en, dmg, e.x, e.y, this._affixes, 0))
+      const g = this.add.graphics().setDepth(10)
+      g.lineStyle(3, 0x9900ff, 0.9)
+      g.strokeCircle(e.x, e.y, radius)
+      this.tweens.add({ targets: g, alpha: 0, duration: 300, onComplete: () => g.destroy() })
+    })
 
     this._enemies.getChildren().forEach(e => Enemy.update(e, this._player, delta))
 
@@ -531,7 +621,23 @@ export default class GameScene extends Phaser.Scene {
       this.events.once('upgrade-chosen', (upgrade) => {
         if (upgrade.target === 'weapon') {
           const entry = this._weapons.find(e => e.weapon.id === upgrade.weaponId)
-          if (entry) upgrade.apply(entry.stats)
+          if (entry) {
+            upgrade.apply(entry.stats)
+            if (upgrade.oneTime) entry.takenUpgrades.add(upgrade.id)
+          }
+        } else if (upgrade.target === 'proj_trait') {
+          this._projTraitsOwned.add(upgrade.id)
+          for (const entry of this._weapons) {
+            if (PROJ_WEAPON_IDS.has(entry.weapon.id)) upgrade.apply(entry.stats)
+          }
+        } else if (upgrade.target === 'melee_trait') {
+          this._meleeTraitsOwned.add(upgrade.id)
+          for (const entry of this._weapons) {
+            if (MELEE_WEAPON_IDS.has(entry.weapon.id)) {
+              if (!upgrade.swingOnly || SWING_WEAPON_IDS.has(entry.weapon.id))
+                upgrade.apply(entry.stats)
+            }
+          }
         } else if (upgrade.target === 'affix') {
           this._applyAffix(upgrade.affix)
         } else if (upgrade.target === 'mechanical') {
@@ -558,11 +664,13 @@ export default class GameScene extends Phaser.Scene {
   _buildUpgradePool() {
     const pool = []
 
-    // Weapon-specific upgrades (always repeatable)
-    for (const entry of this._weapons)
-      pool.push(...(entry.weapon.upgrades ?? []).map(u => ({
-        ...u, target: 'weapon', weaponId: entry.weapon.id,
-      })))
+    // Weapon-specific upgrades (one-time dedup per entry)
+    for (const entry of this._weapons) {
+      for (const u of (entry.weapon.upgrades ?? [])) {
+        if (u.oneTime && entry.takenUpgrades.has(u.id)) continue
+        pool.push({ ...u, target: 'weapon', weaponId: entry.weapon.id })
+      }
+    }
 
     // Tier-1 elemental affixes — only show if not yet owned
     pool.push(...ALL_AFFIXES
@@ -609,6 +717,26 @@ export default class GameScene extends Phaser.Scene {
       if (hasWeapon && hasAffix) {
         pool.push({ ...evo, target: 'evolution' })
         this._offeredEvos.add(evo.id)   // mark offered NOW so re-roll never re-offers it
+      }
+    }
+
+    // Layer P — projectile universal traits
+    const hasProjWeapon = this._weapons.some(w => PROJ_WEAPON_IDS.has(w.weapon.id))
+    if (hasProjWeapon) {
+      for (const trait of ALL_PROJ_TRAITS) {
+        if (!this._projTraitsOwned.has(trait.id))
+          pool.push({ ...trait, target: 'proj_trait' })
+      }
+    }
+
+    // Layer M — melee universal traits
+    const hasMeleeWeapon = this._weapons.some(w => MELEE_WEAPON_IDS.has(w.weapon.id))
+    const hasSwingWeapon = this._weapons.some(w => SWING_WEAPON_IDS.has(w.weapon.id))
+    if (hasMeleeWeapon) {
+      for (const trait of ALL_MELEE_TRAITS) {
+        if (this._meleeTraitsOwned.has(trait.id)) continue
+        if (trait.swingOnly && !hasSwingWeapon) continue
+        pool.push({ ...trait, target: 'melee_trait' })
       }
     }
 
