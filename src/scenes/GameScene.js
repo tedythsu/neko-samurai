@@ -344,7 +344,7 @@ export default class GameScene extends Phaser.Scene {
 
     // 命運印記 — deferred explosion check
     this._enemies.getChildren().forEach(e => {
-      if (!e.active || !e._doomTimer) return
+      if (!e.active || e.dying || !e._doomTimer) return
       if (this.time.now < e._doomTimer) return
       const radius = e._doomRadius || 60
       const dmg    = e._doomDamage || 0

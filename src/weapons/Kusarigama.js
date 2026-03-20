@@ -130,6 +130,10 @@ export default {
                 }
               }
               scene.events.on('update', shockFn)
+              scene.events.once('shutdown', () => {
+                scene.events.off('update', shockFn)
+                sg.destroy()
+              })
             }
           }
         }
