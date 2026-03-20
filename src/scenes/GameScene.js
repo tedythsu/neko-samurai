@@ -86,6 +86,7 @@ export default class GameScene extends Phaser.Scene {
 
     this.events.on('enemy-died', ({ x, y }) => this._spawnOrb(x, y))
     this.events.on('player-dead', this._onPlayerDead, this)
+    this.events.on('player-hit', () => { this._regenTimer = 0 })
 
     // HUD — fixed to camera
     this._hud = this.add.graphics().setScrollFactor(0).setDepth(200)
@@ -156,6 +157,15 @@ export default class GameScene extends Phaser.Scene {
 
   update(_, delta) {
     this._player.update(delta)
+
+    // 武者の気 regen — tick after combat logic
+    if (this._regenActive && !this._player._dead) {
+      this._regenTimer += delta
+      if (this._regenTimer >= 4000) {
+        this._player.heal(this._player.maxHp * 0.015 * delta / 1000)
+      }
+    }
+
     this._enemies.getChildren().forEach(e => Enemy.update(e, this._player, delta))
 
     const px = this._player.x

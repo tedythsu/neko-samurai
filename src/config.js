@@ -55,9 +55,10 @@ export const PLAYER_UPGRADES = [
     apply: (player) => { player.speed *= 1.15 } },
   { id: 'maxhp',  name: '武者の意志', desc: '最大HP +20%',
     apply: (player) => { player.maxHp *= 1.20; player.heal(player.maxHp * 0.20) } },
-  { id: 'regen',  name: '忍の回復',  desc: '每5秒回復1 HP',
+  { id: 'regen', name: '武者の気', desc: '未受傷4秒後每秒回復最大HP 1.5%', oneTime: true,
     apply: (player, scene) => {
-      scene.time.addEvent({ delay: 5000, loop: true, callback: () => player.heal(1) })
+      scene._regenActive = true
+      scene._regenTimer  = 0
     } },
   { id: 'crit_rate', name: '武者の眼', desc: '爆擊率 +10%', oneTime: true,
     apply: (player, scene) => { scene._critBonus = (scene._critBonus || 0) + 0.10 } },

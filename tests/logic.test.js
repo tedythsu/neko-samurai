@@ -46,6 +46,11 @@ describe('PLAYER_UPGRADES', () => {
       expect(u.desc).toBeTruthy()
     })
   })
+  it('regen upgrade is oneTime', () => {
+    const regen = PLAYER_UPGRADES.find(u => u.id === 'regen')
+    expect(regen).toBeDefined()
+    expect(regen.oneTime).toBe(true)
+  })
 })
 
 describe('weapon upgrade caps', () => {

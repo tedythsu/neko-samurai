@@ -59,6 +59,7 @@ export default class Player {
   }
 
   takeDamage(amount) {
+    this.scene.events.emit('player-hit')   // reset out-of-combat regen timer
     this.hp = Math.max(0, this.hp - amount)
 
     // 1. Sprite red tint flash
