@@ -7,6 +7,8 @@ import { ALL_AFFIXES, ALL_TIER2_AFFIXES, ALL_MECHANICAL, ALL_EVOLUTIONS, checkRe
 import { ALL_WEAPONS } from '../weapons/index.js'
 import { ALL_PROJ_TRAITS, PROJ_WEAPON_IDS }              from '../upgrades/projTraits.js'
 import { ALL_MELEE_TRAITS, MELEE_WEAPON_IDS, SWING_WEAPON_IDS } from '../upgrades/meleeTraits.js'
+import { ENEMY_TYPES, getDifficultyMult } from '../enemies/EnemyTypes.js'
+import { PROGRESSION_BREAKPOINTS }        from '../config.js'
 
 export default class GameScene extends Phaser.Scene {
   constructor() { super('GameScene') }
@@ -65,7 +67,7 @@ export default class GameScene extends Phaser.Scene {
       (_, enemy) => Enemy.dealDamage(enemy, this._player)
     )
 
-    this.time.addEvent({
+    this._spawnEvent = this.time.addEvent({
       delay: CFG.ENEMY_SPAWN_INTERVAL,
       loop: true,
       callback: this._spawnWave,
@@ -95,7 +97,10 @@ export default class GameScene extends Phaser.Scene {
     this._upgrading = false
     this._orbs = []
 
-    this.events.on('enemy-died', ({ x, y }) => this._spawnOrb(x, y))
+    this.events.on('enemy-died', ({ x, y }) => {
+      this._spawnOrb(x, y)
+      this._killCount++
+    })
     this.events.on('player-dead', this._onPlayerDead, this)
     this.events.on('player-hit', () => { this._regenTimer = 0 })
 
@@ -146,6 +151,8 @@ export default class GameScene extends Phaser.Scene {
     }).setScrollFactor(0).setDepth(201)
 
     this._elapsed = 0
+    this._killCount = 0
+    this._bossActive = false
   }
 
   _createScorchZone(x, y, radius, damage, affixes) {
@@ -455,15 +462,33 @@ export default class GameScene extends Phaser.Scene {
   }
 
   _spawnWave() {
+    // Difficulty multipliers for current elapsed time
+    const diff = getDifficultyMult(this._elapsed, PROGRESSION_BREAKPOINTS)
+
+    // Update spawn interval in-place (no destroy/recreate)
+    this._spawnEvent.delay = Math.round(diff.spawnInterval)
+
+    // Max-on-screen cap
+    if (this._enemies.countActive() >= diff.maxEnemies) return
+
+    // Build unlocked type pool (excluding 爆炸型 during boss — _bossActive flag)
+    const pool = ENEMY_TYPES.filter(t =>
+      t.unlockMs <= this._elapsed &&
+      !(this._bossActive && t.id === 'bakuha')
+    )
+
     const count = Math.floor(this._level / CFG.WAVE_SCALE) + 1
     for (let i = 0; i < count; i++) {
+      if (this._enemies.countActive() >= diff.maxEnemies) break
       const { x, y } = randomEdgePoint(CFG.WORLD_WIDTH, CFG.WORLD_HEIGHT)
       let enemy = this._enemies.getFirstDead(false)
       if (!enemy) {
         enemy = this._enemies.create(x, y, 'kisotsu-run', 0)
         enemy.setDepth(5)
       }
-      Enemy.activate(enemy, x, y)
+      // Pick a random type from the unlocked pool
+      const typeConfig = pool[Math.floor(Math.random() * pool.length)]
+      Enemy.activate(enemy, x, y, typeConfig, diff)
     }
   }
 
