@@ -8,6 +8,7 @@ import { ALL_WEAPONS } from '../weapons/index.js'
 import { ALL_PROJ_TRAITS, PROJ_WEAPON_IDS }              from '../upgrades/projTraits.js'
 import { ALL_MELEE_TRAITS, MELEE_WEAPON_IDS, SWING_WEAPON_IDS } from '../upgrades/meleeTraits.js'
 import { ENEMY_TYPES, getDifficultyMult } from '../enemies/EnemyTypes.js'
+import BossManager from '../enemies/BossManager.js'
 
 export default class GameScene extends Phaser.Scene {
   constructor() { super('GameScene') }
@@ -152,6 +153,32 @@ export default class GameScene extends Phaser.Scene {
     this._elapsed = 0
     this._killCount = 0
     this._bossActive = false
+    this._bossManager = new BossManager(this)
+
+    // Boss HP bar (hidden by default, shown during boss encounters)
+    const bossBarBW = 300
+    const bossBarY  = this.cameras.main.height - 40
+    this._bossBarBg = this.add.rectangle(
+      this.cameras.main.width / 2, bossBarY, bossBarBW + 4, 14, 0x220008
+    ).setScrollFactor(0).setDepth(202).setOrigin(0.5, 0.5).setAlpha(0)
+    this._bossBarFill = this.add.rectangle(
+      this.cameras.main.width / 2 - bossBarBW / 2, bossBarY, bossBarBW, 10, 0xcc2244
+    ).setScrollFactor(0).setDepth(203).setOrigin(0, 0.5).setAlpha(0)
+    this._bossBarHighlight = this.add.rectangle(
+      this.cameras.main.width / 2 - bossBarBW / 2, bossBarY - 4, bossBarBW, 2, 0xff4466
+    ).setScrollFactor(0).setDepth(204).setOrigin(0, 0.5).setAlpha(0)
+    this._bossNameText = this.add.text(
+      this.cameras.main.width / 2 - bossBarBW / 2 - 4, bossBarY, '', {
+        fontSize: '12px', color: '#ffaacc',
+        fontFamily: '"Noto Serif JP", serif',
+      }
+    ).setScrollFactor(0).setDepth(204).setOrigin(1, 0.5).setAlpha(0)
+    this._bossPctText = this.add.text(
+      this.cameras.main.width / 2 + bossBarBW / 2 + 4, bossBarY, '', {
+        fontSize: '12px', color: '#ffaacc',
+        fontFamily: '"Cinzel", serif',
+      }
+    ).setScrollFactor(0).setDepth(204).setOrigin(0, 0.5).setAlpha(0)
   }
 
   _createScorchZone(x, y, radius, damage, affixes) {
@@ -311,6 +338,7 @@ export default class GameScene extends Phaser.Scene {
     }
 
     this._elapsed += delta
+    this._bossManager.update(this._elapsed)
     this._hudTimer.setText(`${Math.floor(this._elapsed / 1000)}s`)
     this._drawHud()
 
@@ -458,6 +486,22 @@ export default class GameScene extends Phaser.Scene {
     this._hudResonanceText.setText(
       [...this._resonances].map(id => resonanceNames[id] || id).join('  ')
     )
+
+    // Boss HP bar
+    const bossAlpha = this._bossManager.activeBoss ? 1 : 0
+    this._bossBarBg.setAlpha(bossAlpha)
+    this._bossBarFill.setAlpha(bossAlpha)
+    this._bossBarHighlight.setAlpha(bossAlpha)
+    this._bossNameText.setAlpha(bossAlpha)
+    this._bossPctText.setAlpha(bossAlpha)
+
+    if (this._bossManager.activeBoss) {
+      const pct   = this._bossManager._bossHpPct
+      const bossW = 300
+      this._bossBarFill.setDisplaySize(Math.round(bossW * pct), 10)
+      this._bossPctText.setText(`${Math.round(pct * 100)}%`)
+      this._bossNameText.setText(this._bossManager._bossName)
+    }
   }
 
   _spawnWave() {
@@ -746,7 +790,7 @@ export default class GameScene extends Phaser.Scene {
 
     // Survival stats
     const statsText = this.add.text(cx, cy + 12,
-      `生存  ${_fmtTime(this._elapsed)}   到達  Lv ${this._level}`, {
+      `生存  ${_fmtTime(this._elapsed)}   到達  Lv ${this._level}   擊殺  ${this._killCount}`, {
         fontSize: '17px', color: '#c8a84b',
         fontFamily: '"Cinzel", "Palatino Linotype", serif',
         stroke: '#06060f', strokeThickness: 3,
@@ -765,6 +809,51 @@ export default class GameScene extends Phaser.Scene {
     })
     this.tweens.add({
       targets: deathKanji,
+      scaleX: { from: 1.5, to: 1 }, scaleY: { from: 1.5, to: 1 },
+      duration: 700, ease: 'Back.easeOut',
+    })
+
+    this.input.once('pointerdown', () => this.scene.restart())
+  }
+
+  _onVictory() {
+    this.physics.pause()
+    const W  = this.cameras.main.width
+    const H  = this.cameras.main.height
+    const cx = W / 2, cy = H / 2
+
+    // Dim overlay
+    this.add.rectangle(cx, cy, W, H, 0x000000, 0.72)
+      .setScrollFactor(0).setDepth(300)
+
+    // 勝 kanji
+    const victoryKanji = this.add.text(cx, cy - 70, '勝', {
+      fontSize: '88px', color: '#d4a843',
+      fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
+      stroke: '#3a2000', strokeThickness: 5,
+    }).setScrollFactor(0).setDepth(301).setOrigin(0.5).setAlpha(0)
+
+    // Stats
+    const statsText = this.add.text(cx, cy + 12,
+      `生存  ${_fmtTime(this._elapsed)}   到達  Lv ${this._level}   擊殺  ${this._killCount}`, {
+        fontSize: '17px', color: '#c8a84b',
+        fontFamily: '"Cinzel", "Palatino Linotype", serif',
+        stroke: '#06060f', strokeThickness: 3,
+      }
+    ).setScrollFactor(0).setDepth(301).setOrigin(0.5).setAlpha(0)
+
+    const restartText = this.add.text(cx, cy + 58, 'Click to restart', {
+      fontSize: '12px', color: '#6a6854',
+      fontFamily: '"Cinzel", serif',
+      stroke: '#06060f', strokeThickness: 2,
+    }).setScrollFactor(0).setDepth(301).setOrigin(0.5).setAlpha(0)
+
+    this.tweens.add({
+      targets: [victoryKanji, statsText, restartText],
+      alpha: 1, duration: 900, ease: 'Power2',
+    })
+    this.tweens.add({
+      targets: victoryKanji,
       scaleX: { from: 1.5, to: 1 }, scaleY: { from: 1.5, to: 1 },
       duration: 700, ease: 'Back.easeOut',
     })
