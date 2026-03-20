@@ -165,6 +165,7 @@ export default class Enemy {
 
   static _triggerDeath(sprite) {
     if (sprite.dying) return
+    sprite._doomTimer = null
     const { x, y } = sprite
     const scene     = sprite.scene
 
