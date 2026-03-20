@@ -1,6 +1,10 @@
 // src/weapons/Kunai.js
 import Phaser from 'phaser'
+import Enemy  from '../entities/Enemy.js'
 import { getOrCreate } from './_pool.js'
+
+const BASE_H    = 40   // display height in px regardless of source image size
+const HIT_HALF  = 14   // hit radius in px (approx half the visual width)
 
 export default {
   id: 'kunai',
@@ -32,15 +36,19 @@ export default {
     if (targets.length === 0) return
     targets.forEach(target => {
       const s = getOrCreate(pool, fromX, fromY, this.texKey)
-      // Scale uniformly to preserve image's natural proportions (0.7 = base display size)
-      s.setScale(0.7 * stats._scale)
-      s.body.setSize(s.displayWidth, s.displayHeight)
-      s.damage    = stats.damage
-      s.hitSet    = new Set()
-      s.spawnX    = fromX
-      s.spawnY    = fromY
-      s.range     = 500            // fixed travel range (no longer upgradeable)
-      s.penetrate = stats.penetrate
+      // Use native frame dimensions so pooled scale doesn't affect sizing
+      const nativeH = s.frame.realHeight
+      const nativeW = s.frame.realWidth
+      const h = BASE_H * stats._scale
+      const w = h * (nativeW / nativeH)
+      s.setDisplaySize(w, h)
+      s.damage      = stats.damage
+      s.hitSet      = new Set()
+      s.spawnX      = fromX
+      s.spawnY      = fromY
+      s.range       = 500
+      s.penetrate   = stats.penetrate
+      s._hitRadius  = HIT_HALF * stats._scale
 
       const angle = Phaser.Math.Angle.Between(fromX, fromY, target.x, target.y)
       scene.physics.velocityFromAngle(
@@ -51,11 +59,26 @@ export default {
 
   update(sprite) {
     if (!sprite.active) return
-    // Rotate so image top faces travel direction (-π/2 offset since image is vertical)
+    // Rotate so image top faces travel direction
     sprite.rotation = Math.atan2(sprite.body.velocity.y, sprite.body.velocity.x) + Math.PI / 2
     if (Phaser.Math.Distance.Between(sprite.spawnX, sprite.spawnY, sprite.x, sprite.y) >= sprite.range) {
       sprite.disableBody(true, true)
     }
+  },
+
+  // Manual hit detection — bypasses physics overlap body-size issues
+  updateActive(entry, scene, enemies, _player, affixes) {
+    entry.projectiles.getChildren().forEach(proj => {
+      if (!proj.active || proj._spent) return
+      enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
+        if (proj.hitSet.has(e)) return
+        if (Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y) < proj._hitRadius) {
+          proj.hitSet.add(e)
+          Enemy.takeDamage(e, proj.damage, proj.x, proj.y, affixes)
+          if (!proj.penetrate) proj._spent = true
+        }
+      })
+    })
   },
 }
 

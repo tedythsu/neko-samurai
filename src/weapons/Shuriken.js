@@ -1,6 +1,9 @@
 // src/weapons/Shuriken.js
 import Phaser from 'phaser'
+import Enemy  from '../entities/Enemy.js'
 import { getOrCreate } from './_pool.js'
+
+const HIT_RADIUS = 28   // manual overlap radius in px (independent of body size)
 
 export default {
   id: 'shuriken',
@@ -31,13 +34,13 @@ export default {
       const s = getOrCreate(pool, fromX, fromY, this.texKey)
       const baseW = 28, baseH = 28
       s.setDisplaySize(baseW * stats._scale, baseH * stats._scale)
-      s.body.setSize(64 * stats._scale, 64 * stats._scale, true)  // hitbox larger than visual, centered
       s.damage    = stats.damage
       s.hitSet    = new Set()
       s.spawnX    = fromX
       s.spawnY    = fromY
-      s.range     = 300            // fixed travel range
+      s.range     = 300
       s.penetrate = stats.penetrate
+      s._hitRadius = HIT_RADIUS * stats._scale
 
       const deg = (360 / stats.projectileCount) * i
       scene.physics.velocityFromAngle(deg, stats.speed, s.body.velocity)
@@ -50,5 +53,20 @@ export default {
     if (Phaser.Math.Distance.Between(sprite.spawnX, sprite.spawnY, sprite.x, sprite.y) >= sprite.range) {
       sprite.disableBody(true, true)
     }
+  },
+
+  // Manual hit detection — bypasses Phaser physics overlap so body size doesn't matter
+  updateActive(entry, scene, enemies, _player, affixes) {
+    entry.projectiles.getChildren().forEach(proj => {
+      if (!proj.active || proj._spent) return
+      enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
+        if (proj.hitSet.has(e)) return
+        if (Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y) < proj._hitRadius) {
+          proj.hitSet.add(e)
+          Enemy.takeDamage(e, proj.damage, proj.x, proj.y, affixes)
+          if (!proj.penetrate) proj._spent = true
+        }
+      })
+    })
   },
 }
