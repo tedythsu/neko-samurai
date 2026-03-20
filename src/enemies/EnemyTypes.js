@@ -37,7 +37,7 @@ export const ENEMY_TYPES = [
     hpMult:    0.7,
     speedMult: 1.3,
     sizeMult:  1.0,
-    behaviorFlags: { explode: true, explodeRadius: 60, explodeRange: 30 },
+    behaviorFlags: { explode: true, explodeRadius: 60, explodeRange: 30 },  // explodeRange: trigger distance from player; explodeRadius: AoE blast radius
   },
   {
     id:        'jonin',
@@ -53,7 +53,7 @@ export const ENEMY_TYPES = [
 /**
  * Return { hpMult, speedMult, spawnInterval, maxEnemies } for the given
  * elapsed time in ms, linearly interpolating between PROGRESSION_BREAKPOINTS.
- * Import CFG.PROGRESSION_BREAKPOINTS from config.js.
+ * Pass in the `PROGRESSION_BREAKPOINTS` array imported from config.js.
  */
 export function getDifficultyMult(elapsedMs, breakpoints) {
   const pts = breakpoints
