@@ -219,12 +219,12 @@ export default class GameScene extends Phaser.Scene {
 
       // Orb lifetime — exempt attracted orbs (already flying toward player)
       if (!orb._attracted) {
+        if (!orb._spawnTime) orb._spawnTime = this.time.now
         const elapsed = this.time.now - orb._spawnTime
         if (elapsed >= 12000) {
           // Expire: kill existing tweens first, then fade out and destroy
           if (orb._emitter) orb._emitter.destroy()
           this.tweens.killTweensOf(orb)    // kill warning tween BEFORE adding fade tween
-          orb.setActive(false)             // prevent re-processing during 300ms fade
           this._orbs.splice(i, 1)
           this.tweens.add({
             targets: orb, alpha: 0, duration: 300, ease: 'Linear',
@@ -240,7 +240,7 @@ export default class GameScene extends Phaser.Scene {
           if (!orb._warnFreq || Math.abs(orb._warnFreq - freq) > 10) {
             orb._warnFreq = freq
             this.tweens.killTweensOf(orb)
-            orb._warnTween = this.tweens.add({
+            this.tweens.add({
               targets: orb, alpha: { from: 0.2, to: 1.0 },
               yoyo: true, repeat: -1, duration: freq, ease: 'Linear',
             })
