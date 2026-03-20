@@ -1,6 +1,7 @@
 // src/weapons/Ofuda.js
 import Phaser     from 'phaser'
 import { getOrCreate } from './_pool.js'
+import { doScatter } from '../upgrades/projTraits.js'
 
 export default {
   id:     'ofuda',
@@ -22,8 +23,6 @@ export default {
     { id: 'dmg',   name: '霊符 傷害 +25%',  desc: '', apply: s => { s.damage          *= 1.25 } },
     { id: 'speed', name: '霊符 追蹤速度 +30%', desc: '', apply: s => { s.speed = Math.min(450, s.speed * 1.30) } },
     { id: 'multi', name: '霊符 投射數 +1',   desc: '', apply: s => { s.projectileCount = Math.min(5, s.projectileCount + 1) } },
-    { id: 'split',  name: '分裂', desc: '射程到達後分裂成3個小符（0.5倍傷害、無追蹤）', apply: s => { s._split = true } },
-    { id: 'linger', name: '滯留', desc: '命中爆炸後留下2秒輻射區（0.2倍傷害/300ms）',   apply: s => { s._linger = true } },
   ],
 
   createTexture(scene) {
@@ -51,9 +50,13 @@ export default {
       s._explodeRadius = 60
       s._explodeMult   = 1.5
       s._speed        = stats.speed
-      s._split      = stats._split
-      s._splitFired = false
+      s._scatter      = stats._scatter || false
+      s._scatterFired = false
       s._linger     = stats._linger
+      s._pool          = pool
+      s._miniExplosion = stats._miniExplosion || false
+      s._ricochet      = stats._ricochet      || false
+      s._ricochetDepth = 0
       s._evoKaku    = stats._evo === 'kaku'
       // 核符 evo — force linger and bigger explosion
       if (s._evoKaku) {
@@ -71,9 +74,15 @@ export default {
 
     // Out of range → expire (with optional split)
     if (Phaser.Math.Distance.Between(sprite.spawnX, sprite.spawnY, sprite.x, sprite.y) >= sprite.range) {
-      if (sprite._split && !sprite._splitFired) {
-        sprite._splitFired = true
-        _doSplit(sprite)
+      if (sprite._scatter && !sprite._scatterFired) {
+        doScatter(sprite, sprite.scene, {
+          _explodeRadius: (sprite._explodeRadius || 30) * 0.5,
+          _speed:         250,
+          _evoKaku:       false,
+          _target:        null,
+          _linger:        false,
+          range:          150,
+        })
       }
       sprite.disableBody(true, true)
       return
@@ -108,31 +117,4 @@ function _nearestEnemies(enemies, x, y, count) {
     .sort((a, b) => a.d - b.d)
     .slice(0, count)
     .map(({ e }) => e)
-}
-
-function _doSplit(proj) {
-  const scene     = proj.scene
-  const baseAngle = Math.atan2(proj.body.velocity.y, proj.body.velocity.x)
-  const group     = scene._weapons.find(w => w.weapon.id === 'ofuda')?.projectiles
-  if (!group) return
-  for (let i = -1; i <= 1; i++) {
-    const s = getOrCreate(group, proj.x, proj.y, 'ofuda-tex')
-    s.setDisplaySize(proj.displayWidth * 0.5, proj.displayHeight * 0.5)
-    s.damage         = proj.damage * 0.5
-    s.hitSet         = new Set()
-    s.spawnX         = proj.x
-    s.spawnY         = proj.y
-    s.range          = 150
-    s.penetrate      = false
-    s._target        = null
-    s._explodeRadius = 30
-    s._explodeMult   = 1.5
-    s._speed         = 250
-    s._split         = false
-    s._splitFired    = true
-    s._linger        = false
-    s._evoKaku       = false
-    const angle = baseAngle + Phaser.Math.DegToRad(i * 45)
-    scene.physics.velocityFromAngle(Phaser.Math.RadToDeg(angle), 250, s.body.velocity)
-  }
 }
