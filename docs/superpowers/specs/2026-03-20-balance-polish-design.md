@@ -86,7 +86,7 @@ Additionally, `乱射` gains a secondary effect to reinforce its global nature a
 
 ### Implementation notes
 - Edit the `multishot` branch in `GameScene._applyMechanical()` (currently around line 463)
-- After the existing `entry.stats.projectileCount += 1` line, add: `entry.stats.range = (entry.stats.range || entry.stats.range) * 1.10` for entries where `projectileCount !== undefined` (i.e. projectile weapons)
+- After the existing `entry.stats.projectileCount += 1` line, add: `entry.stats.range = (entry.stats.range || 100) * 1.10` for entries where `projectileCount !== undefined` (i.e. projectile weapons)
 - Melee entries (those without `projectileCount`) already get `range * 1.15` in the existing `else` branch — leave that unchanged
 - Also update the `乱射` desc in `ALL_MECHANICAL` (in `src/affixes/index.js`) to: `'所有投射型武器：投射數+1、射程+10%（近戰：射程+15%）'`
 
@@ -120,9 +120,9 @@ Additionally, `乱射` gains a secondary effect to reinforce its global nature a
 - Reference: Hades' "Stubborn Roots" (regen after not taking damage for a period) is one of the most valued defensive boons
 
 ### Implementation notes
-- `apply` sets `scene._regenActive = true` and `scene._regenTimer = 0`. No initialization in `create()` is needed — `_regenActive` is `undefined` (falsy) until the upgrade is picked, so the `update()` guard `if (this._regenActive)` correctly skips the logic before the upgrade is selected.
-- In `GameScene.update()`: `if (this._regenActive) { this._regenTimer += delta; if (this._regenTimer >= 4000) this._player.heal(this._player.maxHp * 0.015 * delta / 1000) }`
-- **Timer reset on damage:** `Player.takeDamage()` does **not** currently emit a `'player-hit'` event (it only emits `'player-dead'`). Add `if (this.scene) this.scene.events.emit('player-hit')` at the top of `Player.takeDamage()` (before the death check). Then in `GameScene`, register: `this.events.on('player-hit', () => { this._regenTimer = 0 })` inside `create()`.
+- `apply` uses the standard two-argument signature: `apply: (player, scene) => { scene._regenActive = true; scene._regenTimer = 0 }`. No initialization in `create()` is needed — `_regenActive` is `undefined` (falsy) until the upgrade is picked.
+- In `GameScene.update()`: `if (this._regenActive && !this._player._dead) { this._regenTimer += delta; if (this._regenTimer >= 4000) this._player.heal(this._player.maxHp * 0.015 * delta / 1000) }`. The `!this._player._dead` guard prevents regen from calling `heal()` on the death frame in the same tick that `player-dead` is emitted.
+- **Timer reset on damage:** `Player.takeDamage()` does **not** currently emit a `'player-hit'` event (it only emits `'player-dead'` on death). Add `this.scene.events.emit('player-hit')` at the very start of `Player.takeDamage()` (line 61, before `this.hp = Math.max(...)`). Then in `GameScene.create()`, register: `this.events.on('player-hit', () => { this._regenTimer = 0 })`.
 - One-time upgrade (`oneTime: true`), tracked in `_playerUpgradesOwned`
 - **File changes:** `src/entities/Player.js` (add emit), `src/scenes/GameScene.js` (listener + update loop), `src/config.js` (upgrade entry)
 
@@ -170,9 +170,8 @@ Range upgrades for projectile weapons (Kunai `長射程`, Shuriken `遠投`) ext
 
 **Mechanics of the size upgrade:**
 - Add `_scale: 1.0` to `baseStats` in both `Kunai.js` and `Shuriken.js` — same pattern as `_explodeRadius: 80` in `Homura.js`. This ensures `stats._scale` is always a defined number.
-- `apply: s => { s._scale = Math.min(2.0, s._scale * 1.30) }` (no `??` guard needed since `baseStats` guarantees the value)
-- In `fire()`, read the base display dimensions (`baseW`/`baseH`) from the existing `setDisplaySize` call, then apply scale: `s.setDisplaySize(baseW * stats._scale, baseH * stats._scale)`
-- Phaser Arcade physics hitbox is resized proportionally: `s.body.setSize(baseW * stats._scale, baseH * stats._scale)`
+- `apply: s => { s._scale = Math.min(2.0, s._scale * 1.30) }` (no `??` guard needed since `baseStats` guarantees the value). With base 1.0 and ×1.30 per pick, the effective cap is hit after **3 picks** (1.0 → 1.30 → 1.69 → 2.0).
+- `fire()` in both Kunai and Shuriken does **not** currently call `setDisplaySize` (the sprite inherits the render-texture size from `createTexture()`). The implementer must add an explicit call with the literal base pixel dimensions: **Kunai: 4×14 px** (from `createTexture` which fills a 4×14 RenderTexture); **Shuriken: 12×12 px** (from `createTexture` which fills a 12×12 RenderTexture). Apply as: `s.setDisplaySize(baseW * stats._scale, baseH * stats._scale)` and `s.body.setSize(baseW * stats._scale, baseH * stats._scale)`.
 - Visually, the player sees a noticeably larger kunai/shuriken after the upgrade
 - A larger projectile naturally intersects more enemies per flight path, which is a meaningful gameplay improvement (not just cosmetic)
 
