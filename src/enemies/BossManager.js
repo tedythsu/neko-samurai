@@ -156,10 +156,140 @@ export default class BossManager {
     if (def.id === 'daiyoma') this._registerDaiyomaPhase1(sprite)  // implemented in Task 5
   }
 
-  // Stub methods — expanded in Task 5
-  _registerRaikiSkills(_boss)   { /* Task 5 */ }
-  _enterDaiyomaPhase2()         { /* Task 5 */ }
-  _registerDaiyomaPhase1(_boss) { /* Task 5 */ }
+  // ─── 雷鬼 Skills ─────────────────────────────────────────────────────────
+
+  _registerRaikiSkills(boss) {
+    const scene = this._scene
+
+    // 雷擊圈: every 5s, expanding ring 0→200px over 0.8s, damages player if within
+    const lightningEvent = scene.time.addEvent({
+      delay: 5000, loop: true,
+      callback: () => {
+        if (!boss.active || boss.dying) return
+        const { x, y } = boss
+        _doLightningRing(scene, x, y)
+      },
+    })
+    this._activeEvents.push(lightningEvent)
+
+    // 召喚: every 8s, spawn 3 快速型 near boss
+    const hayateType = { id: 'hayate', baseTint: 0x44ff88, hpMult: 0.5, speedMult: 2.0, sizeMult: 0.75, behaviorFlags: {} }
+    const summonEvent = scene.time.addEvent({
+      delay: 8000, loop: true,
+      callback: () => {
+        if (!boss.active || boss.dying) return
+        const diff = { hpMult: 1, speedMult: 1 }
+        for (let i = 0; i < 3; i++) {
+          const ox = boss.x + Phaser.Math.Between(-120, 120)
+          const oy = boss.y + Phaser.Math.Between(-120, 120)
+          let minion = scene._enemies.getFirstDead(false)
+          if (!minion) {
+            minion = scene._enemies.create(ox, oy, 'kisotsu-run', 0)
+            minion.setDepth(5)
+          }
+          Enemy.activate(minion, ox, oy, hayateType, diff)
+        }
+      },
+    })
+    this._activeEvents.push(summonEvent)
+  }
+
+  _enterDaiyomaPhase2() {
+    this._phase2Done = true
+    const scene = this._scene
+    const boss  = this.activeBoss
+
+    // Cleanup phase 1 events
+    this.cleanup()
+
+    // Screen flash
+    const W = scene.cameras.main.width, H = scene.cameras.main.height
+    const flash = scene.add.rectangle(W / 2, H / 2, W, H, 0xffffff, 0.4)
+      .setScrollFactor(0).setDepth(499)
+    scene.time.delayedCall(200, () => flash.destroy())
+
+    // Tint change + speed increase
+    boss._baseTint = 0xff0000
+    boss.setTint(0xff0000)
+    boss._speed = CFG.ENEMY_SPEED * 1.2
+
+    // Phase 2 events
+    const hayateType = { id: 'hayate', baseTint: 0x44ff88, hpMult: 0.5, speedMult: 2.0, sizeMult: 0.75, behaviorFlags: {} }
+    const yoroiType  = { id: 'yoroi',  baseTint: 0xcc6622, hpMult: 4.0, speedMult: 0.5, sizeMult: 1.5,  behaviorFlags: {} }
+    const diff = { hpMult: 1, speedMult: 1 }
+
+    const dashEvent = scene.time.addEvent({
+      delay: 3000, loop: true,
+      callback: () => {
+        if (!boss.active || boss.dying) return
+        scene.physics.moveToObject(boss, scene._player.sprite, 600)
+        boss._dashing = true
+        scene.time.delayedCall(300, () => {
+          if (boss.active && !boss.dying) { boss.body.velocity.set(0, 0); boss._dashing = false }
+        })
+      },
+    })
+    this._activeEvents.push(dashEvent)
+
+    const lightningEvent = scene.time.addEvent({
+      delay: 6000, loop: true,
+      callback: () => {
+        if (!boss.active || boss.dying) return
+        _doLightningRing(scene, boss.x, boss.y)
+      },
+    })
+    this._activeEvents.push(lightningEvent)
+
+    // 混合召喚: every 6s, 2 快速型 + 1 坦克型
+    const summonEvent = scene.time.addEvent({
+      delay: 6000, loop: true,
+      callback: () => {
+        if (!boss.active || boss.dying) return
+        const spawnNear = (type) => {
+          const ox = boss.x + Phaser.Math.Between(-120, 120)
+          const oy = boss.y + Phaser.Math.Between(-120, 120)
+          let m = scene._enemies.getFirstDead(false)
+          if (!m) { m = scene._enemies.create(ox, oy, 'kisotsu-run', 0); m.setDepth(5) }
+          Enemy.activate(m, ox, oy, type, diff)
+        }
+        spawnNear(hayateType)
+        spawnNear(hayateType)
+        spawnNear(yoroiType)
+      },
+    })
+    this._activeEvents.push(summonEvent)
+  }
+
+  // ─── 大妖魔 Skills ────────────────────────────────────────────────────────
+
+  _registerDaiyomaPhase1(boss) {
+    const scene = this._scene
+
+    // Phase 1: dash every 5s
+    const dashEvent = scene.time.addEvent({
+      delay: 5000, loop: true,
+      callback: () => {
+        if (!boss.active || boss.dying) return
+        const player = scene._player
+        scene.physics.moveToObject(boss, player.sprite, 600)
+        boss._dashing = true
+        scene.time.delayedCall(300, () => {
+          if (boss.active && !boss.dying) { boss.body.velocity.set(0, 0); boss._dashing = false }
+        })
+      },
+    })
+    this._activeEvents.push(dashEvent)
+
+    // Phase 1: lightning ring every 6s
+    const lightningEvent = scene.time.addEvent({
+      delay: 6000, loop: true,
+      callback: () => {
+        if (!boss.active || boss.dying) return
+        _doLightningRing(scene, boss.x, boss.y)
+      },
+    })
+    this._activeEvents.push(lightningEvent)
+  }
 
   _onBossDead(def) {
     this.cleanup()
@@ -254,4 +384,30 @@ function _randomEdge(scene) {
     case 2: return { x: inset,              y: Math.random() * H }
     default: return { x: W - inset,         y: Math.random() * H }
   }
+}
+
+function _doLightningRing(scene, x, y) {
+  const maxR  = 200
+  const dur   = 800
+  const ring  = scene.add.graphics().setDepth(8)
+
+  ring.lineStyle(3, 0x66aaff, 0.9)
+  ring.strokeCircle(x, y, 1)
+
+  // Tween radius via a proxy object
+  const proxy = { r: 0 }
+  scene.tweens.add({
+    targets: proxy, r: maxR, duration: dur,
+    ease: 'Linear',
+    onUpdate: () => {
+      const curR = proxy.r
+      ring.clear()
+      ring.lineStyle(3, 0x66aaff, 0.9)
+      ring.strokeCircle(x, y, curR)
+      // Damage player if at ring edge this frame
+      const pDist = Phaser.Math.Distance.Between(x, y, scene._player.x, scene._player.y)
+      if (Math.abs(pDist - curR) < 12) scene._player.takeDamage(CFG.ENEMY_DAMAGE * 1.5)
+    },
+    onComplete: () => ring.destroy(),
+  })
 }
