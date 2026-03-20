@@ -1,4 +1,5 @@
 // src/affixes/index.js
+import { ALL_EVOLUTIONS } from './evolutions.js'
 import burn    from './burn.js'
 import poison  from './poison.js'
 import chain   from './chain.js'
@@ -14,6 +15,8 @@ export { checkResonances } from './resonances.js'
 export const ALL_AFFIXES = [burn, poison, chain, chill, curse, leech, burst, lucky]
 
 export const ALL_TIER2_AFFIXES = tier2
+
+export { ALL_EVOLUTIONS }
 
 export const ALL_MECHANICAL = [
   {

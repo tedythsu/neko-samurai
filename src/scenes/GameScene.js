@@ -3,7 +3,7 @@ import Phaser from 'phaser'
 import Player   from '../entities/Player.js'
 import Enemy    from '../entities/Enemy.js'
 import { CFG, randomEdgePoint, xpThreshold, PLAYER_UPGRADES } from '../config.js'
-import { ALL_AFFIXES, ALL_MECHANICAL, ALL_TIER2_AFFIXES, checkResonances } from '../affixes/index.js'
+import { ALL_AFFIXES, ALL_TIER2_AFFIXES, ALL_MECHANICAL, ALL_EVOLUTIONS, checkResonances } from '../affixes/index.js'
 import { ALL_WEAPONS } from '../weapons/index.js'
 
 export default class GameScene extends Phaser.Scene {
@@ -80,6 +80,7 @@ export default class GameScene extends Phaser.Scene {
     this._critDmgBonus = 0
     this._mechanicalsOwned    = new Set()
     this._playerUpgradesOwned = new Set()
+    this._offeredEvos         = new Set()
 
     this._addWeapon(this._startWeapon)
 
@@ -457,6 +458,9 @@ export default class GameScene extends Phaser.Scene {
           this._applyMechanical(upgrade)
         } else if (upgrade.target === 'new_weapon') {
           this._addWeapon(upgrade.weapon)
+        } else if (upgrade.target === 'evolution') {
+          const entry = this._weapons.find(e => e.weapon.id === upgrade.weaponId)
+          if (entry) entry.stats._evo = upgrade.id
         } else {
           upgrade.apply(this._player, this)
           if (upgrade.oneTime) this._playerUpgradesOwned.add(upgrade.id)
@@ -516,6 +520,17 @@ export default class GameScene extends Phaser.Scene {
     // NOTE: Tier-1 elemental affixes are now one-time only (filtered above). This intentionally
     // removes stacking for all tier-1 affixes including `lucky`. Tier-2 affixes (e.g. lucky2,
     // burn2) provide the next power step. Dead stacking branches in affix files are harmless.
+
+    // Weapon evolutions — offered once per run when weapon + affix both held
+    for (const evo of ALL_EVOLUTIONS) {
+      if (this._offeredEvos.has(evo.id)) continue
+      const hasWeapon = this._weapons.some(w => w.weapon.id === evo.weaponId)
+      const hasAffix  = (this._affixCounts.get(evo.affixId) || 0) >= 1
+      if (hasWeapon && hasAffix) {
+        pool.push({ ...evo, target: 'evolution' })
+        this._offeredEvos.add(evo.id)   // mark offered NOW so re-roll never re-offers it
+      }
+    }
 
     // Deduplicate by id+weaponId before shuffling to prevent duplicate choices
     const seen    = new Set()
