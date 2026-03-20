@@ -141,12 +141,14 @@ export default class BossManager {
     this._phase2Done = false
 
     // Register boss-death watcher
-    sprite._bossDeathWatcher = scene.events.on('update', () => {
+    const deathWatcher = () => {
       if (sprite.dying || !sprite.active || sprite.hp <= 0) {
-        scene.events.off('update', sprite._bossDeathWatcher)
+        scene.events.off('update', deathWatcher)
         this._onBossDead(def)
       }
-    })
+    }
+    scene.events.on('update', deathWatcher)
+    sprite._bossDeathWatcher = deathWatcher
 
     // Register skills by boss ID
     if (def.id === 'kijo')    this._registerKijoSkills(sprite)
