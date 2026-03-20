@@ -6,6 +6,8 @@ import Ogi         from '../src/weapons/Ogi.js'
 import Homura      from '../src/weapons/Homura.js'
 import Ofuda       from '../src/weapons/Ofuda.js'
 import Kusarigama  from '../src/weapons/Kusarigama.js'
+import Kunai       from '../src/weapons/Kunai.js'
+import Shuriken    from '../src/weapons/Shuriken.js'
 
 describe('xpThreshold', () => {
   it('returns > 0 for level 1', () => {
@@ -109,5 +111,47 @@ describe('weapon upgrade caps', () => {
     const s = { ...Kusarigama.baseStats }
     for (let i = 0; i < 20; i++) upg.apply(s)
     expect(s.sickleCount).toBeLessThanOrEqual(4)
+  })
+  it('Kunai fireRate never drops below 200ms', () => {
+    const upg = Kunai.upgrades.find(u => u.id === 'firerate')
+    expect(upg).toBeDefined()
+    const s = { ...Kunai.baseStats }
+    for (let i = 0; i < 20; i++) upg.apply(s)
+    expect(s.fireRate).toBeGreaterThanOrEqual(200)
+  })
+  it('Kunai projectileCount capped at 5', () => {
+    const upg = Kunai.upgrades.find(u => u.id === 'multishot')
+    expect(upg).toBeDefined()
+    const s = { ...Kunai.baseStats }
+    for (let i = 0; i < 20; i++) upg.apply(s)
+    expect(s.projectileCount).toBeLessThanOrEqual(5)
+  })
+  it('Kunai _scale capped at 2.0', () => {
+    const upg = Kunai.upgrades.find(u => u.id === 'scale')
+    expect(upg).toBeDefined()
+    const s = { ...Kunai.baseStats }
+    for (let i = 0; i < 20; i++) upg.apply(s)
+    expect(s._scale).toBeLessThanOrEqual(2.0)
+  })
+  it('Shuriken fireRate never drops below 200ms', () => {
+    const upg = Shuriken.upgrades.find(u => u.id === 'firerate')
+    expect(upg).toBeDefined()
+    const s = { ...Shuriken.baseStats }
+    for (let i = 0; i < 20; i++) upg.apply(s)
+    expect(s.fireRate).toBeGreaterThanOrEqual(200)
+  })
+  it('Shuriken projectileCount capped at 5', () => {
+    const upg = Shuriken.upgrades.find(u => u.id === 'multishot')
+    expect(upg).toBeDefined()
+    const s = { ...Shuriken.baseStats }
+    for (let i = 0; i < 20; i++) upg.apply(s)
+    expect(s.projectileCount).toBeLessThanOrEqual(5)
+  })
+  it('Shuriken _scale capped at 2.0', () => {
+    const upg = Shuriken.upgrades.find(u => u.id === 'scale')
+    expect(upg).toBeDefined()
+    const s = { ...Shuriken.baseStats }
+    for (let i = 0; i < 20; i++) upg.apply(s)
+    expect(s._scale).toBeLessThanOrEqual(2.0)
   })
 })

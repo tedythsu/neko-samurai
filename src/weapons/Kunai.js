@@ -12,17 +12,17 @@ export default {
     damage: 8,
     fireRate: 350,
     projectileCount: 1,
-    range: 500,
     speed: 600,
     penetrate: false,
+    _scale: 1.0,
   },
 
   upgrades: [
-    { id: 'dmg',       name: '苦無強化', desc: '傷害 +25%',       apply: s => { s.damage         *= 1.25 } },
-    { id: 'firerate',  name: '連投',     desc: '射速 +20%',       apply: s => { s.fireRate        *= 0.80 } },
-    { id: 'multishot', name: '複數標的', desc: '同時鎖定 +1 敵人', apply: s => { s.projectileCount += 1 } },
-    { id: 'penetrate', name: '穿透',     desc: '貫穿敵人',         apply: s => { s.penetrate = true } },
-    { id: 'range',     name: '長射程',   desc: '射程 +20%',       apply: s => { s.range           *= 1.20 } },
+    { id: 'dmg',       name: '苦無 傷害 +25%',    desc: '', apply: s => { s.damage         *= 1.25 } },
+    { id: 'firerate',  name: '苦無 攻擊速度 +20%', desc: '', apply: s => { s.fireRate        = Math.max(200, s.fireRate * 0.80) } },
+    { id: 'multishot', name: '苦無 投射數 +1',     desc: '', apply: s => { s.projectileCount = Math.min(5, s.projectileCount + 1) } },
+    { id: 'penetrate', name: '苦無 貫穿',          desc: '', apply: s => { s.penetrate = true } },
+    { id: 'scale',     name: '苦無 體積 +30%',     desc: '', apply: s => { s._scale = Math.min(2.0, s._scale * 1.30) } },
   ],
 
   createTexture(scene) {
@@ -38,11 +38,14 @@ export default {
     if (targets.length === 0) return
     targets.forEach(target => {
       const s = getOrCreate(pool, fromX, fromY, this.texKey)
+      const baseW = 4, baseH = 14
+      s.setDisplaySize(baseW * stats._scale, baseH * stats._scale)
+      s.body.setSize(baseW * stats._scale, baseH * stats._scale)
       s.damage    = stats.damage
       s.hitSet    = new Set()
       s.spawnX    = fromX
       s.spawnY    = fromY
-      s.range     = stats.range
+      s.range     = 500            // fixed travel range (no longer upgradeable)
       s.penetrate = stats.penetrate
 
       const angle = Phaser.Math.Angle.Between(fromX, fromY, target.x, target.y)
