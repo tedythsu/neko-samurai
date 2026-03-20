@@ -2,6 +2,7 @@
 import Phaser from 'phaser'
 import Enemy  from '../entities/Enemy.js'
 import { getOrCreate } from './_pool.js'
+import { doScatter } from '../upgrades/projTraits.js'
 
 const HIT_RADIUS = 28   // manual overlap radius in px (independent of body size)
 
@@ -26,8 +27,6 @@ export default {
     { id: 'firerate',  name: '手裏剣 攻擊速度 +25%', desc: '', apply: s => { s.fireRate        = Math.max(200, s.fireRate * 0.75) } },
     { id: 'multishot', name: '手裏剣 投射數 +1',     desc: '', apply: s => { s.projectileCount = Math.min(5, s.projectileCount + 1) } },
     { id: 'scale',     name: '手裏剣 體積 +30%',     desc: '', apply: s => { s._scale = Math.min(2.0, s._scale * 1.30) } },
-    { id: 'boomerang', name: '回転刃', desc: '抵達射程後反彈飛回', apply: s => { s._boomerang = true } },
-    { id: 'scatter',   name: '散花',   desc: '消失時分裂成3個小手裏剣（0.4倍傷害）', apply: s => { s._scatter = true } },
   ],
 
   createTexture() { /* loaded in GameScene.preload() */ },
@@ -47,6 +46,12 @@ export default {
       s._hitRadius = HIT_RADIUS * stats._scale
       s._pool = pool
       s._reversed = false
+      s._boomerang     = stats._boomerang     || false
+      s._scatter       = stats._scatter       || false
+      s._scatterFired  = false
+      s._miniExplosion = stats._miniExplosion || false
+      s._ricochet      = stats._ricochet      || false
+      s._ricochetDepth = 0
 
       const deg = (360 / stats.projectileCount) * i
       scene.physics.velocityFromAngle(deg, stats.speed, s.body.velocity)
@@ -61,18 +66,16 @@ export default {
 
     if (sprite._boomerang) {
       if (!sprite._reversed && dist >= sprite.range) {
-        // Reverse velocity
         sprite.body.velocity.x *= -1
         sprite.body.velocity.y *= -1
         sprite._reversed = true
       } else if (sprite._reversed && dist <= 30) {
-        // Back near spawn — expire
-        if (sprite._scatter) _doScatter(sprite)
+        if (sprite._scatter) doScatter(sprite, sprite.scene)
         sprite.disableBody(true, true)
       }
     } else {
       if (dist >= sprite.range) {
-        if (sprite._scatter) _doScatter(sprite)
+        if (sprite._scatter) doScatter(sprite, sprite.scene)
         sprite.disableBody(true, true)
       }
     }
@@ -87,6 +90,50 @@ export default {
         if (Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y) < proj._hitRadius) {
           proj.hitSet.add(e)
           Enemy.takeDamage(e, proj.damage, proj.x, proj.y, affixes, proj.knockback ?? 60)
+
+          // 爆裂弾 — mini explosion on hit
+          if (proj._miniExplosion) {
+            const r = 40
+            enemies.getChildren()
+              .filter(en => en.active && !en.dying && en !== e &&
+                Phaser.Math.Distance.Between(e.x, e.y, en.x, en.y) < r)
+              .forEach(en => Enemy.takeDamage(en, proj.damage * 0.4, e.x, e.y, affixes, 0))
+            const g = scene.add.graphics().setDepth(10)
+            g.lineStyle(2, 0xff6600, 0.8)
+            g.strokeCircle(e.x, e.y, r)
+            scene.tweens.add({ targets: g, alpha: 0, duration: 200, onComplete: () => g.destroy() })
+          }
+
+          // 彈射 — ricochet projectile to nearest unhit enemy
+          if (proj._ricochet && proj._ricochetDepth < 2) {
+            const next = enemies.getChildren()
+              .filter(en => en.active && !en.dying && !proj.hitSet.has(en))
+              .sort((a, b) =>
+                Phaser.Math.Distance.Between(e.x, e.y, a.x, a.y) -
+                Phaser.Math.Distance.Between(e.x, e.y, b.x, b.y))[0]
+            if (next) {
+              const r2 = getOrCreate(proj._pool, e.x, e.y, proj.texture.key)
+              r2.setDisplaySize(proj.displayWidth, proj.displayHeight)
+              r2.damage         = proj.damage * 0.7
+              r2.hitSet         = new Set([e])
+              r2.spawnX         = e.x
+              r2.spawnY         = e.y
+              r2.range          = 200
+              r2.penetrate      = false
+              r2.knockback      = proj.knockback
+              r2._hitRadius     = proj._hitRadius
+              r2._boomerang     = false
+              r2._scatter       = proj._scatter
+              r2._scatterFired  = false
+              r2._miniExplosion = proj._miniExplosion
+              r2._ricochet      = true
+              r2._ricochetDepth = proj._ricochetDepth + 1
+              r2._pool          = proj._pool
+              r2._reversed      = false
+              scene.physics.moveToObject(r2, next, 400)
+            }
+          }
+
           // 雷轟剣 evo — 100% chain bounce, bounces = projectileCount
           if (entry.stats._evo === 'raikou') {
             const bounces = entry.stats.projectileCount || 3
@@ -114,29 +161,4 @@ export default {
       })
     })
   },
-}
-
-function _doScatter(proj) {
-  if (!proj._pool || proj._scatterFired) return
-  proj._scatterFired = true
-  const baseAngle = Math.atan2(proj.body.velocity.y, proj.body.velocity.x)
-  const scene     = proj.scene
-  for (let i = -1; i <= 1; i++) {
-    const s = getOrCreate(proj._pool, proj.x, proj.y, 'shuriken')
-    s.setDisplaySize(proj.displayWidth * 0.5, proj.displayHeight * 0.5)
-    s.damage     = proj.damage * 0.4
-    s.hitSet     = new Set()
-    s.spawnX     = proj.x
-    s.spawnY     = proj.y
-    s.range      = 120
-    s.penetrate  = false
-    s.knockback  = 0
-    s._hitRadius = (proj._hitRadius || 14) * 0.5
-    s._boomerang = false
-    s._scatter   = false
-    s._pool      = proj._pool
-    s._reversed  = false
-    const angle  = baseAngle + Phaser.Math.DegToRad(i * 45)
-    scene.physics.velocityFromAngle(Phaser.Math.RadToDeg(angle), 400, s.body.velocity)
-  }
 }
