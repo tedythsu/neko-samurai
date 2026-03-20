@@ -58,21 +58,21 @@ Add the following block immediately after `const dist = ...` and before the coll
       if (!orb._attracted) {
         const elapsed = this.time.now - orb._spawnTime
         if (elapsed >= 12000) {
-          // Expire: destroy emitter + fade out + remove
+          // Expire: kill existing tweens first, then fade out and destroy
           if (orb._emitter) orb._emitter.destroy()
+          this.tweens.killTweensOf(orb)    // kill warning tween BEFORE adding fade tween
           this.tweens.add({
             targets: orb, alpha: 0, duration: 300, ease: 'Linear',
             onComplete: () => orb.destroy(),
           })
-          this.tweens.killTweensOf(orb)
           this._orbs.splice(i, 1)
           continue
         }
-        // Warning flash: last 3 seconds — alpha oscillates faster as time runs out
+        // Warning flash: last 3 seconds — alpha oscillates, restart only when not already playing
         if (elapsed >= 9000) {
           const remaining = 12000 - elapsed         // 3000 → 0
           const freq = Phaser.Math.Linear(200, 80, 1 - remaining / 3000)
-          if (!orb._warnTween || orb._warnTween.totalElapsed % freq < 16) {
+          if (!orb._warnTween || !orb._warnTween.isPlaying()) {
             this.tweens.killTweensOf(orb)
             orb._warnTween = this.tweens.add({
               targets: orb, alpha: { from: 0.2, to: 1.0 },
@@ -125,43 +125,59 @@ import Kusarigama  from '../src/weapons/Kusarigama.js'
 
 describe('weapon upgrade caps', () => {
   it('Tachi fireRate never drops below 200ms', () => {
+    const upg = Tachi.upgrades.find(u => u.id === 'firerate')
+    expect(upg).toBeDefined()
     const s = { ...Tachi.baseStats }
-    for (let i = 0; i < 20; i++) Tachi.upgrades.find(u => u.id === 'firerate').apply(s)
+    for (let i = 0; i < 20; i++) upg.apply(s)
     expect(s.fireRate).toBeGreaterThanOrEqual(200)
   })
   it('Tachi range capped at 2× base', () => {
+    const upg = Tachi.upgrades.find(u => u.id === 'range')
+    expect(upg).toBeDefined()
     const s = { ...Tachi.baseStats }
-    for (let i = 0; i < 20; i++) Tachi.upgrades.find(u => u.id === 'range').apply(s)
+    for (let i = 0; i < 20; i++) upg.apply(s)
     expect(s.range).toBeLessThanOrEqual(Tachi.baseStats.range * 2)
   })
   it('Ogi fireRate never drops below 200ms', () => {
+    const upg = Ogi.upgrades.find(u => u.id === 'speed')
+    expect(upg).toBeDefined()
     const s = { ...Ogi.baseStats }
-    for (let i = 0; i < 20; i++) Ogi.upgrades.find(u => u.id === 'speed').apply(s)
+    for (let i = 0; i < 20; i++) upg.apply(s)
     expect(s.fireRate).toBeGreaterThanOrEqual(200)
   })
   it('Ogi range capped at 2× base', () => {
+    const upg = Ogi.upgrades.find(u => u.id === 'range')
+    expect(upg).toBeDefined()
     const s = { ...Ogi.baseStats }
-    for (let i = 0; i < 20; i++) Ogi.upgrades.find(u => u.id === 'range').apply(s)
+    for (let i = 0; i < 20; i++) upg.apply(s)
     expect(s.range).toBeLessThanOrEqual(Ogi.baseStats.range * 2)
   })
   it('Homura projectileCount capped at 5', () => {
+    const upg = Homura.upgrades.find(u => u.id === 'multi')
+    expect(upg).toBeDefined()
     const s = { ...Homura.baseStats }
-    for (let i = 0; i < 20; i++) Homura.upgrades.find(u => u.id === 'multi').apply(s)
+    for (let i = 0; i < 20; i++) upg.apply(s)
     expect(s.projectileCount).toBeLessThanOrEqual(5)
   })
   it('Homura _explodeRadius capped at base + 60', () => {
+    const upg = Homura.upgrades.find(u => u.id === 'radius')
+    expect(upg).toBeDefined()
     const s = { ...Homura.baseStats }
-    for (let i = 0; i < 20; i++) Homura.upgrades.find(u => u.id === 'radius').apply(s)
+    for (let i = 0; i < 20; i++) upg.apply(s)
     expect(s._explodeRadius).toBeLessThanOrEqual(Homura.baseStats._explodeRadius + 60)
   })
   it('Ofuda projectileCount capped at 5', () => {
+    const upg = Ofuda.upgrades.find(u => u.id === 'multi')
+    expect(upg).toBeDefined()
     const s = { ...Ofuda.baseStats }
-    for (let i = 0; i < 20; i++) Ofuda.upgrades.find(u => u.id === 'multi').apply(s)
+    for (let i = 0; i < 20; i++) upg.apply(s)
     expect(s.projectileCount).toBeLessThanOrEqual(5)
   })
   it('Kusarigama sickleCount capped at 4', () => {
+    const upg = Kusarigama.upgrades.find(u => u.id === 'sickle')
+    expect(upg).toBeDefined()
     const s = { ...Kusarigama.baseStats }
-    for (let i = 0; i < 20; i++) Kusarigama.upgrades.find(u => u.id === 'sickle').apply(s)
+    for (let i = 0; i < 20; i++) upg.apply(s)
     expect(s.sickleCount).toBeLessThanOrEqual(4)
   })
 })
@@ -339,6 +355,7 @@ describe('PLAYER_UPGRADES', () => {
     PLAYER_UPGRADES.forEach(u => {
       expect(u.id).toBeTruthy()
       expect(u.name).toBeTruthy()
+      expect(u.desc).toBeTruthy()
     })
   })
   it('regen upgrade is oneTime', () => {
@@ -440,33 +457,45 @@ In `tests/logic.test.js`, add to the `weapon upgrade caps` describe block:
   import Shuriken from '../src/weapons/Shuriken.js'
   // (add inside the describe block)
   it('Kunai fireRate never drops below 200ms', () => {
+    const upg = Kunai.upgrades.find(u => u.id === 'firerate')
+    expect(upg).toBeDefined()
     const s = { ...Kunai.baseStats }
-    for (let i = 0; i < 20; i++) Kunai.upgrades.find(u => u.id === 'firerate').apply(s)
+    for (let i = 0; i < 20; i++) upg.apply(s)
     expect(s.fireRate).toBeGreaterThanOrEqual(200)
   })
   it('Kunai projectileCount capped at 5', () => {
+    const upg = Kunai.upgrades.find(u => u.id === 'multishot')
+    expect(upg).toBeDefined()
     const s = { ...Kunai.baseStats }
-    for (let i = 0; i < 20; i++) Kunai.upgrades.find(u => u.id === 'multishot').apply(s)
+    for (let i = 0; i < 20; i++) upg.apply(s)
     expect(s.projectileCount).toBeLessThanOrEqual(5)
   })
   it('Kunai _scale capped at 2.0', () => {
+    const upg = Kunai.upgrades.find(u => u.id === 'scale')
+    expect(upg).toBeDefined()
     const s = { ...Kunai.baseStats }
-    for (let i = 0; i < 20; i++) Kunai.upgrades.find(u => u.id === 'scale').apply(s)
+    for (let i = 0; i < 20; i++) upg.apply(s)
     expect(s._scale).toBeLessThanOrEqual(2.0)
   })
   it('Shuriken fireRate never drops below 200ms', () => {
+    const upg = Shuriken.upgrades.find(u => u.id === 'firerate')
+    expect(upg).toBeDefined()
     const s = { ...Shuriken.baseStats }
-    for (let i = 0; i < 20; i++) Shuriken.upgrades.find(u => u.id === 'firerate').apply(s)
+    for (let i = 0; i < 20; i++) upg.apply(s)
     expect(s.fireRate).toBeGreaterThanOrEqual(200)
   })
   it('Shuriken projectileCount capped at 5', () => {
+    const upg = Shuriken.upgrades.find(u => u.id === 'multishot')
+    expect(upg).toBeDefined()
     const s = { ...Shuriken.baseStats }
-    for (let i = 0; i < 20; i++) Shuriken.upgrades.find(u => u.id === 'multishot').apply(s)
+    for (let i = 0; i < 20; i++) upg.apply(s)
     expect(s.projectileCount).toBeLessThanOrEqual(5)
   })
   it('Shuriken _scale capped at 2.0', () => {
+    const upg = Shuriken.upgrades.find(u => u.id === 'scale')
+    expect(upg).toBeDefined()
     const s = { ...Shuriken.baseStats }
-    for (let i = 0; i < 20; i++) Shuriken.upgrades.find(u => u.id === 'scale').apply(s)
+    for (let i = 0; i < 20; i++) upg.apply(s)
     expect(s._scale).toBeLessThanOrEqual(2.0)
   })
 ```
@@ -506,9 +535,12 @@ Replace `upgrades`:
   ],
 ```
 
-In `fire()`, update the projectile setup. Find the block that sets `s.damage`, `s.hitSet`, etc. and add display size + physics resize. The base Kunai size is 4×14px:
+Replace the entire `fire()` method body with (base Kunai size is 4×14px):
 
 ```js
+  fire(scene, pool, fromX, fromY, stats, enemies) {
+    const targets = _nearestEnemies(enemies, fromX, fromY, stats.projectileCount)
+    if (targets.length === 0) return
     targets.forEach(target => {
       const s = getOrCreate(pool, fromX, fromY, this.texKey)
       const baseW = 4, baseH = 14
@@ -526,6 +558,7 @@ In `fire()`, update the projectile setup. Find the block that sets `s.damage`, `
         Phaser.Math.RadToDeg(angle), stats.speed, s.body.velocity
       )
     })
+  },
 ```
 
 - [ ] **Step 4: Rewrite `Shuriken.js`**
