@@ -94,35 +94,51 @@ export default class GameScene extends Phaser.Scene {
     this.events.on('player-dead', this._onPlayerDead, this)
     this.events.on('player-hit', () => { this._regenTimer = 0 })
 
-    // HUD — fixed to camera
+    // ── HUD ──────────────────────────────────────────────────────────────────
+    // Stat panel backdrop (static, drawn once)
+    this._hudPanel = this.add.graphics().setScrollFactor(0).setDepth(199)
+    this._hudPanel.fillStyle(0x07070f, 0.86)
+    this._hudPanel.fillRoundedRect(10, 10, 216, 74, 6)
+    this._hudPanel.lineStyle(1, 0xb8943f, 0.7)
+    this._hudPanel.strokeRoundedRect(10, 10, 216, 74, 6)
+    this._hudPanel.lineStyle(2, 0xd4a843, 1)
+    this._hudPanel.lineBetween(16, 10, 220, 10)
+
+    // Dynamic HUD graphics (redrawn each frame)
     this._hud = this.add.graphics().setScrollFactor(0).setDepth(200)
-    this._hudLevel = this.add.text(16, 52, 'Lv 1', {
-      fontSize: '14px', color: '#88bbff',
-    }).setScrollFactor(0).setDepth(200)
+
+    // Level text
+    this._hudLevel = this.add.text(32, 58, 'Lv 1', {
+      fontSize: '13px', color: '#c8a84b',
+      fontFamily: '"Cinzel", "Palatino Linotype", serif',
+    }).setScrollFactor(0).setDepth(201)
+
+    // Timer (top-right)
     this._hudTimer = this.add.text(
-      this.cameras.main.width - 16, 16,
-      '0s', { fontSize: '16px', color: '#ffffff' }
-    ).setScrollFactor(0).setDepth(200).setOrigin(1, 0)
+      this.cameras.main.width - 12, 14,
+      '0:00', {
+        fontSize: '17px', color: '#d4c09a',
+        fontFamily: '"Cinzel", "Palatino Linotype", serif',
+        stroke: '#06060f', strokeThickness: 3,
+      }
+    ).setScrollFactor(0).setDepth(201).setOrigin(1, 0)
 
     // Weapon icon row — each entry is { icon, label } so both can be destroyed together
     this._hudWeaponIcons  = []
     this._lastWeaponCount = 0
 
-    // Affix dot row (pre-create up to 16 slots)
+    // Affix dot row (circles, pre-create 16 slots)
     this._hudAffixDots = Array.from({ length: 16 }, (_, i) =>
-      this.add.rectangle(16 + i * 18, 72, 12, 12, 0x444466)
+      this.add.arc(14 + i * 16, 112, 5, 0, 360, false, 0x222244, 1)
         .setScrollFactor(0).setDepth(200).setAlpha(0)
-    )
-    this._hudAffixLabels = Array.from({ length: 16 }, (_, i) =>
-      this.add.text(16 + i * 18, 72, '', { fontSize: '8px', color: '#ffffff' })
-        .setScrollFactor(0).setDepth(201).setOrigin(0.5)
-        .setAlpha(0)
     )
 
     // Resonance glyph row
-    this._hudResonanceText = this.add.text(16, 92, '', {
-      fontSize: '11px', color: '#ffcc44',
-    }).setScrollFactor(0).setDepth(200)
+    this._hudResonanceText = this.add.text(12, 124, '', {
+      fontSize: '12px', color: '#e8c85a',
+      fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
+      stroke: '#06060f', strokeThickness: 2,
+    }).setScrollFactor(0).setDepth(201)
 
     this._elapsed = 0
   }
@@ -289,66 +305,89 @@ export default class GameScene extends Phaser.Scene {
   }
 
   _drawHud() {
-    const W    = this.cameras.main.width
-    const hpPct = this._player.hp / this._player.maxHp
-    const xpPct = this._xp / this._xpToNext
+    const W      = this.cameras.main.width
+    const hpPct  = Math.max(0, this._player.hp / this._player.maxHp)
+    const xpPct  = Math.max(0, this._xp / this._xpToNext)
+    const BX = 32, BW = 188   // bar x, bar width
 
     this._hud.clear()
 
-    // HP bar (200px wide)
-    this._hud.fillStyle(0x555555).fillRect(16, 16, 200, 14)
-    this._hud.fillStyle(0xee3333).fillRect(16, 16, 200 * hpPct, 14)
+    // HP indicator dot
+    this._hud.fillStyle(0xcc2233, 1).fillCircle(21, 27, 6)
+
+    // HP bar track → dark fill → bright fill → top highlight
+    this._hud.fillStyle(0x180508, 1).fillRoundedRect(BX, 21, BW, 12, 4)
+    if (hpPct > 0) {
+      const fw = Math.max(8, BW * hpPct)
+      this._hud.fillStyle(0x881520, 1).fillRoundedRect(BX, 21, fw, 12, 4)
+      this._hud.fillStyle(0xdd2235, 1).fillRoundedRect(BX, 21, fw,  5, 4)
+    }
+    this._hud.lineStyle(1, 0x661222, 0.8).strokeRoundedRect(BX, 21, BW, 12, 4)
+
+    // XP indicator dot
+    this._hud.fillStyle(0x2255cc, 1).fillCircle(21, 44, 5)
 
     // XP bar
-    this._hud.fillStyle(0x333355).fillRect(16, 34, 200, 10)
-    this._hud.fillStyle(0x4488ff).fillRect(16, 34, 200 * xpPct, 10)
+    this._hud.fillStyle(0x040812, 1).fillRoundedRect(BX, 39, BW, 8, 3)
+    if (xpPct > 0) {
+      const fw = Math.max(6, BW * xpPct)
+      this._hud.fillStyle(0x2255cc, 1).fillRoundedRect(BX, 39, fw, 8, 3)
+      this._hud.fillStyle(0x55aaff, 1).fillRoundedRect(BX, 39, fw, 3, 3)
+    }
+    this._hud.lineStyle(1, 0x223366, 0.8).strokeRoundedRect(BX, 39, BW, 8, 3)
 
     this._hudLevel.setText(`Lv ${this._level}`)
-    this._hudTimer.setX(W - 16)
+    this._hudTimer.setX(W - 12).setText(_fmtTime(this._elapsed))
 
     // Weapon icon row — rebuild only when weapon count changes
     if (this._weapons.length !== this._lastWeaponCount) {
       this._lastWeaponCount = this._weapons.length
-      const weaponColors = [0xff8844, 0x44aaff, 0xaaff44, 0xff44aa]
+      const weaponColors = [0xd47c3a, 0x3a8fd4, 0x5ab84c, 0xc44ab8]
       this._hudWeaponIcons.forEach(({ icon, label }) => { icon.destroy(); label.destroy() })
       this._hudWeaponIcons = this._weapons.map((entry, i) => {
-        const icon = this.add.rectangle(16 + i * 26, 58, 20, 20, weaponColors[i] || 0xffffff)
-          .setScrollFactor(0).setDepth(200).setStrokeStyle(1, 0xffffff)
-        const label = this.add.text(16 + i * 26, 58, entry.weapon.name[0], {
-          fontSize: '8px', color: '#000000',
+        const cx = 22 + i * 28
+        const icon = this.add.arc(cx, 93, 12, 0, 360, false, weaponColors[i] || 0x888888)
+          .setScrollFactor(0).setDepth(200)
+          .setStrokeStyle(1.5, 0xffffff, 0.55)
+        const label = this.add.text(cx, 93, entry.weapon.name[0], {
+          fontSize: '10px', color: '#0a0814',
+          fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
         }).setScrollFactor(0).setDepth(201).setOrigin(0.5)
         return { icon, label }
       })
     }
 
-    // Affix dot row
+    // Affix dot row (circles, tier-2 get outer ring)
     const affixIds   = [...this._affixCounts.keys()]
     const affixColor = {
-      burn: 0xff6600, poison: 0x44cc44, chain: 0xffff00,
-      chill: 0x88ccff, curse: 0xaa44aa, leech: 0xff4488,
-      burst: 0xff4400, lucky: 0xffdd88,
-      // Tier-2 — brighter/more saturated versions of parent
-      burn2: 0xff3300, poison2: 0x00ff44, chain2: 0xffff00,
-      chill2: 0x44aaff, curse2: 0xcc00cc, leech2: 0xff0066,
-      burst2: 0xff6600, lucky2: 0xffaa00,
+      burn:    0xff6600, burn2:    0xff3300,
+      poison:  0x44cc44, poison2:  0x00ff44,
+      chain:   0xffff00, chain2:   0xffff00,
+      chill:   0x88ccff, chill2:   0x44aaff,
+      curse:   0xaa44aa, curse2:   0xcc00cc,
+      leech:   0xff4488, leech2:   0xff0066,
+      burst:   0xff4400, burst2:   0xff6600,
+      lucky:   0xffdd88, lucky2:   0xffaa00,
     }
     this._hudAffixDots.forEach((dot, i) => {
       if (i < affixIds.length) {
-        const id = affixIds[i]
-        dot.setFillStyle(affixColor[id] || 0x888888).setAlpha(1)
-        this._hudAffixLabels[i].setText(`${this._affixCounts.get(id)}`).setAlpha(1).setPosition(16 + i * 18, 72)
+        const id  = affixIds[i]
+        const col = affixColor[id] || 0x888888
+        dot.setFillStyle(col, 1).setAlpha(1)
+        dot.setStrokeStyle(id.endsWith('2') ? 1.5 : 0, 0xffffff, 0.85)
       } else {
-        dot.setAlpha(0); this._hudAffixLabels[i].setAlpha(0)
+        dot.setAlpha(0)
       }
     })
 
-    // Resonance glyph row
+    // Resonance glyphs
     const resonanceNames = {
       explode_burn: '爆炎', toxic_chain: '毒鏈', blizzard_arc: '雪電',
-      corrosion: '腐蝕', dark_harvest: '暗刈'
+      corrosion: '腐蝕', dark_harvest: '暗刈',
     }
-    const glyphs = [...this._resonances].map(id => resonanceNames[id] || id).join('  ')
-    this._hudResonanceText.setText(glyphs)
+    this._hudResonanceText.setText(
+      [...this._resonances].map(id => resonanceNames[id] || id).join('  ')
+    )
   }
 
   _spawnWave() {
@@ -549,12 +588,51 @@ export default class GameScene extends Phaser.Scene {
 
   _onPlayerDead() {
     this.physics.pause()
-    this.add.text(
-      this.cameras.main.midPoint.x,
-      this.cameras.main.midPoint.y,
-      '死\n\nClick to restart',
-      { color: '#ff4444', fontSize: '48px', align: 'center' }
-    ).setOrigin(0.5)
+    const W  = this.cameras.main.width
+    const H  = this.cameras.main.height
+    const cx = W / 2, cy = H / 2
+
+    // Dim overlay
+    this.add.rectangle(cx, cy, W, H, 0x000000, 0.72)
+      .setScrollFactor(0).setDepth(300)
+
+    // 死 kanji
+    const deathKanji = this.add.text(cx, cy - 70, '死', {
+      fontSize: '88px', color: '#cc1122',
+      fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
+      stroke: '#3a0008', strokeThickness: 5,
+    }).setScrollFactor(0).setDepth(301).setOrigin(0.5).setAlpha(0)
+
+    // Survival stats
+    const statsText = this.add.text(cx, cy + 12,
+      `生存  ${_fmtTime(this._elapsed)}   到達  Lv ${this._level}`, {
+        fontSize: '17px', color: '#c8a84b',
+        fontFamily: '"Cinzel", "Palatino Linotype", serif',
+        stroke: '#06060f', strokeThickness: 3,
+      }
+    ).setScrollFactor(0).setDepth(301).setOrigin(0.5).setAlpha(0)
+
+    const restartText = this.add.text(cx, cy + 58, 'Click to restart', {
+      fontSize: '12px', color: '#6a6854',
+      fontFamily: '"Cinzel", serif',
+      stroke: '#06060f', strokeThickness: 2,
+    }).setScrollFactor(0).setDepth(301).setOrigin(0.5).setAlpha(0)
+
+    this.tweens.add({
+      targets: [deathKanji, statsText, restartText],
+      alpha: 1, duration: 900, ease: 'Power2',
+    })
+    this.tweens.add({
+      targets: deathKanji,
+      scaleX: { from: 1.5, to: 1 }, scaleY: { from: 1.5, to: 1 },
+      duration: 700, ease: 'Back.easeOut',
+    })
+
     this.input.once('pointerdown', () => this.scene.restart())
   }
+}
+
+function _fmtTime(ms) {
+  const s = Math.floor(ms / 1000)
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
