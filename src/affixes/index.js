@@ -19,7 +19,7 @@ export const ALL_MECHANICAL = [
   {
     id:   'multishot',
     name: '乱射',
-    desc: '所有投射型武器：投射數+1、射程+10%（近戰：射程+15%）',
+    desc: '所有投射型武器：投射數+1；射程型投射物另加射程+10%（近戰：射程+15%）',
   },
   {
     id:   'piercing',

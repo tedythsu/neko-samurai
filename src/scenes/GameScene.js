@@ -506,7 +506,9 @@ export default class GameScene extends Phaser.Scene {
       for (const entry of this._weapons) {
         if (entry.stats.projectileCount !== undefined) {
           entry.stats.projectileCount = Math.min(5, entry.stats.projectileCount + 1)
-          entry.stats.range = (entry.stats.range || 100) * 1.10
+          if (entry.stats.range !== undefined) {
+            entry.stats.range = entry.stats.range * 1.10
+          }
         } else {
           entry.stats.range = (entry.stats.range || 100) * 1.15
         }
