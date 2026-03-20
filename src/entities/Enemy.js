@@ -27,17 +27,31 @@ export default class Enemy {
 
   /**
    * Activate a pooled enemy at position (x, y).
-   * Call from GameScene when getting an enemy from the group.
+   * typeConfig — one of ENEMY_TYPES entries (defaults to kisotsu if omitted)
+   * diffMult   — { hpMult, speedMult } from getDifficultyMult()
    */
-  static activate(sprite, x, y) {
+  static activate(sprite, x, y, typeConfig = null, diffMult = null) {
+    const type = typeConfig || { id: 'kisotsu', baseTint: null, hpMult: 1.0, speedMult: 1.0, sizeMult: 1.0, behaviorFlags: {} }
+    const dm   = diffMult   || { hpMult: 1.0, speedMult: 1.0 }
+
     sprite.enableBody(true, x, y, true, true)
-    sprite.hp             = CFG.ENEMY_HP
+    sprite.hp             = CFG.ENEMY_HP * type.hpMult * dm.hpMult
     sprite.damageCd       = 0
     sprite.knockbackTimer = 0
     sprite.dying          = false
     sprite._frame         = 0
     sprite._timer         = 0
-    sprite.setAlpha(1).clearTint()
+    sprite._baseTint      = type.baseTint    // store for tint pipeline restore
+    sprite._typeConfig    = type             // store for behavior checks (e.g. bakuha explode)
+    sprite._speed         = CFG.ENEMY_SPEED * type.speedMult * dm.speedMult
+
+    sprite.setAlpha(1)
+    if (type.baseTint !== null) {
+      sprite.setTint(type.baseTint)
+    } else {
+      sprite.clearTint()
+    }
+
     sprite._statusEffects = {
       burn:   { stacks: 0, timer: 0, dps: 5, _accum: 0 },
       poison: { stacks: 0, timer: 0, _accum: 0 },
@@ -45,11 +59,26 @@ export default class Enemy {
       curse:  { active: false, timer: 0 },
       frozen: { active: false, timer: 0 },
     }
+
     const frame0 = sprite.scene.textures.get('kisotsu-run').frames[0]
-    const dH = 64
+    const dH = Math.round(64 * type.sizeMult)
     const dW = Math.round(dH * frame0.realWidth / frame0.realHeight)
     sprite.setTexture('kisotsu-run', 0).setDisplaySize(dW, dH)
-    sprite.body.setSize(18, 38)
+
+    // Scale physics body proportionally (base body is 18×38 for 64px height)
+    const bodyW = Math.round(18 * type.sizeMult)
+    const bodyH = Math.round(38 * type.sizeMult)
+    sprite.body.setSize(bodyW, bodyH)
+
+    // 爆炸型: pulsing alpha tween
+    if (type.behaviorFlags.explode) {
+      sprite._pulseTween = sprite.scene.tweens.add({
+        targets: sprite, alpha: { from: 0.6, to: 1.0 },
+        yoyo: true, repeat: -1, duration: 350,
+      })
+    } else {
+      sprite._pulseTween = null
+    }
   }
 
   /**
@@ -63,13 +92,28 @@ export default class Enemy {
     } else {
       const frozen  = sprite._statusEffects && sprite._statusEffects.frozen.active
       const chilled = sprite._statusEffects && sprite._statusEffects.chill.active
-      const speed   = frozen ? 0 : (chilled ? CFG.ENEMY_SPEED * 0.5 : CFG.ENEMY_SPEED)
+      const baseSpeed = sprite._speed ?? CFG.ENEMY_SPEED
+      const speed     = frozen ? 0 : (chilled ? baseSpeed * 0.5 : baseSpeed)
       // Frozen: skip moveToObject (avoids unnecessary physics call each frame).
       // Note: knockback impulses still apply to frozen enemies by design.
       if (speed > 0) sprite.scene.physics.moveToObject(sprite, player.sprite, speed)
     }
 
     sprite.setFlipX(player.x < sprite.x)
+
+    // 爆炸型: explode when within range of player
+    if (!sprite.dying && sprite._typeConfig?.behaviorFlags?.explode) {
+      const dist = Phaser.Math.Distance.Between(sprite.x, sprite.y, player.x, player.y)
+      if (dist < sprite._typeConfig.behaviorFlags.explodeRange) {
+        // AoE damage to player
+        player.takeDamage(CFG.ENEMY_DAMAGE * 2)
+        // Kill pulse tween then die
+        if (sprite._pulseTween) { sprite._pulseTween.stop(); sprite._pulseTween = null }
+        Enemy._triggerDeath(sprite)
+        return
+      }
+    }
+
     if (sprite.damageCd > 0) sprite.damageCd -= delta
     Enemy.updateStatus(sprite, delta)
 
@@ -152,7 +196,11 @@ export default class Enemy {
     if (se.poison.stacks > 0 && se.poison.timer > 0)    { sprite.setTint(0x44cc44); return }
     if (se.chill.active || se.frozen.active)            { sprite.setTint(0x88ccff); return }
     if (se.curse.active)                                 { sprite.setTint(0xaa44aa); return }
-    sprite.clearTint()
+    if (sprite._baseTint !== null && sprite._baseTint !== undefined) {
+      sprite.setTint(sprite._baseTint)
+    } else {
+      sprite.clearTint()
+    }
   }
 
   static _hasStatusTint(sprite) {
@@ -171,6 +219,7 @@ export default class Enemy {
 
     scene.events.emit('enemy-died', { x, y })
     sprite.dying = true
+    if (sprite._pulseTween) { sprite._pulseTween.stop(); sprite._pulseTween = null }
     sprite.clearTint()
 
     // Resonance: explode_burn — burning enemies explode on death
