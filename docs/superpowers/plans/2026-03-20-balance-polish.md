@@ -61,11 +61,12 @@ Add the following block immediately after `const dist = ...` and before the coll
           // Expire: kill existing tweens first, then fade out and destroy
           if (orb._emitter) orb._emitter.destroy()
           this.tweens.killTweensOf(orb)    // kill warning tween BEFORE adding fade tween
+          orb.setActive(false)             // prevent re-processing during 300ms fade
+          this._orbs.splice(i, 1)
           this.tweens.add({
             targets: orb, alpha: 0, duration: 300, ease: 'Linear',
             onComplete: () => orb.destroy(),
           })
-          this._orbs.splice(i, 1)
           continue
         }
         // Warning flash: last 3 seconds — alpha oscillates, restart only when not already playing
@@ -450,12 +451,16 @@ git commit -m "feat: replace regen with 武者の気 — out-of-combat 1.5% maxH
 
 - [ ] **Step 1: Write cap + scale tests**
 
-In `tests/logic.test.js`, add to the `weapon upgrade caps` describe block:
+In `tests/logic.test.js`, add the following two imports at the **top of the file** alongside the other weapon imports added in Task 2, Step 1:
 
 ```js
-  import Kunai    from '../src/weapons/Kunai.js'
-  import Shuriken from '../src/weapons/Shuriken.js'
-  // (add inside the describe block)
+import Kunai    from '../src/weapons/Kunai.js'
+import Shuriken from '../src/weapons/Shuriken.js'
+```
+
+Then add the following tests **inside** the existing `weapon upgrade caps` describe block (after the Kusarigama test):
+
+```js
   it('Kunai fireRate never drops below 200ms', () => {
     const upg = Kunai.upgrades.find(u => u.id === 'firerate')
     expect(upg).toBeDefined()
@@ -563,7 +568,7 @@ Replace the entire `fire()` method body with (base Kunai size is 4×14px):
 
 - [ ] **Step 4: Rewrite `Shuriken.js`**
 
-Replace `baseStats` (add `_scale: 1.0`, remove `range`):
+Replace `baseStats` (add `_scale: 1.0`, add `penetrate: false`, remove `range`). Note: `penetrate: false` is added explicitly so `stats.penetrate` is never `undefined` in `fire()` — Shuriken has no penetrate upgrade so it stays false:
 
 ```js
   baseStats: {
