@@ -27,6 +27,7 @@ Orbs never expire. In long sessions they accumulate on the ground, causing visua
 - Add `orb._spawnTime = this.time.now` in `_spawnOrb()`
 - In the orb update loop (already iterates `this._orbs`), check elapsed time each frame
 - Reuse the existing `this.tweens.killTweensOf(orb)` pattern (already used for attraction) for the expiry fade
+- **Emitter cleanup:** Each orb has `orb._emitter` (a particle emitter attached via `startFollow`). The expiry handler must call `orb._emitter.destroy()` before `orb.destroy()` — same as the existing collect path at GameScene.js line 221
 - No new data structures needed
 
 ### Reference
@@ -83,6 +84,12 @@ Additionally, `乱射` gains a secondary effect to reinforce its global nature a
 - Current: `projectileCount += 1` for all projectile weapons
 - New: `projectileCount += 1` **AND** `range *= 1.10` for all projectile weapons (melee still gets range ×1.15 as before)
 
+### Implementation notes
+- Edit the `multishot` branch in `GameScene._applyMechanical()` (currently around line 463)
+- After the existing `entry.stats.projectileCount += 1` line, add: `entry.stats.range = (entry.stats.range || entry.stats.range) * 1.10` for entries where `projectileCount !== undefined` (i.e. projectile weapons)
+- Melee entries (those without `projectileCount`) already get `range * 1.15` in the existing `else` branch — leave that unchanged
+- Also update the `乱射` desc in `ALL_MECHANICAL` (in `src/affixes/index.js`) to: `'所有投射型武器：投射數+1、射程+10%（近戰：射程+15%）'`
+
 ---
 
 ## Point 4 — Sustain Redesign: Replace Regen
@@ -113,10 +120,11 @@ Additionally, `乱射` gains a secondary effect to reinforce its global nature a
 - Reference: Hades' "Stubborn Roots" (regen after not taking damage for a period) is one of the most valued defensive boons
 
 ### Implementation notes
-- `apply` sets `scene._regenActive = true` and `scene._regenTimer = 0`
-- In `GameScene.update()`, increment `_regenTimer` by `delta`; if `>= 4000` and player alive, call `player.heal(player.maxHp * 0.015 * delta / 1000)`
-- Player's `takeDamage()` triggers `scene.events.emit('player-hit')` (already does this); listener resets `scene._regenTimer = 0`
+- `apply` sets `scene._regenActive = true` and `scene._regenTimer = 0`. No initialization in `create()` is needed — `_regenActive` is `undefined` (falsy) until the upgrade is picked, so the `update()` guard `if (this._regenActive)` correctly skips the logic before the upgrade is selected.
+- In `GameScene.update()`: `if (this._regenActive) { this._regenTimer += delta; if (this._regenTimer >= 4000) this._player.heal(this._player.maxHp * 0.015 * delta / 1000) }`
+- **Timer reset on damage:** `Player.takeDamage()` does **not** currently emit a `'player-hit'` event (it only emits `'player-dead'`). Add `if (this.scene) this.scene.events.emit('player-hit')` at the top of `Player.takeDamage()` (before the death check). Then in `GameScene`, register: `this.events.on('player-hit', () => { this._regenTimer = 0 })` inside `create()`.
 - One-time upgrade (`oneTime: true`), tracked in `_playerUpgradesOwned`
+- **File changes:** `src/entities/Player.js` (add emit), `src/scenes/GameScene.js` (listener + update loop), `src/config.js` (upgrade entry)
 
 ---
 
@@ -161,9 +169,9 @@ Range upgrades for projectile weapons (Kunai `長射程`, Shuriken `遠投`) ext
 | 手裏剣 | `遠投 — 射程 +25%` | `手裏剣 體積 +30%` |
 
 **Mechanics of the size upgrade:**
-- `stats._scale` is introduced as a new stat (default `1.0`)
-- `apply: s => { s._scale = Math.min(2.0, (s._scale ?? 1.0) * 1.30) }` (cap at 2× original)
-- In `fire()`, `s.setDisplaySize(baseW * stats._scale, baseH * stats._scale)` sizes the projectile
+- Add `_scale: 1.0` to `baseStats` in both `Kunai.js` and `Shuriken.js` — same pattern as `_explodeRadius: 80` in `Homura.js`. This ensures `stats._scale` is always a defined number.
+- `apply: s => { s._scale = Math.min(2.0, s._scale * 1.30) }` (no `??` guard needed since `baseStats` guarantees the value)
+- In `fire()`, read the base display dimensions (`baseW`/`baseH`) from the existing `setDisplaySize` call, then apply scale: `s.setDisplaySize(baseW * stats._scale, baseH * stats._scale)`
 - Phaser Arcade physics hitbox is resized proportionally: `s.body.setSize(baseW * stats._scale, baseH * stats._scale)`
 - Visually, the player sees a noticeably larger kunai/shuriken after the upgrade
 - A larger projectile naturally intersects more enemies per flight path, which is a meaningful gameplay improvement (not just cosmetic)
@@ -176,12 +184,14 @@ Reference: Vampire Survivors' Area stat grows the visual size of all projectiles
 
 | File | Changes |
 |------|---------|
-| `src/scenes/GameScene.js` | Orb lifetime + warning flash; `_regenTimer` logic in `update()`; `乱射` secondary range effect |
-| `src/config.js` | Replace `regen` entry with `武者の気` redesign |
+| `src/scenes/GameScene.js` | Orb lifetime + warning flash in orb update loop; `_regenTimer` increment + heal in `update()`; `player-hit` listener in `create()`; `乱射` range secondary effect in `_applyMechanical()` |
+| `src/entities/Player.js` | Add `scene.events.emit('player-hit')` at top of `takeDamage()` |
+| `src/config.js` | Replace `regen` entry with `武者の気` redesign (`oneTime: true`) |
+| `src/affixes/index.js` | Update `乱射` desc to reflect new secondary range effect |
 | `src/weapons/Tachi.js` | Upgrade name changes; cap on `range` and `fireRate` |
 | `src/weapons/Ogi.js` | Upgrade name changes; cap on `range` and `fireRate` |
-| `src/weapons/Kunai.js` | Replace `range` upgrade with `_scale`; cap on `fireRate` and `projectileCount`; `fire()` uses `stats._scale` |
-| `src/weapons/Shuriken.js` | Replace `range` upgrade with `_scale`; cap on `fireRate` and `projectileCount`; `fire()` uses `stats._scale` |
+| `src/weapons/Kunai.js` | Add `_scale: 1.0` to `baseStats`; replace `range` upgrade with `_scale`; cap on `fireRate` and `projectileCount`; `fire()` applies `stats._scale` to `setDisplaySize` and `body.setSize` |
+| `src/weapons/Shuriken.js` | Add `_scale: 1.0` to `baseStats`; replace `range` upgrade with `_scale`; cap on `fireRate` and `projectileCount`; `fire()` applies `stats._scale` to `setDisplaySize` and `body.setSize` |
 | `src/weapons/Homura.js` | Cap on `_explodeRadius` and `projectileCount`; upgrade name changes |
 | `src/weapons/Ofuda.js` | Cap on `projectileCount`; upgrade name changes |
 | `src/weapons/Kusarigama.js` | Cap on `sickleCount`; upgrade name changes |
