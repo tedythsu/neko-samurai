@@ -27,7 +27,7 @@ export default {
       const poisoned   = next._statusEffects && next._statusEffects.poison.stacks > 0
       const toxicChain = scene._resonances && scene._resonances.has('toxic_chain')
       const dmgMult    = 0.5 * (toxicChain && poisoned ? 2 : 1)
-      Enemy.takeDamage(next, damage * dmgMult, src.x, src.y, [])
+      Enemy.takeDamage(next, damage * dmgMult, src.x, src.y, [], 0)
 
       // Blizzard arc resonance: chill all bounced targets
       if (scene._resonances && scene._resonances.has('blizzard_arc') && next._statusEffects) {

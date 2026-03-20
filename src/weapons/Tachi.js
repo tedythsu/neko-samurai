@@ -11,6 +11,7 @@ export default {
     damage:    20,
     fireRate:  1500,
     range:     50,
+    knockback: 120,
     // projectileCount / speed / penetrate not used by melee
   },
 
@@ -45,7 +46,7 @@ export default {
       enemies.getChildren()
         .filter(e => e.active && !e.dying && !hitSet.has(e) &&
           Phaser.Math.Distance.Between(player.x, player.y, e.x, e.y) < stats.range)
-        .forEach(e => { hitSet.add(e); Enemy.takeDamage(e, stats.damage, player.x, player.y, affixes) })
+        .forEach(e => { hitSet.add(e); Enemy.takeDamage(e, stats.damage, player.x, player.y, affixes, stats.knockback ?? 120) })
     }
 
     scene.events.on('update', onUpdate)

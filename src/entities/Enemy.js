@@ -178,7 +178,7 @@ export default class Enemy {
       scene._enemies.getChildren()
         .filter(e => e.active && !e.dying && e !== sprite &&
           Phaser.Math.Distance.Between(x, y, e.x, e.y) < 60)
-        .forEach(e => Enemy.takeDamage(e, CFG.ENEMY_HP * 0.3, x, y, scene._affixes || []))
+        .forEach(e => Enemy.takeDamage(e, CFG.ENEMY_HP * 0.3, x, y, scene._affixes || [], 0))
     }
 
     // Resonance: dark_harvest — cursed enemies explode on death + heal
@@ -187,7 +187,7 @@ export default class Enemy {
       scene._enemies.getChildren()
         .filter(e => e.active && !e.dying && e !== sprite &&
           Phaser.Math.Distance.Between(x, y, e.x, e.y) < 50)
-        .forEach(e => Enemy.takeDamage(e, 15, x, y, scene._affixes || []))
+        .forEach(e => Enemy.takeDamage(e, 15, x, y, scene._affixes || [], 0))
       if (scene._player) scene._player.heal(5)
     }
 
@@ -218,7 +218,7 @@ export default class Enemy {
       scene._enemies.getChildren()
         .filter(e => e.active && !e.dying && e !== sprite &&
           Phaser.Math.Distance.Between(x, y, e.x, e.y) < 80)
-        .forEach(e => Enemy.takeDamage(e, 15, x, y, scene._affixes || []))
+        .forEach(e => Enemy.takeDamage(e, 15, x, y, scene._affixes || [], 0))
       // Visual: fear pulse ring
       const g = scene.add.graphics().setDepth(10)
       g.lineStyle(2, 0xaa44aa, 0.9)
@@ -298,7 +298,7 @@ export default class Enemy {
   /**
    * Reduce enemy HP. Returns true if enemy died.
    */
-  static takeDamage(sprite, amount, fromX, fromY, affixes = []) {
+  static takeDamage(sprite, amount, fromX, fromY, affixes = [], knockback = 80) {
     if (sprite.dying) return false
 
     const se = sprite._statusEffects
@@ -337,14 +337,14 @@ export default class Enemy {
       onComplete: () => txt.destroy(),
     })
 
-    // Knockback impulse — push enemy away from hit source
-    if (fromX !== undefined && fromY !== undefined) {
+    // Knockback impulse — per-weapon force defined in each weapon's baseStats.knockback.
+    if (knockback > 0 && fromX !== undefined && fromY !== undefined) {
       const dx  = sprite.x - fromX
       const dy  = sprite.y - fromY
       const len = Math.hypot(dx, dy) || 1
-      sprite.body.velocity.x = (dx / len) * 250
-      sprite.body.velocity.y = (dy / len) * 250
-      sprite.knockbackTimer  = 150
+      sprite.body.velocity.x = (dx / len) * knockback
+      sprite.body.velocity.y = (dy / len) * knockback
+      sprite.knockbackTimer  = knockback > 150 ? 240 : 140
     }
 
     // Hit flash (red tint, 120ms)

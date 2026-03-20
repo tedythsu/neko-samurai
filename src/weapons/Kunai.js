@@ -18,6 +18,7 @@ export default {
     projectileCount: 1,
     speed: 600,
     penetrate: false,
+    knockback: 60,
     _scale: 1.0,
   },
 
@@ -48,6 +49,7 @@ export default {
       s.spawnY      = fromY
       s.range       = 500
       s.penetrate   = stats.penetrate
+      s.knockback   = stats.knockback ?? 60
       s._hitRadius  = HIT_HALF * stats._scale
 
       const angle = Phaser.Math.Angle.Between(fromX, fromY, target.x, target.y)
@@ -74,7 +76,7 @@ export default {
         if (proj.hitSet.has(e)) return
         if (Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y) < proj._hitRadius) {
           proj.hitSet.add(e)
-          Enemy.takeDamage(e, proj.damage, proj.x, proj.y, affixes)
+          Enemy.takeDamage(e, proj.damage, proj.x, proj.y, affixes, proj.knockback ?? 60)
           if (!proj.penetrate) proj._spent = true
         }
       })

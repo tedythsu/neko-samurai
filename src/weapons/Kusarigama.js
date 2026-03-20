@@ -11,6 +11,7 @@ export default {
     damage:      8,
     fireRate:    0,      // always active — handled by updateActive()
     sickleCount: 1,
+    knockback:   0,
   },
 
   upgrades: [
@@ -63,7 +64,7 @@ export default {
           const last = entry.damageCd.get(e) || 0
           if (now - last >= 200) {
             entry.damageCd.set(e, now)
-            Enemy.takeDamage(e, entry.stats.damage, sx, sy, affixes)
+            Enemy.takeDamage(e, entry.stats.damage, sx, sy, affixes, 0)
           }
         }
       })

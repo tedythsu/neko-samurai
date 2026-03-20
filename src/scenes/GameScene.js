@@ -153,13 +153,13 @@ export default class GameScene extends Phaser.Scene {
       (proj, enemy) => {
         if (proj.hitSet.has(enemy)) return
         proj.hitSet.add(enemy)
-        Enemy.takeDamage(enemy, proj.damage, proj.x, proj.y, this._affixes)
-        // Explosive projectiles (Ofuda, Homura)
+        Enemy.takeDamage(enemy, proj.damage, proj.x, proj.y, this._affixes, proj.knockback ?? 80)
+        // Explosive projectiles (Ofuda, Homura) — splash has no knockback
         if (proj._explodeRadius) {
           this._enemies.getChildren()
             .filter(e => e.active && !e.dying && e !== enemy &&
               Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y) < proj._explodeRadius)
-            .forEach(e => Enemy.takeDamage(e, proj.damage * (proj._explodeMult || 1), proj.x, proj.y, this._affixes))
+            .forEach(e => Enemy.takeDamage(e, proj.damage * (proj._explodeMult || 1), proj.x, proj.y, this._affixes, 0))
         }
         if (!proj.penetrate) proj._spent = true
       }
@@ -233,7 +233,7 @@ export default class GameScene extends Phaser.Scene {
             const last = shield.damageCd.get(e) || 0
             if (now - last >= 200) {
               shield.damageCd.set(e, now)
-              Enemy.takeDamage(e, 1.2, px, py, this._affixes)
+              Enemy.takeDamage(e, 1.2, px, py, this._affixes, 0)
             }
           }
         })

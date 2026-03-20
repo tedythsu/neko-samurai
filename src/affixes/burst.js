@@ -13,7 +13,7 @@ export default {
     scene._enemies.getChildren()
       .filter(e => e.active && !e.dying && e !== enemy &&
         Phaser.Math.Distance.Between(enemy.x, enemy.y, e.x, e.y) < radius)
-      .forEach(e => Enemy.takeDamage(e, damage * 0.4, enemy.x, enemy.y, []))
+      .forEach(e => Enemy.takeDamage(e, damage * 0.4, enemy.x, enemy.y, [], 0))
 
     const g = scene.add.graphics().setDepth(10)
     g.lineStyle(2, 0xff4400, 0.8)

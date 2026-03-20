@@ -15,6 +15,7 @@ export default {
     range:          600,
     speed:          150,
     penetrate:      false,
+    knockback:      80,
   },
 
   upgrades: [
@@ -43,6 +44,7 @@ export default {
       s.spawnY        = fromY
       s.range         = stats.range
       s.penetrate     = stats.penetrate ?? false
+      s.knockback     = stats.knockback ?? 80
       s._target       = target
       s._explodeRadius = 60
       s._explodeMult   = 1.5

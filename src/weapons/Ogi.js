@@ -11,6 +11,7 @@ export default {
     damage:   18,
     fireRate: 1200,
     range:    90,
+    knockback: 200,
   },
 
   upgrades: [
@@ -68,7 +69,7 @@ export default {
           const diff = Phaser.Math.Wrap(angleDeg - facingDeg, -180, 180)
           if (Math.abs(diff) <= 60) {
             hitSet.add(e)
-            Enemy.takeDamage(e, stats.damage, player.x, player.y, affixes)
+            Enemy.takeDamage(e, stats.damage, player.x, player.y, affixes, stats.knockback ?? 200)
           }
         })
 
