@@ -1,6 +1,11 @@
 // tests/logic.test.js
 import { describe, it, expect } from 'vitest'
 import { CFG, xpThreshold, randomEdgePoint, PLAYER_UPGRADES } from '../src/config.js'
+import Tachi       from '../src/weapons/Tachi.js'
+import Ogi         from '../src/weapons/Ogi.js'
+import Homura      from '../src/weapons/Homura.js'
+import Ofuda       from '../src/weapons/Ofuda.js'
+import Kusarigama  from '../src/weapons/Kusarigama.js'
 
 describe('xpThreshold', () => {
   it('returns > 0 for level 1', () => {
@@ -40,5 +45,64 @@ describe('PLAYER_UPGRADES', () => {
       expect(u.name).toBeTruthy()
       expect(u.desc).toBeTruthy()
     })
+  })
+})
+
+describe('weapon upgrade caps', () => {
+  it('Tachi fireRate never drops below 200ms', () => {
+    const upg = Tachi.upgrades.find(u => u.id === 'firerate')
+    expect(upg).toBeDefined()
+    const s = { ...Tachi.baseStats }
+    for (let i = 0; i < 20; i++) upg.apply(s)
+    expect(s.fireRate).toBeGreaterThanOrEqual(200)
+  })
+  it('Tachi range capped at 2× base', () => {
+    const upg = Tachi.upgrades.find(u => u.id === 'range')
+    expect(upg).toBeDefined()
+    const s = { ...Tachi.baseStats }
+    for (let i = 0; i < 20; i++) upg.apply(s)
+    expect(s.range).toBeLessThanOrEqual(Tachi.baseStats.range * 2)
+  })
+  it('Ogi fireRate never drops below 200ms', () => {
+    const upg = Ogi.upgrades.find(u => u.id === 'speed')
+    expect(upg).toBeDefined()
+    const s = { ...Ogi.baseStats }
+    for (let i = 0; i < 20; i++) upg.apply(s)
+    expect(s.fireRate).toBeGreaterThanOrEqual(200)
+  })
+  it('Ogi range capped at 2× base', () => {
+    const upg = Ogi.upgrades.find(u => u.id === 'range')
+    expect(upg).toBeDefined()
+    const s = { ...Ogi.baseStats }
+    for (let i = 0; i < 20; i++) upg.apply(s)
+    expect(s.range).toBeLessThanOrEqual(Ogi.baseStats.range * 2)
+  })
+  it('Homura projectileCount capped at 5', () => {
+    const upg = Homura.upgrades.find(u => u.id === 'multi')
+    expect(upg).toBeDefined()
+    const s = { ...Homura.baseStats }
+    for (let i = 0; i < 20; i++) upg.apply(s)
+    expect(s.projectileCount).toBeLessThanOrEqual(5)
+  })
+  it('Homura _explodeRadius capped at base + 60', () => {
+    const upg = Homura.upgrades.find(u => u.id === 'radius')
+    expect(upg).toBeDefined()
+    const s = { ...Homura.baseStats }
+    for (let i = 0; i < 20; i++) upg.apply(s)
+    expect(s._explodeRadius).toBeLessThanOrEqual(Homura.baseStats._explodeRadius + 60)
+  })
+  it('Ofuda projectileCount capped at 5', () => {
+    const upg = Ofuda.upgrades.find(u => u.id === 'multi')
+    expect(upg).toBeDefined()
+    const s = { ...Ofuda.baseStats }
+    for (let i = 0; i < 20; i++) upg.apply(s)
+    expect(s.projectileCount).toBeLessThanOrEqual(5)
+  })
+  it('Kusarigama sickleCount capped at 4', () => {
+    const upg = Kusarigama.upgrades.find(u => u.id === 'sickle')
+    expect(upg).toBeDefined()
+    const s = { ...Kusarigama.baseStats }
+    for (let i = 0; i < 20; i++) upg.apply(s)
+    expect(s.sickleCount).toBeLessThanOrEqual(4)
   })
 })

@@ -15,9 +15,9 @@ export default {
   },
 
   upgrades: [
-    { id: 'dmg',      name: '太刀強化', desc: '傷害 +25%', apply: s => { s.damage   *= 1.25 } },
-    { id: 'firerate', name: '居合',     desc: '揮速 +20%', apply: s => { s.fireRate *= 0.80 } },
-    { id: 'range',    name: '斬擊延伸', desc: '射程 +30%', apply: s => { s.range    *= 1.30 } },
+    { id: 'dmg',      name: '太刀 傷害 +25%',    desc: '', apply: s => { s.damage   *= 1.25 } },
+    { id: 'firerate', name: '太刀 攻擊速度 +20%', desc: '', apply: s => { s.fireRate  = Math.max(200, s.fireRate * 0.80) } },
+    { id: 'range',    name: '太刀 攻擊範圍 +30%', desc: '', apply: s => { s.range     = Math.min(100, s.range * 1.30) } },
   ],
 
   createTexture(scene) {

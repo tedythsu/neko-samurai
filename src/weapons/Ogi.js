@@ -14,9 +14,9 @@ export default {
   },
 
   upgrades: [
-    { id: 'dmg',   name: '扇強化', desc: '傷害 +25%', apply: s => { s.damage   *= 1.25 } },
-    { id: 'range', name: '廣域',   desc: '射程 +20%', apply: s => { s.range    *= 1.20 } },
-    { id: 'speed', name: '速揮',   desc: '揮速 +20%', apply: s => { s.fireRate *= 0.80 } },
+    { id: 'dmg',   name: '扇 傷害 +25%',    desc: '', apply: s => { s.damage   *= 1.25 } },
+    { id: 'range', name: '扇 攻擊範圍 +20%', desc: '', apply: s => { s.range    = Math.min(180, s.range * 1.20) } },
+    { id: 'speed', name: '扇 攻擊速度 +20%', desc: '', apply: s => { s.fireRate = Math.max(200, s.fireRate * 0.80) } },
   ],
 
   createTexture(_scene) { /* no persistent texture — arc is drawn with Graphics */ },

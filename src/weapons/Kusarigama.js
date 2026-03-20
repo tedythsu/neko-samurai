@@ -14,8 +14,8 @@ export default {
   },
 
   upgrades: [
-    { id: 'dmg',    name: '鎌強化', desc: '傷害 +25%', apply: s => { s.damage      *= 1.25 } },
-    { id: 'sickle', name: '多鎌',   desc: '鎌刃 +1',   apply: s => { s.sickleCount += 1 } },
+    { id: 'dmg',    name: '鎖鎌 傷害 +25%', desc: '', apply: s => { s.damage      *= 1.25 } },
+    { id: 'sickle', name: '鎖鎌 鎌刃 +1',   desc: '', apply: s => { s.sickleCount = Math.min(4, s.sickleCount + 1) } },
   ],
 
   createTexture(_scene) { /* sickles are drawn as rectangles in updateActive */ },

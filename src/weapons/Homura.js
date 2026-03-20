@@ -19,9 +19,9 @@ export default {
   },
 
   upgrades: [
-    { id: 'dmg',    name: '炎矢強化', desc: '傷害 +25%',    apply: s => { s.damage          *= 1.25 } },
-    { id: 'radius', name: '大爆炸',   desc: '爆炸半徑+20px', apply: s => { s._explodeRadius += 20 } },
-    { id: 'multi',  name: '多重炎矢', desc: '彈數 +1',       apply: s => { s.projectileCount += 1 } },
+    { id: 'dmg',    name: '炎矢 傷害 +25%',    desc: '', apply: s => { s.damage          *= 1.25 } },
+    { id: 'radius', name: '炎矢 爆炸範圍 +20px', desc: '', apply: s => { s._explodeRadius = Math.min(140, s._explodeRadius + 20) } },
+    { id: 'multi',  name: '炎矢 投射數 +1',     desc: '', apply: s => { s.projectileCount = Math.min(5, s.projectileCount + 1) } },
   ],
 
   createTexture(scene) {
