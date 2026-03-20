@@ -2,6 +2,7 @@
 import Phaser from 'phaser'
 import Enemy  from '../entities/Enemy.js'
 import { getOrCreate } from './_pool.js'
+import { doScatter } from '../upgrades/projTraits.js'
 
 const BASE_H    = 40   // display height in px regardless of source image size
 const HIT_HALF  = 14   // hit radius in px (approx half the visual width)
@@ -28,8 +29,6 @@ export default {
     { id: 'multishot', name: '苦無 投射數 +1',     desc: '', apply: s => { s.projectileCount = Math.min(5, s.projectileCount + 1) } },
     { id: 'penetrate', name: '苦無 貫穿',          desc: '', apply: s => { s.penetrate = true } },
     { id: 'scale',     name: '苦無 體積 +30%',     desc: '', apply: s => { s._scale = Math.min(2.0, s._scale * 1.30) } },
-    { id: 'chainHit',    name: '連刃', desc: '命中後跳躍至最近120px敵人（同等傷害）', apply: s => { s._chainHit = true } },
-    { id: 'alwaysPierce',name: '穿心', desc: '永遠貫穿敵人',                          apply: s => { s._alwaysPierce = true } },
   ],
 
   createTexture() { /* loaded in GameScene.preload() */ },
@@ -50,10 +49,15 @@ export default {
       s.spawnX      = fromX
       s.spawnY      = fromY
       s.range       = 500
-      s.penetrate   = stats.penetrate || stats._alwaysPierce || false
-      s._chained    = false
+      s.penetrate   = stats.penetrate || false
       s.knockback   = stats.knockback ?? 60
       s._hitRadius  = HIT_HALF * stats._scale
+      s._miniExplosion = stats._miniExplosion || false
+      s._ricochet      = stats._ricochet      || false
+      s._ricochetDepth = 0
+      s._scatter       = stats._scatter       || false
+      s._scatterFired  = false
+      s._pool          = pool
 
       const angle = Phaser.Math.Angle.Between(fromX, fromY, target.x, target.y)
       scene.physics.velocityFromAngle(
@@ -67,6 +71,7 @@ export default {
     // Rotate so image top faces travel direction
     sprite.rotation = Math.atan2(sprite.body.velocity.y, sprite.body.velocity.x) + Math.PI / 2
     if (Phaser.Math.Distance.Between(sprite.spawnX, sprite.spawnY, sprite.x, sprite.y) >= sprite.range) {
+      if (sprite._scatter) doScatter(sprite, sprite.scene)
       sprite.disableBody(true, true)
     }
   },
@@ -87,32 +92,51 @@ export default {
             e._statusEffects.frozen.timer  = 2000
           }
 
-          // 連刃 — one chain-bounce to nearest unhit enemy
-          if (entry.stats._chainHit && !proj._chained) {
-            const nearest = enemies.getChildren()
-              .filter(en => en.active && !en.dying && !proj.hitSet.has(en) &&
-                Phaser.Math.Distance.Between(proj.x, proj.y, en.x, en.y) < 120)
+          // 爆裂弾
+          if (proj._miniExplosion) {
+            const r = 40
+            enemies.getChildren()
+              .filter(en => en.active && !en.dying && en !== e &&
+                Phaser.Math.Distance.Between(e.x, e.y, en.x, en.y) < r)
+              .forEach(en => Enemy.takeDamage(en, proj.damage * 0.4, e.x, e.y, affixes, 0))
+            const g = scene.add.graphics().setDepth(10)
+            g.lineStyle(2, 0xff6600, 0.8)
+            g.strokeCircle(e.x, e.y, r)
+            scene.tweens.add({ targets: g, alpha: 0, duration: 200, onComplete: () => g.destroy() })
+          }
+
+          // 彈射
+          if (proj._ricochet && proj._ricochetDepth < 2) {
+            const next = enemies.getChildren()
+              .filter(en => en.active && !en.dying && !proj.hitSet.has(en))
               .sort((a, b) =>
-                Phaser.Math.Distance.Between(proj.x, proj.y, a.x, a.y) -
-                Phaser.Math.Distance.Between(proj.x, proj.y, b.x, b.y))[0]
-            if (nearest) {
-              proj.hitSet.add(nearest)
-              proj._chained = true
-              // Teleport projectile to bounce target
-              proj.x = nearest.x
-              proj.y = nearest.y
-              Enemy.takeDamage(nearest, proj.damage, proj.x, proj.y, affixes, proj.knockback ?? 60)
-              // 氷刃苦無 on bounce target too
-              if (entry.stats._evo === 'koori' && nearest._statusEffects && nearest._statusEffects.frozen) {
-                nearest._statusEffects.frozen.active = true
-                nearest._statusEffects.frozen.timer  = 2000
-              }
+                Phaser.Math.Distance.Between(e.x, e.y, a.x, a.y) -
+                Phaser.Math.Distance.Between(e.x, e.y, b.x, b.y))[0]
+            if (next) {
+              const r2 = getOrCreate(proj._pool, e.x, e.y, proj.texture.key)
+              r2.setDisplaySize(proj.displayWidth, proj.displayHeight)
+              r2.damage         = proj.damage * 0.7
+              r2.hitSet         = new Set([e])
+              r2.spawnX         = e.x
+              r2.spawnY         = e.y
+              r2.range          = 200
+              r2.penetrate      = false
+              r2.knockback      = proj.knockback
+              r2._hitRadius     = proj._hitRadius
+              r2._boomerang     = false
+              r2._scatter       = proj._scatter
+              r2._scatterFired  = false
+              r2._miniExplosion = proj._miniExplosion
+              r2._ricochet      = true
+              r2._ricochetDepth = proj._ricochetDepth + 1
+              r2._pool          = proj._pool
+              r2._reversed      = false
+              scene.physics.moveToObject(r2, next, 400)
             }
           }
 
           // 氷刃苦無 — pierce frozen enemies (don't expire)
-          const targetFrozen = e._statusEffects && e._statusEffects.frozen.active
-          const shouldPierce = proj.penetrate || (entry.stats._evo === 'koori' && targetFrozen)
+          const shouldPierce = proj.penetrate || (entry.stats._evo === 'koori' && e._statusEffects?.frozen?.active)
           if (!shouldPierce) proj._spent = true
         }
       })
