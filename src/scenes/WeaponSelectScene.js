@@ -131,11 +131,11 @@ export default class WeaponSelectScene extends Phaser.Scene {
 
     // Hover
     bg.on('pointerover', () => {
-      bg.setFillColor(0x141428).setStrokeStyle(1.5, accent, 0.85)
+      bg.setFillStyle(0x141428).setStrokeStyle(1.5, accent, 0.85)
       this.tweens.add({ targets: container, scaleX: 1.03, scaleY: 1.03, duration: 100 })
     })
     bg.on('pointerout', () => {
-      bg.setFillColor(0x0d0d1e).setStrokeStyle(1, 0x252535)
+      bg.setFillStyle(0x0d0d1e).setStrokeStyle(1, 0x252535)
       this.tweens.add({ targets: container, scaleX: 1, scaleY: 1, duration: 120 })
     })
     bg.on('pointerdown', () => this.scene.start('GameScene', { weapon }))

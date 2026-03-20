@@ -126,11 +126,11 @@ export default class UpgradeScene extends Phaser.Scene {
 
     // Hover
     bg.on('pointerover', () => {
-      bg.setFillColor(0x14142a).setStrokeStyle(1.5, accent, 0.9)
+      bg.setFillStyle(0x14142a).setStrokeStyle(1.5, accent, 0.9)
       this.tweens.add({ targets: container, scaleX: 1.04, scaleY: 1.04, duration: 100 })
     })
     bg.on('pointerout', () => {
-      bg.setFillColor(0x0b0b1c).setStrokeStyle(1, 0x2a2a42)
+      bg.setFillStyle(0x0b0b1c).setStrokeStyle(1, 0x2a2a42)
       this.tweens.add({ targets: container, scaleX: 1, scaleY: 1, duration: 120 })
     })
     bg.on('pointerdown', () => this._choose(upg))
