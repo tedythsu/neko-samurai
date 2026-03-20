@@ -1,7 +1,7 @@
 // src/weapons/Kunai.js
 import Phaser from 'phaser'
 import Enemy  from '../entities/Enemy.js'
-import { getOrCreate } from './_pool.js'
+import { getOrCreate, nearestEnemies } from './_pool.js'
 import { doScatter } from '../upgrades/projTraits.js'
 import { applyMiniExplosion, applyRicochet } from '../upgrades/projEffects.js'
 
@@ -35,7 +35,7 @@ export default {
   createTexture() { /* loaded in GameScene.preload() */ },
 
   fire(scene, pool, fromX, fromY, stats, enemies) {
-    const targets = _nearestEnemies(enemies, fromX, fromY, stats.projectileCount)
+    const targets = nearestEnemies(enemies, fromX, fromY, stats.projectileCount)
     if (targets.length === 0) return
     targets.forEach(target => {
       const s = getOrCreate(pool, fromX, fromY, this.texKey)
@@ -104,12 +104,3 @@ export default {
   },
 }
 
-function _nearestEnemies(enemies, x, y, count) {
-  return enemies
-    .getChildren()
-    .filter(e => e.active && !e.dying)
-    .map(e => ({ e, d: Phaser.Math.Distance.Between(x, y, e.x, e.y) }))
-    .sort((a, b) => a.d - b.d)
-    .slice(0, count)
-    .map(({ e }) => e)
-}

@@ -1,4 +1,5 @@
 // src/weapons/_pool.js
+import Phaser from 'phaser'
 
 /**
  * Get a dead pooled sprite or create a new one.
@@ -14,4 +15,17 @@ export function getOrCreate(pool, fromX, fromY, texKey) {
   s.enableBody(true, fromX, fromY, true, true)
   s._spent = false
   return s
+}
+
+/**
+ * Return up to `count` nearest active enemies sorted by distance.
+ */
+export function nearestEnemies(enemies, x, y, count) {
+  return enemies
+    .getChildren()
+    .filter(e => e.active && !e.dying)
+    .map(e => ({ e, d: Phaser.Math.Distance.Between(x, y, e.x, e.y) }))
+    .sort((a, b) => a.d - b.d)
+    .slice(0, count)
+    .map(({ e }) => e)
 }

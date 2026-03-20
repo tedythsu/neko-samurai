@@ -149,34 +149,16 @@ export default class GameScene extends Phaser.Scene {
   }
 
   _createScorchZone(x, y, radius, damage, affixes) {
-    const gz = this.add.graphics().setDepth(4)
-    gz.fillStyle(0xff4400, 0.30)
-    gz.fillCircle(x, y, radius)
-    const damageCd = new Map()
-    const tick = () => {
-      const now = this.time.now
-      this._enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
-        if (Phaser.Math.Distance.Between(x, y, e.x, e.y) < radius) {
-          const last = damageCd.get(e) || 0
-          if (now - last >= 300) {
-            damageCd.set(e, now)
-            Enemy.takeDamage(e, damage * 0.15, x, y, affixes, 0)
-          }
-        }
-      })
-    }
-    this.events.on('update', tick)
-    const cleanup = () => {
-      this.events.off('update', tick)
-      gz.destroy()
-    }
-    this.time.delayedCall(3000, cleanup)
-    this.events.once('shutdown', cleanup)
+    this._createDamageZone(x, y, radius, damage, affixes, { color: 0xff4400, alpha: 0.30, mult: 0.15, duration: 3000 })
   }
 
   _createLingerZone(x, y, radius, damage, affixes) {
+    this._createDamageZone(x, y, radius, damage, affixes, { color: 0x8800cc, alpha: 0.25, mult: 0.20, duration: 2000 })
+  }
+
+  _createDamageZone(x, y, radius, damage, affixes, { color, alpha, mult, duration }) {
     const gz = this.add.graphics().setDepth(4)
-    gz.fillStyle(0x8800cc, 0.25)
+    gz.fillStyle(color, alpha)
     gz.fillCircle(x, y, radius)
     const damageCd = new Map()
     const tick = () => {
@@ -186,17 +168,14 @@ export default class GameScene extends Phaser.Scene {
           const last = damageCd.get(e) || 0
           if (now - last >= 300) {
             damageCd.set(e, now)
-            Enemy.takeDamage(e, damage * 0.20, x, y, affixes, 0)
+            Enemy.takeDamage(e, damage * mult, x, y, affixes, 0)
           }
         }
       })
     }
     this.events.on('update', tick)
-    const cleanup = () => {
-      this.events.off('update', tick)
-      gz.destroy()
-    }
-    this.time.delayedCall(2000, cleanup)
+    const cleanup = () => { this.events.off('update', tick); gz.destroy() }
+    this.time.delayedCall(duration, cleanup)
     this.events.once('shutdown', cleanup)
   }
 
