@@ -6,7 +6,7 @@ export default {
   id: 'shuriken',
   name: '手裏剣',
   desc: '均衡型・全方位放射',
-  texKey: 'shuriken-tex',
+  texKey: 'shuriken',
 
   baseStats: {
     damage: 10,
@@ -24,20 +24,14 @@ export default {
     { id: 'scale',     name: '手裏剣 體積 +30%',     desc: '', apply: s => { s._scale = Math.min(2.0, s._scale * 1.30) } },
   ],
 
-  createTexture(scene) {
-    if (scene.textures.exists('shuriken-tex')) return
-    const rt = scene.add.renderTexture(0, 0, 12, 12)
-    rt.fill(0x222244)
-    rt.saveTexture('shuriken-tex')
-    rt.destroy()
-  },
+  createTexture() { /* loaded in GameScene.preload() */ },
 
   fire(scene, pool, fromX, fromY, stats /*, enemies unused */) {
     for (let i = 0; i < stats.projectileCount; i++) {
       const s = getOrCreate(pool, fromX, fromY, this.texKey)
-      const baseW = 12, baseH = 12
+      const baseW = 28, baseH = 28
       s.setDisplaySize(baseW * stats._scale, baseH * stats._scale)
-      s.body.setSize(baseW * stats._scale, baseH * stats._scale)
+      s.body.setSize(64 * stats._scale, 64 * stats._scale, true)  // hitbox larger than visual, centered
       s.damage    = stats.damage
       s.hitSet    = new Set()
       s.spawnX    = fromX

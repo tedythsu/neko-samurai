@@ -32,10 +32,18 @@ export default {
     }
 
     // Grow sickle array if sickleCount increased via upgrade
+    const SICKLE_LEN     = 80   // chain length in px (orbit radius)
+    // CHAIN_ATTACH_Y: where the chain connects on the image (1.0 = absolute bottom pixel).
+    // If the artwork has bottom padding, lower this value (e.g. 0.85) until the chain
+    // visually connects to the player center.
+    const CHAIN_ATTACH_Y = 1.0
+
     while (entry.sickles.length < entry.stats.sickleCount) {
-      entry.sickles.push(
-        scene.add.rectangle(0, 0, 20, 8, 0x00cccc).setDepth(8)
-      )
+      const img = scene.add.image(0, 0, 'kusarigama').setDepth(8)
+      const aspect = img.width / img.height
+      img.setDisplaySize(SICKLE_LEN * aspect, SICKLE_LEN)
+          .setOrigin(0.5, CHAIN_ATTACH_Y)
+      entry.sickles.push(img)
     }
 
     const now       = scene.time.now
@@ -44,9 +52,11 @@ export default {
     for (let i = 0; i < entry.sickles.length; i++) {
       const sickle  = entry.sickles[i]
       const angle   = Phaser.Math.DegToRad(baseAngle + (360 / entry.sickles.length) * i)
-      const sx      = player.x + Math.cos(angle) * 80
-      const sy      = player.y + Math.sin(angle) * 80
-      sickle.setPosition(sx, sy).setRotation(angle)
+      // Anchor (CHAIN_ATTACH_Y point on image) sits at player center; image extends outward
+      sickle.setPosition(player.x, player.y).setRotation(angle + Math.PI / 2)
+      // Collision point = tip of sickle (CHAIN_ATTACH_Y fraction of length from player)
+      const sx = player.x + Math.cos(angle) * SICKLE_LEN * CHAIN_ATTACH_Y
+      const sy = player.y + Math.sin(angle) * SICKLE_LEN * CHAIN_ATTACH_Y
 
       enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
         if (Phaser.Math.Distance.Between(sx, sy, e.x, e.y) < 20) {

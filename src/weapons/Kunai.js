@@ -6,7 +6,7 @@ export default {
   id: 'kunai',
   name: '苦無',
   desc: '速射型・精確追蹤',
-  texKey: 'kunai-tex',
+  texKey: 'kunai',
 
   baseStats: {
     damage: 8,
@@ -25,22 +25,16 @@ export default {
     { id: 'scale',     name: '苦無 體積 +30%',     desc: '', apply: s => { s._scale = Math.min(2.0, s._scale * 1.30) } },
   ],
 
-  createTexture(scene) {
-    if (scene.textures.exists('kunai-tex')) return
-    const rt = scene.add.renderTexture(0, 0, 4, 14)
-    rt.fill(0x666688)
-    rt.saveTexture('kunai-tex')
-    rt.destroy()
-  },
+  createTexture() { /* loaded in GameScene.preload() */ },
 
   fire(scene, pool, fromX, fromY, stats, enemies) {
     const targets = _nearestEnemies(enemies, fromX, fromY, stats.projectileCount)
     if (targets.length === 0) return
     targets.forEach(target => {
       const s = getOrCreate(pool, fromX, fromY, this.texKey)
-      const baseW = 4, baseH = 14
-      s.setDisplaySize(baseW * stats._scale, baseH * stats._scale)
-      s.body.setSize(baseW * stats._scale, baseH * stats._scale)
+      // Scale uniformly to preserve image's natural proportions (0.7 = base display size)
+      s.setScale(0.7 * stats._scale)
+      s.body.setSize(s.displayWidth, s.displayHeight)
       s.damage    = stats.damage
       s.hitSet    = new Set()
       s.spawnX    = fromX
@@ -57,8 +51,8 @@ export default {
 
   update(sprite) {
     if (!sprite.active) return
-    // Rotate to face travel direction for visual clarity
-    sprite.rotation = Math.atan2(sprite.body.velocity.y, sprite.body.velocity.x)
+    // Rotate so image top faces travel direction (-π/2 offset since image is vertical)
+    sprite.rotation = Math.atan2(sprite.body.velocity.y, sprite.body.velocity.x) + Math.PI / 2
     if (Phaser.Math.Distance.Between(sprite.spawnX, sprite.spawnY, sprite.x, sprite.y) >= sprite.range) {
       sprite.disableBody(true, true)
     }
