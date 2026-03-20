@@ -28,6 +28,8 @@ export default {
     { id: 'multishot', name: '苦無 投射數 +1',     desc: '', apply: s => { s.projectileCount = Math.min(5, s.projectileCount + 1) } },
     { id: 'penetrate', name: '苦無 貫穿',          desc: '', apply: s => { s.penetrate = true } },
     { id: 'scale',     name: '苦無 體積 +30%',     desc: '', apply: s => { s._scale = Math.min(2.0, s._scale * 1.30) } },
+    { id: 'chainHit',    name: '連刃', desc: '命中後跳躍至最近120px敵人（同等傷害）', apply: s => { s._chainHit = true } },
+    { id: 'alwaysPierce',name: '穿心', desc: '永遠貫穿敵人',                          apply: s => { s._alwaysPierce = true } },
   ],
 
   createTexture() { /* loaded in GameScene.preload() */ },
@@ -48,7 +50,8 @@ export default {
       s.spawnX      = fromX
       s.spawnY      = fromY
       s.range       = 500
-      s.penetrate   = stats.penetrate
+      s.penetrate   = stats.penetrate || stats._alwaysPierce || false
+      s._chained    = false
       s.knockback   = stats.knockback ?? 60
       s._hitRadius  = HIT_HALF * stats._scale
 
@@ -77,7 +80,40 @@ export default {
         if (Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y) < proj._hitRadius) {
           proj.hitSet.add(e)
           Enemy.takeDamage(e, proj.damage, proj.x, proj.y, affixes, proj.knockback ?? 60)
-          if (!proj.penetrate) proj._spent = true
+
+          // 氷刃苦無 evo — freeze on hit
+          if (entry.stats._evo === 'koori' && e._statusEffects && e._statusEffects.frozen) {
+            e._statusEffects.frozen.active = true
+            e._statusEffects.frozen.timer  = 2000
+          }
+
+          // 連刃 — one chain-bounce to nearest unhit enemy
+          if (entry.stats._chainHit && !proj._chained) {
+            const nearest = enemies.getChildren()
+              .filter(en => en.active && !en.dying && !proj.hitSet.has(en) &&
+                Phaser.Math.Distance.Between(proj.x, proj.y, en.x, en.y) < 120)
+              .sort((a, b) =>
+                Phaser.Math.Distance.Between(proj.x, proj.y, a.x, a.y) -
+                Phaser.Math.Distance.Between(proj.x, proj.y, b.x, b.y))[0]
+            if (nearest) {
+              proj.hitSet.add(nearest)
+              proj._chained = true
+              // Teleport projectile to bounce target
+              proj.x = nearest.x
+              proj.y = nearest.y
+              Enemy.takeDamage(nearest, proj.damage, proj.x, proj.y, affixes, proj.knockback ?? 60)
+              // 氷刃苦無 on bounce target too
+              if (entry.stats._evo === 'koori' && nearest._statusEffects && nearest._statusEffects.frozen) {
+                nearest._statusEffects.frozen.active = true
+                nearest._statusEffects.frozen.timer  = 2000
+              }
+            }
+          }
+
+          // 氷刃苦無 — pierce frozen enemies (don't expire)
+          const targetFrozen = e._statusEffects && e._statusEffects.frozen.active
+          const shouldPierce = proj.penetrate || (entry.stats._evo === 'koori' && targetFrozen)
+          if (!shouldPierce) proj._spent = true
         }
       })
     })
