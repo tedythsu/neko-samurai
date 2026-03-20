@@ -2,13 +2,12 @@
 import Phaser from 'phaser'
 import Player   from '../entities/Player.js'
 import Enemy    from '../entities/Enemy.js'
-import { CFG, randomEdgePoint, xpThreshold, PLAYER_UPGRADES } from '../config.js'
+import { CFG, randomEdgePoint, xpThreshold, PLAYER_UPGRADES, PROGRESSION_BREAKPOINTS } from '../config.js'
 import { ALL_AFFIXES, ALL_TIER2_AFFIXES, ALL_MECHANICAL, ALL_EVOLUTIONS, checkResonances } from '../affixes/index.js'
 import { ALL_WEAPONS } from '../weapons/index.js'
 import { ALL_PROJ_TRAITS, PROJ_WEAPON_IDS }              from '../upgrades/projTraits.js'
 import { ALL_MELEE_TRAITS, MELEE_WEAPON_IDS, SWING_WEAPON_IDS } from '../upgrades/meleeTraits.js'
 import { ENEMY_TYPES, getDifficultyMult } from '../enemies/EnemyTypes.js'
-import { PROGRESSION_BREAKPOINTS }        from '../config.js'
 
 export default class GameScene extends Phaser.Scene {
   constructor() { super('GameScene') }
@@ -476,6 +475,7 @@ export default class GameScene extends Phaser.Scene {
       t.unlockMs <= this._elapsed &&
       !(this._bossActive && t.id === 'bakuha')
     )
+    if (pool.length === 0) return
 
     const count = Math.floor(this._level / CFG.WAVE_SCALE) + 1
     for (let i = 0; i < count; i++) {
