@@ -1,7 +1,9 @@
 // src/weapons/Ofuda.js
 import Phaser     from 'phaser'
+import Enemy      from '../entities/Enemy.js'
 import { getOrCreate } from './_pool.js'
 import { doScatter } from '../upgrades/projTraits.js'
+import { applyExplosion, applyMiniExplosion, applyRicochet } from '../upgrades/projEffects.js'
 
 export default {
   id:     'ofuda',
@@ -63,6 +65,7 @@ export default {
         s._linger = true
         s._explodeRadius = 60 * 2.5
       }
+      s._hitRadius = 10
 
       const angle = Phaser.Math.Angle.Between(fromX, fromY, target.x, target.y)
       scene.physics.velocityFromAngle(Phaser.Math.RadToDeg(angle), stats.speed, s.body.velocity)
@@ -107,6 +110,29 @@ export default {
     sprite.body.velocity.x = Math.cos(newAngle) * speed
     sprite.body.velocity.y = Math.sin(newAngle) * speed
     sprite.rotation = newAngle
+  },
+
+  updateActive(entry, scene, enemies, _player, affixes) {
+    entry.projectiles.getChildren().forEach(proj => {
+      if (!proj.active || proj._spent) return
+      enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
+        if (proj.hitSet.has(e)) return
+        if (Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y) < proj._hitRadius) {
+          proj.hitSet.add(e)
+          Enemy.takeDamage(e, proj.damage, proj.x, proj.y, affixes, proj.knockback ?? 80)
+          applyExplosion(proj, e, scene, enemies, affixes)
+          applyMiniExplosion(proj, e, scene, enemies, affixes)
+          applyRicochet(proj, e, scene, enemies, affixes, next => ({
+            _target:        next,
+            _explodeRadius: proj._explodeRadius,
+            _explodeMult:   proj._explodeMult,
+            _linger:        false,
+            _evoKaku:       false,
+          }))
+          if (!proj.penetrate) proj._spent = true
+        }
+      })
+    })
   },
 }
 

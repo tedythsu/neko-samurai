@@ -1,11 +1,11 @@
 // src/upgrades/projEffects.js
 //
-// Shared projectile hit-effect helpers for the Layer P trait system.
-// Used by weapon updateActive() and GameScene overlap callback.
+// Shared projectile hit-effect helpers.
+// Used by all weapon updateActive() implementations.
 //
-// Two functions, two traits:
-//   applyMiniExplosion — 爆裂弾
-//   applyRicochet      — 彈射
+// applyExplosion     — Homura/Ofuda AoE burst (scorch, chain, linger, evoKaku)
+// applyMiniExplosion — 爆裂弾 Layer P trait
+// applyRicochet      — 彈射 Layer P trait
 
 import Phaser from 'phaser'
 import Enemy  from '../entities/Enemy.js'
@@ -17,6 +17,38 @@ const RICOCHET_SPEED     = 400
 const RICOCHET_RANGE     = 200
 const RICOCHET_DAMAGE    = 0.7   // × proj.damage
 const RICOCHET_MAX_DEPTH = 2
+
+/**
+ * applyExplosion — Homura/Ofuda AoE burst at proj's position.
+ * No-op if proj._explodeRadius is falsy.
+ * Handles: main splash, _scorch zone, _chainExplode, _linger zone, _evoKaku bonus splash.
+ */
+export function applyExplosion(proj, hitEnemy, scene, enemies, affixes) {
+  if (!proj._explodeRadius) return
+  const explodeR = proj._evoKaku ? proj._explodeRadius * 2.5 : proj._explodeRadius
+  enemies.getChildren()
+    .filter(en => en.active && !en.dying && en !== hitEnemy &&
+      Phaser.Math.Distance.Between(proj.x, proj.y, en.x, en.y) < explodeR)
+    .forEach(en => Enemy.takeDamage(en, proj.damage * (proj._explodeMult || 1), proj.x, proj.y, affixes, 0))
+
+  if (proj._scorch) scene._createScorchZone(proj.x, proj.y, explodeR, proj.damage, affixes)
+
+  if (proj._chainExplode && proj._chainDepth === 0 && Math.random() < 0.25) {
+    enemies.getChildren()
+      .filter(en => en.active && !en.dying && en !== hitEnemy &&
+        Phaser.Math.Distance.Between(proj.x, proj.y, en.x, en.y) < proj._explodeRadius)
+      .forEach(en => Enemy.takeDamage(en, proj.damage * 0.5, proj.x, proj.y, affixes, 0))
+  }
+
+  if (proj._linger) scene._createLingerZone(proj.x, proj.y, explodeR, proj.damage, affixes)
+
+  if (proj._evoKaku) {
+    enemies.getChildren()
+      .filter(en => en.active && !en.dying && en !== hitEnemy &&
+        Phaser.Math.Distance.Between(proj.x, proj.y, en.x, en.y) < explodeR)
+      .forEach(en => Enemy.takeDamage(en, proj.damage * 0.4, proj.x, proj.y, affixes, 0))
+  }
+}
 
 /**
  * 爆裂弾 — small AoE splash at the hit-enemy's position.

@@ -7,7 +7,6 @@ import { ALL_AFFIXES, ALL_TIER2_AFFIXES, ALL_MECHANICAL, ALL_EVOLUTIONS, checkRe
 import { ALL_WEAPONS } from '../weapons/index.js'
 import { ALL_PROJ_TRAITS, PROJ_WEAPON_IDS }              from '../upgrades/projTraits.js'
 import { ALL_MELEE_TRAITS, MELEE_WEAPON_IDS, SWING_WEAPON_IDS } from '../upgrades/meleeTraits.js'
-import { applyMiniExplosion, applyRicochet }              from '../upgrades/projEffects.js'
 
 export default class GameScene extends Phaser.Scene {
   constructor() { super('GameScene') }
@@ -205,6 +204,8 @@ export default class GameScene extends Phaser.Scene {
     weapon.createTexture(this)
     const projectiles = this.physics.add.group({ maxSize: 60 })
 
+    // Fallback overlap for any weapon without updateActive().
+    // Weapons that implement updateActive() pre-fill hitSet, making this a no-op for them.
     this.physics.add.overlap(
       projectiles,
       this._enemies,
@@ -212,54 +213,6 @@ export default class GameScene extends Phaser.Scene {
         if (proj.hitSet.has(enemy)) return
         proj.hitSet.add(enemy)
         Enemy.takeDamage(enemy, proj.damage, proj.x, proj.y, this._affixes, proj.knockback ?? 80)
-        // Explosive projectiles (Ofuda, Homura) — splash has no knockback
-        if (proj._explodeRadius) {
-          const explodeR = proj._evoKaku ? proj._explodeRadius * 2.5 : proj._explodeRadius
-          this._enemies.getChildren()
-            .filter(e => e.active && !e.dying && e !== enemy &&
-              Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y) < explodeR)
-            .forEach(e => Enemy.takeDamage(e, proj.damage * (proj._explodeMult || 1), proj.x, proj.y, this._affixes, 0))
-
-          // 焦土 / 龍炎矢 evo — scorch zone
-          if (proj._scorch) {
-            this._createScorchZone(proj.x, proj.y, explodeR, proj.damage, this._affixes)
-          }
-
-          // 連鎖爆炸 — 25% chance second explosion (depth-guarded)
-          if (proj._chainExplode && proj._chainDepth === 0 && Math.random() < 0.25) {
-            const chainR = proj._explodeRadius
-            this._enemies.getChildren()
-              .filter(e => e.active && !e.dying && e !== enemy &&
-                Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y) < chainR)
-              .forEach(e => Enemy.takeDamage(e, proj.damage * 0.5, proj.x, proj.y, this._affixes, 0))
-          }
-
-          // 滯留 / 核符 evo — linger zone
-          if (proj._linger) {
-            this._createLingerZone(proj.x, proj.y, explodeR, proj.damage, this._affixes)
-          }
-
-          // 核符 evo — unconditional AoE splash (100%, no burst-affix RNG)
-          if (proj._evoKaku) {
-            this._enemies.getChildren()
-              .filter(e => e.active && !e.dying && e !== enemy &&
-                Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y) < explodeR)
-              .forEach(e => Enemy.takeDamage(e, proj.damage * 0.4, proj.x, proj.y, this._affixes, 0))
-          }
-        }
-        // 爆裂弾 / 彈射 — for Homura/Ofuda (no updateActive)
-        applyMiniExplosion(proj, enemy, this, this._enemies, this._affixes)
-        applyRicochet(proj, enemy, this, this._enemies, this._affixes, next => ({
-          _target:      next,           // Ofuda homing
-          _explodeRadius: proj._explodeRadius,
-          _explodeMult:   proj._explodeMult,
-          _scorch:        false,
-          _chainExplode:  false,
-          _chainDepth:    99,
-          _linger:        false,
-          _evoKaku:       false,
-        }))
-
         if (!proj.penetrate) proj._spent = true
       }
     )

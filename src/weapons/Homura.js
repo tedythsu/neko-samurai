@@ -1,6 +1,8 @@
 // src/weapons/Homura.js
 import Phaser     from 'phaser'
+import Enemy      from '../entities/Enemy.js'
 import { getOrCreate } from './_pool.js'
+import { applyExplosion, applyMiniExplosion, applyRicochet } from '../upgrades/projEffects.js'
 
 export default {
   id:     'homura',
@@ -65,6 +67,7 @@ export default {
         s.damage *= 1.5
         s._explodeRadius = s._explodeRadius * 2
       }
+      s._hitRadius = s.displayWidth * 0.5
 
       const angle = Phaser.Math.Angle.Between(fromX, fromY, target.x, target.y)
       scene.physics.velocityFromAngle(Phaser.Math.RadToDeg(angle), stats.speed, s.body.velocity)
@@ -77,6 +80,32 @@ export default {
     if (Phaser.Math.Distance.Between(sprite.spawnX, sprite.spawnY, sprite.x, sprite.y) >= sprite.range) {
       sprite.disableBody(true, true)
     }
+  },
+
+  updateActive(entry, scene, enemies, _player, affixes) {
+    entry.projectiles.getChildren().forEach(proj => {
+      if (!proj.active || proj._spent) return
+      enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
+        if (proj.hitSet.has(e)) return
+        if (Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y) < proj._hitRadius) {
+          proj.hitSet.add(e)
+          Enemy.takeDamage(e, proj.damage, proj.x, proj.y, affixes, proj.knockback ?? 160)
+          applyExplosion(proj, e, scene, enemies, affixes)
+          applyMiniExplosion(proj, e, scene, enemies, affixes)
+          applyRicochet(proj, e, scene, enemies, affixes, next => ({
+            _target:        next,
+            _explodeRadius: proj._explodeRadius,
+            _explodeMult:   proj._explodeMult,
+            _scorch:        false,
+            _chainExplode:  false,
+            _chainDepth:    99,
+            _linger:        false,
+            _evoKaku:       false,
+          }))
+          if (!proj.penetrate) proj._spent = true
+        }
+      })
+    })
   },
 }
 
