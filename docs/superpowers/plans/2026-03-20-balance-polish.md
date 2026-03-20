@@ -69,11 +69,13 @@ Add the following block immediately after `const dist = ...` and before the coll
           })
           continue
         }
-        // Warning flash: last 3 seconds — alpha oscillates, restart only when not already playing
+        // Warning flash: last 3 seconds — alpha oscillates and accelerates
+        // Recreate tween whenever frequency changes by >10ms so flash visibly speeds up
         if (elapsed >= 9000) {
           const remaining = 12000 - elapsed         // 3000 → 0
-          const freq = Phaser.Math.Linear(200, 80, 1 - remaining / 3000)
-          if (!orb._warnTween || !orb._warnTween.isPlaying()) {
+          const freq = Math.round(Phaser.Math.Linear(200, 80, 1 - remaining / 3000))
+          if (!orb._warnFreq || Math.abs(orb._warnFreq - freq) > 10) {
+            orb._warnFreq = freq
             this.tweens.killTweensOf(orb)
             orb._warnTween = this.tweens.add({
               targets: orb, alpha: { from: 0.2, to: 1.0 },
@@ -115,7 +117,7 @@ This task covers caps and renames for all weapons **except** Kunai and Shuriken 
 
 - [ ] **Step 1: Write cap tests**
 
-In `tests/logic.test.js`, add after the existing `PLAYER_UPGRADES` describe block:
+In `tests/logic.test.js`, add the following five imports at the **top of the file** alongside the existing imports (not inline with the describe blocks):
 
 ```js
 import Tachi       from '../src/weapons/Tachi.js'
@@ -123,7 +125,11 @@ import Ogi         from '../src/weapons/Ogi.js'
 import Homura      from '../src/weapons/Homura.js'
 import Ofuda       from '../src/weapons/Ofuda.js'
 import Kusarigama  from '../src/weapons/Kusarigama.js'
+```
 
+Then add after the existing `PLAYER_UPGRADES` describe block:
+
+```js
 describe('weapon upgrade caps', () => {
   it('Tachi fireRate never drops below 200ms', () => {
     const upg = Tachi.upgrades.find(u => u.id === 'firerate')
@@ -196,18 +202,14 @@ Expected: cap tests fail because no caps exist yet.
 
 Replace the entire `upgrades` array in `src/weapons/Tachi.js`:
 
+Use literal cap values (Tachi base range is 50, ×2 = 100):
+
 ```js
 upgrades: [
   { id: 'dmg',      name: '太刀 傷害 +25%',    desc: '', apply: s => { s.damage   *= 1.25 } },
   { id: 'firerate', name: '太刀 攻擊速度 +20%', desc: '', apply: s => { s.fireRate  = Math.max(200, s.fireRate * 0.80) } },
-  { id: 'range',    name: '太刀 攻擊範圍 +30%', desc: '', apply: s => { s.range     = Math.min(Tachi.baseStats.range * 2, s.range * 1.30) } },
+  { id: 'range',    name: '太刀 攻擊範圍 +30%', desc: '', apply: s => { s.range     = Math.min(100, s.range * 1.30) } },
 ],
-```
-
-Since `Tachi.baseStats.range` is a self-reference, use the literal value `100` for the cap (Tachi base range is 50, ×2 = 100):
-
-```js
-  { id: 'range',    name: '太刀 攻擊範圍 +30%', desc: '', apply: s => { s.range = Math.min(100, s.range * 1.30) } },
 ```
 
 - [ ] **Step 4: Update `Ogi.js` — caps + rename**
