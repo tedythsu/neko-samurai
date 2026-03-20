@@ -17,8 +17,6 @@ export default {
   upgrades: [
     { id: 'dmg',    name: '鎖鎌 傷害 +25%', desc: '', apply: s => { s.damage      *= 1.25 } },
     { id: 'sickle', name: '鎖鎌 鎌刃 +1',   desc: '', apply: s => { s.sickleCount = Math.min(4, s.sickleCount + 1) } },
-    { id: 'gravity',     name: '引力場', desc: '軌道內敵人緩慢被拉向玩家',              apply: s => { s._gravity = true } },
-    { id: 'doubleOrbit', name: '雙軌道', desc: '新增外圈軌道（半徑140px）同等鎌刃數量', apply: s => { s._doubleOrbit = true } },
   ],
 
   createTexture(_scene) { /* sickles are drawn as rectangles in updateActive */ },
@@ -49,24 +47,27 @@ export default {
     const now       = scene.time.now
     const baseAngle = (now / 1000) * 180
 
-    // Gravity pull
-    if (entry.stats._gravity) {
-      enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
-        const dx  = player.x - e.x
-        const dy  = player.y - e.y
-        const len = Math.hypot(dx, dy) || 1
-        if (len < 160) {
-          const pull = 40 * (delta / 1000)
-          e.body.velocity.x += (dx / len) * pull
-          e.body.velocity.y += (dy / len) * pull
-          // Cap net pull velocity so enemy is never teleported
-          const spd = Math.hypot(e.body.velocity.x, e.body.velocity.y)
-          if (spd > 40) {
-            e.body.velocity.x = (e.body.velocity.x / spd) * 40
-            e.body.velocity.y = (e.body.velocity.y / spd) * 40
-          }
-        }
-      })
+    // 疾旋: compute once per frame before all contact checks
+    let rvMult = 1
+    if (entry.stats._rapidVortex) {
+      const nearbyCount = enemies.getChildren()
+        .filter(e => e.active && !e.dying &&
+          Phaser.Math.Distance.Between(player.x, player.y, e.x, e.y) < 150).length
+      rvMult = 1 + Math.min(4, nearbyCount) * 0.25
+    }
+
+    // 殘像 trail every 400ms
+    if (entry.stats._afterimage) {
+      if (!entry.lastTrailTime) entry.lastTrailTime = 0
+      if (now >= entry.lastTrailTime + 400 && entry.sickles.length > 0) {
+        entry.lastTrailTime = now
+        entry.sickles.forEach(sickle => {
+          const trail = scene.add.image(sickle.x, sickle.y, 'kusarigama')
+            .setDisplaySize(sickle.displayWidth, sickle.displayHeight)
+            .setRotation(sickle.rotation).setAlpha(0.4).setDepth(6)
+          scene.tweens.add({ targets: trail, alpha: 0, duration: 300, onComplete: () => trail.destroy() })
+        })
+      }
     }
 
     // Inner orbit
@@ -82,44 +83,57 @@ export default {
           const last = entry.damageCd.get(e) || 0
           if (now - last >= 200) {
             entry.damageCd.set(e, now)
-            Enemy.takeDamage(e, entry.stats.damage, sx, sy, affixes, 0)
+            const killed = Enemy.takeDamage(e, entry.stats.damage * rvMult, sx, sy, affixes, 0)
             // 毒蛇鎖鎌 evo — apply poison stack on contact
             if (isDokuja && e._statusEffects && e._statusEffects.poison) {
               const ps = e._statusEffects.poison
               ps.stacks = Math.min(ps.maxStacks ?? 10, ps.stacks + 1)
             }
+            // 命運印記 — refresh timer on contact
+            if (entry.stats._doom) {
+              e._doomTimer  = now + 2000
+              e._doomDamage = entry.stats.damage * rvMult * 1.5
+              e._doomRadius = 60
+            }
+            // 死爆 — burst on kill
+            if (killed && entry.stats._deathBurst) {
+              const br = 60
+              enemies.getChildren()
+                .filter(en => en.active && !en.dying && en !== e &&
+                  Phaser.Math.Distance.Between(e.x, e.y, en.x, en.y) < br)
+                .forEach(en => Enemy.takeDamage(en, entry.stats.damage * rvMult, e.x, e.y, affixes, 0))
+              const bg = scene.add.graphics().setDepth(10)
+              bg.lineStyle(2, 0xff0000, 0.9)
+              bg.strokeCircle(e.x, e.y, br)
+              scene.tweens.add({ targets: bg, alpha: 0, duration: 250, onComplete: () => bg.destroy() })
+            }
+            // 衝波 — ring on kill
+            if (killed && entry.stats._shockwave) {
+              const shockHit = new Set()
+              const sg = scene.add.graphics().setDepth(6)
+              let rv = 0
+              const shockFn = (_, dt) => {
+                rv = Math.min(80, rv + 80 * dt / 300)
+                sg.clear().setPosition(player.x, player.y)
+                sg.lineStyle(3, 0xff8800, 0.8)
+                sg.strokeCircle(0, 0, rv)
+                enemies.getChildren().filter(en => en.active && !en.dying && !shockHit.has(en)).forEach(en => {
+                  const d = Phaser.Math.Distance.Between(player.x, player.y, en.x, en.y)
+                  if (Math.abs(d - rv) < 18) {
+                    shockHit.add(en)
+                    Enemy.takeDamage(en, entry.stats.damage * rvMult * 0.5, player.x, player.y, affixes, 0)
+                  }
+                })
+                if (rv >= 80) {
+                  scene.events.off('update', shockFn)
+                  sg.destroy()
+                }
+              }
+              scene.events.on('update', shockFn)
+            }
           }
         }
       })
-    }
-
-    // Outer orbit (雙軌道)
-    if (entry.stats._doubleOrbit) {
-      if (!entry.outerSickles)  entry.outerSickles  = []
-      if (!entry.outerDamageCd) entry.outerDamageCd = new Map()
-      const OUTER_RADIUS = 140
-      while (entry.outerSickles.length < entry.stats.sickleCount) {
-        const img = scene.add.image(0, 0, 'kusarigama').setDepth(7)
-        const aspect = img.width / img.height
-        img.setDisplaySize(SICKLE_LEN * aspect, SICKLE_LEN).setOrigin(0.5, CHAIN_ATTACH_Y)
-        entry.outerSickles.push(img)
-      }
-      for (let i = 0; i < entry.outerSickles.length; i++) {
-        const sickle = entry.outerSickles[i]
-        const angle  = Phaser.Math.DegToRad(baseAngle + (360 / entry.outerSickles.length) * i + 30)
-        sickle.setPosition(player.x, player.y).setRotation(angle + Math.PI / 2)
-        const sx = player.x + Math.cos(angle) * OUTER_RADIUS
-        const sy = player.y + Math.sin(angle) * OUTER_RADIUS
-        enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
-          if (Phaser.Math.Distance.Between(sx, sy, e.x, e.y) < 20) {
-            const last = entry.outerDamageCd.get(e) || 0
-            if (now - last >= 200) {
-              entry.outerDamageCd.set(e, now)
-              Enemy.takeDamage(e, entry.stats.damage, sx, sy, affixes, 0)
-            }
-          }
-        })
-      }
     }
   },
 }
