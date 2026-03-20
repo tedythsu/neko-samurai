@@ -9,6 +9,8 @@ const CATEGORY = {
   new_weapon: { color: 0xaa55ff, label: '新武器', text: '#bb88ff' },
   player:     { color: 0x44ddbb, label: '身法',   text: '#55eedd' },
   evolution:  { color: 0xff4444, label: '覚醒', text: '#ff8888' },
+  proj_trait: { color: 0x0088ff, label: '投射', text: '#88ccff' },
+  melee_trait: { color: 0xff6600, label: '近戰', text: '#ffaa44' },
 }
 
 const AFFIX_COLOR = {
