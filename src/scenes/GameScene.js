@@ -170,6 +170,32 @@ export default class GameScene extends Phaser.Scene {
     this.events.once('shutdown', cleanup)
   }
 
+  _createLingerZone(x, y, radius, damage, affixes) {
+    const gz = this.add.graphics().setDepth(4)
+    gz.fillStyle(0x8800cc, 0.25)
+    gz.fillCircle(x, y, radius)
+    const damageCd = new Map()
+    const tick = () => {
+      const now = this.time.now
+      this._enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
+        if (Phaser.Math.Distance.Between(x, y, e.x, e.y) < radius) {
+          const last = damageCd.get(e) || 0
+          if (now - last >= 300) {
+            damageCd.set(e, now)
+            Enemy.takeDamage(e, damage * 0.20, x, y, affixes, 0)
+          }
+        }
+      })
+    }
+    this.events.on('update', tick)
+    const cleanup = () => {
+      this.events.off('update', tick)
+      gz.destroy()
+    }
+    this.time.delayedCall(2000, cleanup)
+    this.events.once('shutdown', cleanup)
+  }
+
   _addWeapon(weapon) {
     weapon.createTexture(this)
     const projectiles = this.physics.add.group({ maxSize: 60 })
@@ -203,7 +229,18 @@ export default class GameScene extends Phaser.Scene {
               .forEach(e => Enemy.takeDamage(e, proj.damage * 0.5, proj.x, proj.y, this._affixes, 0))
           }
 
-          // 核符 evo (kaku) — linger zone handled in Task 8
+          // 滯留 / 核符 evo — linger zone
+          if (proj._linger) {
+            this._createLingerZone(proj.x, proj.y, explodeR, proj.damage, this._affixes)
+          }
+
+          // 核符 evo — unconditional AoE splash (100%, no burst-affix RNG)
+          if (proj._evoKaku) {
+            this._enemies.getChildren()
+              .filter(e => e.active && !e.dying && e !== enemy &&
+                Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y) < explodeR)
+              .forEach(e => Enemy.takeDamage(e, proj.damage * 0.4, proj.x, proj.y, this._affixes, 0))
+          }
         }
         if (!proj.penetrate) proj._spent = true
       }
