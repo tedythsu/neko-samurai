@@ -34,6 +34,14 @@ export const CFG = {
   MAX_WEAPONS: 4,
 }
 
+export const PROGRESSION_BREAKPOINTS = [
+  { timeMs:  0 * 60000, spawnInterval: 2000, hpMult: 1.0, speedMult: 1.0, maxEnemies: 20 },
+  { timeMs:  3 * 60000, spawnInterval: 1700, hpMult: 1.2, speedMult: 1.1, maxEnemies: 25 },
+  { timeMs:  6 * 60000, spawnInterval: 1400, hpMult: 1.5, speedMult: 1.2, maxEnemies: 30 },
+  { timeMs:  9 * 60000, spawnInterval: 1100, hpMult: 2.0, speedMult: 1.3, maxEnemies: 35 },
+  { timeMs: 12 * 60000, spawnInterval:  900, hpMult: 2.5, speedMult: 1.4, maxEnemies: 40 },
+]
+
 /** XP required to reach `level + 1` */
 export function xpThreshold(level) {
   return Math.floor(CFG.XP_BASE * Math.pow(level, CFG.XP_SCALE))
