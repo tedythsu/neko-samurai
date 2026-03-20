@@ -53,6 +53,12 @@ export default {
       s._scorch       = stats._scorch || stats._evo === 'ryuen'
       s._chainExplode = stats._chainExplode
       s._chainDepth   = 0
+      s._pool          = pool
+      s._miniExplosion = stats._miniExplosion || false
+      s._ricochet      = stats._ricochet      || false
+      s._ricochetDepth = 0
+      s._scatter       = stats._scatter       || false
+      s._scatterFired  = false
       // 龍炎矢 evo — bigger projectile, more damage, doubled explosion
       if (stats._evo === 'ryuen') {
         s.setDisplaySize(72, 72)
