@@ -494,10 +494,12 @@ export default class GameScene extends Phaser.Scene {
     this._mechanicalsOwned.add(mechanical.id)
     if (mechanical.id === 'multishot') {
       for (const entry of this._weapons) {
-        if (entry.stats.projectileCount !== undefined)
-          entry.stats.projectileCount += 1
-        else
+        if (entry.stats.projectileCount !== undefined) {
+          entry.stats.projectileCount = Math.min(5, entry.stats.projectileCount + 1)
+          entry.stats.range = (entry.stats.range || 100) * 1.10
+        } else {
           entry.stats.range = (entry.stats.range || 100) * 1.15
+        }
       }
     } else if (mechanical.id === 'piercing') {
       // Only weapons that declare `penetrate` in baseStats support piercing (opt-in by design)
