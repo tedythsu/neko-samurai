@@ -217,6 +217,37 @@ export default class GameScene extends Phaser.Scene {
       const orb  = this._orbs[i]
       const dist = Phaser.Math.Distance.Between(px, py, orb.x, orb.y)
 
+      // Orb lifetime — exempt attracted orbs (already flying toward player)
+      if (!orb._attracted) {
+        const elapsed = this.time.now - orb._spawnTime
+        if (elapsed >= 12000) {
+          // Expire: kill existing tweens first, then fade out and destroy
+          if (orb._emitter) orb._emitter.destroy()
+          this.tweens.killTweensOf(orb)    // kill warning tween BEFORE adding fade tween
+          orb.setActive(false)             // prevent re-processing during 300ms fade
+          this._orbs.splice(i, 1)
+          this.tweens.add({
+            targets: orb, alpha: 0, duration: 300, ease: 'Linear',
+            onComplete: () => orb.destroy(),
+          })
+          continue
+        }
+        // Warning flash: last 3 seconds — alpha oscillates and accelerates
+        // Recreate tween whenever frequency changes by >10ms so flash visibly speeds up
+        if (elapsed >= 9000) {
+          const remaining = 12000 - elapsed         // 3000 → 0
+          const freq = Math.round(Phaser.Math.Linear(200, 80, 1 - remaining / 3000))
+          if (!orb._warnFreq || Math.abs(orb._warnFreq - freq) > 10) {
+            orb._warnFreq = freq
+            this.tweens.killTweensOf(orb)
+            orb._warnTween = this.tweens.add({
+              targets: orb, alpha: { from: 0.2, to: 1.0 },
+              yoyo: true, repeat: -1, duration: freq, ease: 'Linear',
+            })
+          }
+        }
+      }
+
       if (dist < CFG.ORB_COLLECT_RADIUS) {
         if (orb._emitter) orb._emitter.destroy()
         orb.destroy()
@@ -349,6 +380,7 @@ export default class GameScene extends Phaser.Scene {
     orb._emitter = emitter
 
     this._orbs.push(orb)
+    orb._spawnTime = this.time.now
   }
 
   _addXp(amount) {
