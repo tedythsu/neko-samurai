@@ -351,12 +351,7 @@ export default class BossManager {
         if (!boss.active || boss.dying) return
         if (boss.hp / this._bossMaxHp >= 0.5) return
         const { x, y } = boss
-        // AoE damage to nearby enemies
-        scene._enemies.getChildren()
-          .filter(e => e.active && !e.dying && e !== boss &&
-            Phaser.Math.Distance.Between(x, y, e.x, e.y) < 80)
-          .forEach(e => Enemy.takeDamage(e, CFG.ENEMY_DAMAGE * 1.5, x, y, [], 0))
-        // Check player proximity
+        // Tremor AoE — damage player if within radius
         const pDist = Phaser.Math.Distance.Between(x, y, scene._player.x, scene._player.y)
         if (pDist < 80) scene._player.takeDamage(CFG.ENEMY_DAMAGE * 1.5)
         // Expanding ring visual
@@ -390,6 +385,7 @@ function _doLightningRing(scene, x, y) {
   const maxR  = 200
   const dur   = 800
   const ring  = scene.add.graphics().setDepth(8)
+  let   playerHit = false   // cap damage to once per ring pass
 
   ring.lineStyle(3, 0x66aaff, 0.9)
   ring.strokeCircle(x, y, 1)
@@ -404,9 +400,14 @@ function _doLightningRing(scene, x, y) {
       ring.clear()
       ring.lineStyle(3, 0x66aaff, 0.9)
       ring.strokeCircle(x, y, curR)
-      // Damage player if at ring edge this frame
-      const pDist = Phaser.Math.Distance.Between(x, y, scene._player.x, scene._player.y)
-      if (Math.abs(pDist - curR) < 12) scene._player.takeDamage(CFG.ENEMY_DAMAGE * 1.5)
+      // Damage player once when ring edge passes through their position
+      if (!playerHit) {
+        const pDist = Phaser.Math.Distance.Between(x, y, scene._player.x, scene._player.y)
+        if (Math.abs(pDist - curR) < 12) {
+          scene._player.takeDamage(CFG.ENEMY_DAMAGE * 1.5)
+          playerHit = true
+        }
+      }
     },
     onComplete: () => ring.destroy(),
   })
