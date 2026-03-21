@@ -13,7 +13,7 @@ export default {
 
   baseStats: {
     damage:          25,
-    fireRate:        2500,
+    fireRate:        2000,
     projectileCount: 1,
     range:           700,
     speed:           200,

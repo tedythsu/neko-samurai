@@ -10,7 +10,7 @@ export default {
 
   baseStats: {
     damage:    20,
-    fireRate:  1500,
+    fireRate:  1100,
     range:     50,
     knockback: 120,
     // projectileCount / speed / penetrate not used by melee

@@ -14,7 +14,7 @@ export default {
   iconKey: 'shuriken',
 
   baseStats: {
-    damage: 10,
+    damage: 12,
     fireRate: 800,
     projectileCount: 3,
     speed: 400,

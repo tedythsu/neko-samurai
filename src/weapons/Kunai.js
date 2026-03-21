@@ -16,7 +16,7 @@ export default {
 
   baseStats: {
     damage: 8,
-    fireRate: 350,
+    fireRate: 500,
     projectileCount: 1,
     speed: 600,
     penetrate: false,

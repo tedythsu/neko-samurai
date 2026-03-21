@@ -81,7 +81,7 @@ export default {
       enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
         if (Phaser.Math.Distance.Between(sx, sy, e.x, e.y) < 20) {
           const last = entry.damageCd.get(e) || 0
-          if (now - last >= 200) {
+          if (now - last >= 600) {
             entry.damageCd.set(e, now)
             const killed = Enemy.takeDamage(e, entry.stats.damage * rvMult, sx, sy, affixes, 0)
             // 毒蛇鎖鎌 evo — apply poison stack on contact
