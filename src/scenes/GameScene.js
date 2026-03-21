@@ -127,6 +127,37 @@ export default class GameScene extends Phaser.Scene {
       }
     ).setScrollFactor(0).setDepth(201).setOrigin(1, 0)
 
+    // Pause button (below timer, top-right)
+    const W = this.cameras.main.width
+    const H = this.cameras.main.height
+    this._pauseBtn = this.add.text(W - 12, 36, '⏸', {
+      fontSize: '13px', color: '#8a7a5a',
+      stroke: '#06060f', strokeThickness: 2,
+    }).setScrollFactor(0).setDepth(201).setOrigin(1, 0)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerover', () => { if (!this._paused) this._pauseBtn.setColor('#d4c09a') })
+      .on('pointerout',  () => { if (!this._paused) this._pauseBtn.setColor('#8a7a5a') })
+      .on('pointerdown', () => this._togglePause())
+
+    // Pause overlay
+    this._pauseOverlay = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.72)
+      .setScrollFactor(0).setDepth(500).setVisible(false)
+      .setInteractive().on('pointerdown', () => this._togglePause())
+    this._pauseTitleText = this.add.text(W / 2, H / 2 - 24, '一時停止', {
+      fontSize: '42px', color: '#c8a84b',
+      fontFamily: '"Cinzel", "Palatino Linotype", serif',
+      stroke: '#06060f', strokeThickness: 5,
+    }).setScrollFactor(0).setDepth(501).setOrigin(0.5).setVisible(false)
+    this._pauseHintText = this.add.text(W / 2, H / 2 + 28, 'クリックまたは ESC で再開', {
+      fontSize: '13px', color: '#6a5e40',
+      fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
+    }).setScrollFactor(0).setDepth(501).setOrigin(0.5).setVisible(false)
+
+    // ESC key toggle
+    this._escKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC)
+    this._escKey.on('down', () => this._togglePause())
+    this._paused = false
+
     // Weapon icon row — each entry is { icon, label } so both can be destroyed together
     this._hudWeaponIcons  = []
     this._lastWeaponCount = 0
@@ -256,6 +287,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   update(_, delta) {
+    if (this._paused) return
     this._player.update(delta)
 
     // 武者の気 regen — tick after combat logic
@@ -397,6 +429,26 @@ export default class GameScene extends Phaser.Scene {
         orb.x += Math.cos(angle) * speed * (delta / 1000)
         orb.y += Math.sin(angle) * speed * (delta / 1000)
       }
+    }
+  }
+
+  _togglePause() {
+    if (this._player?._dead || this._upgrading) return
+    this._paused = !this._paused
+    if (this._paused) {
+      this.physics.pause()
+      this.time.paused = true
+      this._pauseOverlay.setVisible(true)
+      this._pauseTitleText.setVisible(true)
+      this._pauseHintText.setVisible(true)
+      this._pauseBtn.setColor('#c8a84b')
+    } else {
+      this.physics.resume()
+      this.time.paused = false
+      this._pauseOverlay.setVisible(false)
+      this._pauseTitleText.setVisible(false)
+      this._pauseHintText.setVisible(false)
+      this._pauseBtn.setColor('#8a7a5a')
     }
   }
 
