@@ -13,14 +13,14 @@ export const CFG = {
   ENEMY_SPEED:              80,
   ENEMY_HP:                 60,
   ENEMY_DAMAGE:             10,
-  ENEMY_SPAWN_INTERVAL:   2000,  // ms
+  ENEMY_SPAWN_INTERVAL:   1500,  // ms
 
   // XP
-  XP_PER_ENEMY:             10,
+  XP_PER_ENEMY:             15,
   ORB_ATTRACT_RADIUS:      130,   // px — orb starts flying toward player
   ORB_COLLECT_RADIUS:       30,   // px — orb is collected
-  XP_BASE:                  50,
-  XP_SCALE:                1.4,
+  XP_BASE:                  35,
+  XP_SCALE:                1.35,
 
   // Waves
   WAVE_SCALE: 3,  // extra enemy added per N levels
@@ -35,11 +35,11 @@ export const CFG = {
 }
 
 export const PROGRESSION_BREAKPOINTS = [
-  { timeMs:  0 * 60000, spawnInterval: 2000, hpMult: 1.0, speedMult: 1.0, maxEnemies: 20 },
-  { timeMs:  3 * 60000, spawnInterval: 1700, hpMult: 1.2, speedMult: 1.1, maxEnemies: 25 },
-  { timeMs:  6 * 60000, spawnInterval: 1400, hpMult: 1.5, speedMult: 1.2, maxEnemies: 30 },
-  { timeMs:  9 * 60000, spawnInterval: 1100, hpMult: 2.0, speedMult: 1.3, maxEnemies: 35 },
-  { timeMs: 12 * 60000, spawnInterval:  900, hpMult: 2.5, speedMult: 1.4, maxEnemies: 40 },
+  { timeMs:  0 * 60000, spawnInterval: 1500, hpMult: 1.0, speedMult: 1.0, maxEnemies: 25 },
+  { timeMs:  2 * 60000, spawnInterval: 1200, hpMult: 1.2, speedMult: 1.1, maxEnemies: 30 },
+  { timeMs:  5 * 60000, spawnInterval: 1000, hpMult: 1.5, speedMult: 1.2, maxEnemies: 35 },
+  { timeMs:  8 * 60000, spawnInterval:  800, hpMult: 2.0, speedMult: 1.3, maxEnemies: 40 },
+  { timeMs: 12 * 60000, spawnInterval:  600, hpMult: 2.5, speedMult: 1.4, maxEnemies: 50 },
 ]
 
 /** XP required to reach `level + 1` */
