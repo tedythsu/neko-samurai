@@ -65,6 +65,7 @@ export default class UpgradeScene extends Phaser.Scene {
     const startX  = W / 2 - spacing
     const cardY   = H / 2 + H * 0.025
 
+    this._containers = []
     this._upgrades.forEach((upg, i) => {
       this._buildCard(startX + i * spacing, cardY, cardW, cardH, upg, i)
     })
@@ -142,6 +143,7 @@ export default class UpgradeScene extends Phaser.Scene {
     }).setOrigin(0, 0)
 
     container.add([bg, strip, badge, nameText, sepGfx, descText])
+    this._containers.push(container)
 
     // Entrance: slide up + fade
     container.setAlpha(0).setY(cy + 26)
@@ -163,7 +165,20 @@ export default class UpgradeScene extends Phaser.Scene {
   }
 
   _choose(upgrade) {
-    this.scene.get('GameScene').events.emit('upgrade-chosen', upgrade)
-    this.scene.stop()
+    // Disable all cards immediately to prevent double-clicks
+    this._containers.forEach(c => c.getAt(0).removeInteractive())
+
+    // Exit: slide back down + fade out (reverse of entrance)
+    const last = this._containers.length - 1
+    this._containers.forEach((c, i) => {
+      this.tweens.add({
+        targets: c, alpha: 0, y: c.y + 26,
+        duration: 200, delay: i * 50, ease: 'Back.easeIn',
+        onComplete: i === last ? () => {
+          this.scene.get('GameScene').events.emit('upgrade-chosen', upgrade)
+          this.scene.stop()
+        } : undefined,
+      })
+    })
   }
 }
