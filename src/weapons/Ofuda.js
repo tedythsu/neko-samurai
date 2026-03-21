@@ -137,7 +137,11 @@ export default {
             _linger:        false,
             _evoKaku:       false,
           }))
-          if (!proj.penetrate) proj._spent = true
+          if (!proj.penetrate) {
+            proj._spent = true
+          } else {
+            proj._target = null  // Stop homing after first hit — fly straight and pierce
+          }
         }
       })
     })
