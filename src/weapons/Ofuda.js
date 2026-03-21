@@ -50,7 +50,7 @@ export default {
       s.knockback     = stats.knockback ?? 80
       s._target        = target
       s._explodeRadius = stats._explodeRadius
-      s._explodeMult   = 1.5
+      s._explodeMult   = 0.5
       s._speed         = stats.speed
       s._scatter       = stats._scatter || false
       s._scatterFired  = false

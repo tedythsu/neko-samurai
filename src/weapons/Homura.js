@@ -49,7 +49,7 @@ export default {
       s.penetrate      = stats.penetrate ?? false
       s.knockback      = stats.knockback ?? 160
       s._explodeRadius = stats._explodeRadius
-      s._explodeMult   = 1.2
+      s._explodeMult   = 0.7
       s._scorch       = stats._scorch || stats._evo === 'ryuen'
       s._chainExplode = stats._chainExplode
       s._chainDepth   = 0
