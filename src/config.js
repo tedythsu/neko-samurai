@@ -30,8 +30,7 @@ export const CFG = {
   CRIT_MULTIPLIER: 2.00,  // crit deals 2× damage
 
   // Weapon slots
-  WEAPON_SLOT_LEVELS: [5, 10, 16],  // player level at which 2nd/3rd/4th slot opens
-  MAX_WEAPONS: 4,
+  MAX_WEAPONS: 1,
 }
 
 export const PROGRESSION_BREAKPOINTS = [

@@ -4,7 +4,6 @@ import Player   from '../entities/Player.js'
 import Enemy    from '../entities/Enemy.js'
 import { CFG, randomEdgePoint, xpThreshold, PLAYER_UPGRADES, PROGRESSION_BREAKPOINTS } from '../config.js'
 import { ALL_AFFIXES, ALL_TIER2_AFFIXES, ALL_EVOLUTIONS, checkResonances } from '../affixes/index.js'
-import { ALL_WEAPONS } from '../weapons/index.js'
 import { ALL_PROJ_TRAITS, PROJ_WEAPON_IDS }              from '../upgrades/projTraits.js'
 import { ALL_MELEE_TRAITS, MELEE_WEAPON_IDS, SWING_WEAPON_IDS } from '../upgrades/meleeTraits.js'
 import { ENEMY_TYPES, getDifficultyMult } from '../enemies/EnemyTypes.js'
@@ -629,8 +628,6 @@ export default class GameScene extends Phaser.Scene {
           }
         } else if (upgrade.target === 'affix') {
           this._applyAffix(upgrade.affix)
-        } else if (upgrade.target === 'new_weapon') {
-          this._addWeapon(upgrade.weapon)
         } else if (upgrade.target === 'evolution') {
           const entry = this._weapons.find(e => e.weapon.id === upgrade.weaponId)
           if (entry) entry.stats._evo = upgrade.id
@@ -668,19 +665,6 @@ export default class GameScene extends Phaser.Scene {
     pool.push(...ALL_TIER2_AFFIXES
       .filter(a => this._affixCounts.has(a.requires) && !this._affixCounts.has(a.id))
       .map(a => ({ id: a.id, name: a.name, desc: a.desc, target: 'affix', affix: a })))
-
-    // New weapon (if next slot is available)
-    const nextSlotLevel = CFG.WEAPON_SLOT_LEVELS[this._weapons.length - 1]
-    if (this._weapons.length < CFG.MAX_WEAPONS && nextSlotLevel && this._level >= nextSlotLevel) {
-      const owned      = new Set(this._weapons.map(e => e.weapon.id))
-      const candidates = ALL_WEAPONS.filter(w => !owned.has(w.id))
-      if (candidates.length)
-        pool.push({
-          id: 'new_weapon', name: '新武器', desc: '獲得一把新武器',
-          target: 'new_weapon',
-          weapon: Phaser.Utils.Array.GetRandom(candidates),
-        })
-    }
 
     // Player upgrades — filter out already-owned one-time upgrades; non-one-time always present
     pool.push(...PLAYER_UPGRADES
