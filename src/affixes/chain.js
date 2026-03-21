@@ -5,7 +5,7 @@ import Enemy    from '../entities/Enemy.js'
 export default {
   id:   'chain',
   name: '電撃',
-  desc: '25%機率：閃電跳躍至周圍敵人（0.5倍傷害）',
+  desc: '命中時有機率：閃電跳躍至周圍敵人',
 
   onHit(enemy, damage, scene) {
     if (Math.random() > 0.25) return

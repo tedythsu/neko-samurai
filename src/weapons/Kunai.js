@@ -24,11 +24,7 @@ export default {
     _scale: 1.0,
   },
 
-  upgrades: [
-    { id: 'dmg',       name: '苦無 傷害 +25%',    desc: '', apply: s => { s.damage         *= 1.25 } },
-    { id: 'firerate',  name: '苦無 攻擊速度 +20%', desc: '', apply: s => { s.fireRate        = Math.max(200, s.fireRate * 0.80) } },
-    { id: 'multishot', name: '苦無 投射數 +1',     desc: '', apply: s => { s.projectileCount = Math.min(5, s.projectileCount + 1) } },
-  ],
+  upgrades: [],
 
   createTexture() { /* loaded in GameScene.preload() */ },
 

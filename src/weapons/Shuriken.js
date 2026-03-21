@@ -23,11 +23,7 @@ export default {
     _scale: 1.0,
   },
 
-  upgrades: [
-    { id: 'dmg',       name: '手裏剣 傷害 +20%',    desc: '', apply: s => { s.damage         *= 1.20 } },
-    { id: 'firerate',  name: '手裏剣 攻擊速度 +25%', desc: '', apply: s => { s.fireRate        = Math.max(200, s.fireRate * 0.75) } },
-    { id: 'multishot', name: '手裏剣 投射數 +1',     desc: '', apply: s => { s.projectileCount = Math.min(5, s.projectileCount + 1) } },
-  ],
+  upgrades: [],
 
   createTexture() { /* loaded in GameScene.preload() */ },
 

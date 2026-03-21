@@ -3,6 +3,6 @@
 export default {
   id:   'lucky',
   name: '幸運',
-  desc: '爆擊率+15%，爆擊倍率+0.5倍',
+  desc: '爆擊率 +15%，爆擊倍率 +50%',
   onHit(enemy, damage, scene) { /* passive — applied in takeDamage */ },
 }

@@ -6,6 +6,7 @@ import { CFG, randomEdgePoint, xpThreshold, PLAYER_UPGRADES, PROGRESSION_BREAKPO
 import { ALL_AFFIXES, ALL_TIER2_AFFIXES, ALL_EVOLUTIONS, checkResonances } from '../affixes/index.js'
 import { ALL_PROJ_TRAITS, PROJ_WEAPON_IDS }              from '../upgrades/projTraits.js'
 import { ALL_MELEE_TRAITS, MELEE_WEAPON_IDS, SWING_WEAPON_IDS } from '../upgrades/meleeTraits.js'
+import { WEAPON_STAT_UPGRADES } from '../upgrades/weaponStatUpgrades.js'
 import { ENEMY_TYPES, getDifficultyMult } from '../enemies/EnemyTypes.js'
 import BossManager from '../enemies/BossManager.js'
 
@@ -648,10 +649,11 @@ export default class GameScene extends Phaser.Scene {
   _buildUpgradePool() {
     const pool = []
 
-    // Weapon-specific upgrades (one-time dedup per entry)
-    for (const entry of this._weapons) {
-      for (const u of (entry.weapon.upgrades ?? [])) {
-        if (u.oneTime && entry.takenUpgrades.has(u.id)) continue
+    // Universal weapon stat upgrades — filtered by what the active weapon supports
+    const entry = this._weapons[0]
+    if (entry) {
+      for (const u of WEAPON_STAT_UPGRADES) {
+        if (u.relevant && !u.relevant(entry.stats)) continue
         pool.push({ ...u, target: 'weapon', weaponId: entry.weapon.id })
       }
     }
@@ -714,6 +716,13 @@ export default class GameScene extends Phaser.Scene {
       if (seen.has(key)) return false
       seen.add(key)
       return true
+    })
+
+    // Resolve {weapon} placeholder in desc using active weapon name
+    const weaponName = this._weapons[0]?.weapon.name ?? ''
+    deduped.forEach(u => {
+      if (u.desc?.includes('{weapon}'))
+        u.desc = u.desc.replace('{weapon}', weaponName)
     })
 
     // Safety: pool should never be empty with current upgrade definitions, but

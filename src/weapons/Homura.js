@@ -22,10 +22,7 @@ export default {
     _explodeRadius:  80,
   },
 
-  upgrades: [
-    { id: 'dmg',   name: '炎矢 傷害 +25%', desc: '', apply: s => { s.damage         *= 1.25 } },
-    { id: 'multi', name: '炎矢 投射數 +1', desc: '', apply: s => { s.projectileCount = Math.min(5, s.projectileCount + 1) } },
-  ],
+  upgrades: [],
 
   createTexture(scene) {
     if (scene.textures.exists('homura-tex')) return

@@ -5,7 +5,7 @@ import Phaser from 'phaser'
 export default {
   id:   'burst',
   name: '爆裂',
-  desc: '20%機率：40px範圍爆炸，0.4倍傷害',
+  desc: '命中時有機率：在周圍造成爆炸',
 
   onHit(enemy, damage, scene) {
     if (Math.random() > 0.20) return
