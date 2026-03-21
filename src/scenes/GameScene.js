@@ -110,7 +110,7 @@ export default class GameScene extends Phaser.Scene {
     this._hud = this.add.graphics().setScrollFactor(0).setDepth(200)
 
     // Level text
-    this._hudLevel = this.add.text(32, 58, 'Lv 1', {
+    this._hudLevel = this.add.text(52, 58, 'Lv 1', {
       fontSize: '13px', color: '#c8a84b',
       fontFamily: '"Cinzel", "Palatino Linotype", serif',
     }).setScrollFactor(0).setDepth(201)
@@ -424,12 +424,9 @@ export default class GameScene extends Phaser.Scene {
     const W      = this.cameras.main.width
     const hpPct  = Math.max(0, this._player.hp / this._player.maxHp)
     const xpPct  = Math.max(0, this._xp / this._xpToNext)
-    const BX = 32, BW = 188   // bar x, bar width
+    const BX = 52, BW = 168   // bar x, bar width (icon area occupies x=10..52)
 
     this._hud.clear()
-
-    // HP indicator dot
-    this._hud.fillStyle(0xcc2233, 1).fillCircle(21, 27, 6)
 
     // HP bar track → dark fill → bright fill → top highlight
     this._hud.fillStyle(0x180508, 1).fillRoundedRect(BX, 21, BW, 12, 4)
@@ -439,9 +436,6 @@ export default class GameScene extends Phaser.Scene {
       this._hud.fillStyle(0xdd2235, 1).fillRoundedRect(BX, 21, fw,  5, 4)
     }
     this._hud.lineStyle(1, 0x661222, 0.8).strokeRoundedRect(BX, 21, BW, 12, 4)
-
-    // XP indicator dot
-    this._hud.fillStyle(0x2255cc, 1).fillCircle(21, 44, 5)
 
     // XP bar
     this._hud.fillStyle(0x040812, 1).fillRoundedRect(BX, 39, BW, 8, 3)
@@ -455,31 +449,29 @@ export default class GameScene extends Phaser.Scene {
     this._hudLevel.setText(`Lv ${this._level}`)
     this._hudTimer.setX(W - 12).setText(_fmtTime(this._elapsed))
 
-    // Weapon icon row — rebuild only when weapon count changes
+    // Weapon icon — left of bars, top=HP bar top (y=21), bottom=XP bar bottom (y=47)
     if (this._weapons.length !== this._lastWeaponCount) {
       this._lastWeaponCount = this._weapons.length
-      this._hudWeaponIcons.forEach(({ icon, label }) => { icon.destroy(); label.destroy() })
-      this._hudWeaponIcons = this._weapons.map((entry, i) => {
+      this._hudWeaponIcons.forEach(({ label }) => label.destroy())
+      const entry = this._weapons[0]
+      if (entry) {
         const w  = entry.weapon
-        const cx = 206 - i * 32
-        const cy = 64
-        const icon = this.add.arc(cx, cy, 14, 0, 360, false, 0x000000, 0.55)
-          .setScrollFactor(0).setDepth(200)
-          .setStrokeStyle(1.5, 0xffffff, 0.35)
+        const cx = 31, cy = 47   // centre of available area (x=10..52, y=21..74)
+        const maxW = 40, maxH = 53  // icon area width × HP top to level text bottom
 
         let label
         if (w.iconKey) {
           label = this.add.image(cx, cy, w.iconKey, w.iconFrame ?? undefined)
-          const maxDim = Math.max(label.width, label.height)
-          label.setScale(24 / maxDim).setScrollFactor(0).setDepth(201)
+          const scale = Math.min(maxW / label.width, maxH / label.height)
+          label.setScale(scale).setScrollFactor(0).setDepth(201)
         } else {
           label = this.add.text(cx, cy, w.iconChar ?? w.name[0], {
-            fontSize: '15px', color: '#f0e8d0',
+            fontSize: '20px', color: '#f0e8d0',
             fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
           }).setScrollFactor(0).setDepth(201).setOrigin(0.5)
         }
-        return { icon, label }
-      })
+        this._hudWeaponIcons = [{ label }]
+      }
     }
 
     // Affix dot row (circles, tier-2 get outer ring)
