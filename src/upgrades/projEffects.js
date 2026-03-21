@@ -31,6 +31,12 @@ export function applyExplosion(proj, hitEnemy, scene, enemies, affixes) {
       Phaser.Math.Distance.Between(proj.x, proj.y, en.x, en.y) < explodeR)
     .forEach(en => Enemy.takeDamage(en, proj.damage * (proj._explodeMult || 1), proj.x, proj.y, affixes, 0))
 
+  // Visual ring — anchored at hit position, no scale tween to prevent drift
+  const g = scene.add.graphics().setDepth(10).setPosition(proj.x, proj.y)
+  g.lineStyle(2, 0xff4400, 0.8)
+  g.strokeCircle(0, 0, explodeR)
+  scene.tweens.add({ targets: g, alpha: 0, duration: 200, onComplete: () => g.destroy() })
+
   if (proj._scorch) scene._createScorchZone(proj.x, proj.y, explodeR, proj.damage, affixes)
 
   if (proj._chainExplode && proj._chainDepth === 0 && Math.random() < 0.25) {

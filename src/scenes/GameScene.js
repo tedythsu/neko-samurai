@@ -210,18 +210,22 @@ export default class GameScene extends Phaser.Scene {
     weapon.createTexture(this)
     const projectiles = this.physics.add.group({ maxSize: 60 })
 
-    // Fallback overlap for any weapon without updateActive().
-    // Weapons that implement updateActive() pre-fill hitSet, making this a no-op for them.
-    this.physics.add.overlap(
-      projectiles,
-      this._enemies,
-      (proj, enemy) => {
-        if (proj.hitSet.has(enemy)) return
-        proj.hitSet.add(enemy)
-        Enemy.takeDamage(enemy, proj.damage, proj.x, proj.y, this._affixes, proj.knockback ?? 80)
-        if (!proj.penetrate) proj._spent = true
-      }
-    )
+    // Fallback overlap only for weapons WITHOUT updateActive().
+    // Weapons with updateActive() handle all hit logic there — registering an overlap would
+    // fire during preUpdate (before scene.update), stealing the hit before updateActive runs
+    // and preventing AoE/ricochet/burn effects from firing.
+    if (!weapon.updateActive) {
+      this.physics.add.overlap(
+        projectiles,
+        this._enemies,
+        (proj, enemy) => {
+          if (proj.hitSet.has(enemy)) return
+          proj.hitSet.add(enemy)
+          Enemy.takeDamage(enemy, proj.damage, proj.x, proj.y, this._affixes, proj.knockback ?? 80)
+          if (!proj.penetrate) proj._spent = true
+        }
+      )
+    }
 
     // NOTE: each _addWeapon() call stacks one more worldbounds listener.
     // With up to 4 weapons this is 4 listeners — each checks its own group, so behavior is correct.
@@ -677,11 +681,12 @@ export default class GameScene extends Phaser.Scene {
     }
 
     // Layer P — projectile universal traits
-    const hasProjWeapon = this._weapons.some(w => PROJ_WEAPON_IDS.has(w.weapon.id))
-    if (hasProjWeapon) {
+    const ownedProjEntries = this._weapons.filter(w => PROJ_WEAPON_IDS.has(w.weapon.id))
+    if (ownedProjEntries.length > 0) {
       for (const trait of ALL_PROJ_TRAITS) {
-        if (!this._projTraitsOwned.has(trait.id))
-          pool.push({ ...trait, target: 'proj_trait' })
+        if (this._projTraitsOwned.has(trait.id)) continue
+        if (trait.relevant && !ownedProjEntries.some(e => trait.relevant(e.stats))) continue
+        pool.push({ ...trait, target: 'proj_trait' })
       }
     }
 

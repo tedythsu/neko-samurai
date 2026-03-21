@@ -10,6 +10,7 @@ export const ALL_PROJ_TRAITS = [
     name: '爆炸範圍 +25px',
     desc: '爆炸型投射物的爆炸半徑 +25px',
     oneTime: true,
+    relevant: stats => stats._explodeRadius != null,
     apply(stats) { if (stats._explodeRadius != null) stats._explodeRadius += 25 },
   },
   {
@@ -45,6 +46,7 @@ export const ALL_PROJ_TRAITS = [
     name: '爆裂弾',
     desc: '投射物命中時在40px範圍造成0.4倍傷害爆炸',
     oneTime: true,
+    relevant: stats => stats._explodeRadius == null,
     apply(stats) { stats._miniExplosion = true },
   },
   {

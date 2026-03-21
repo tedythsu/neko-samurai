@@ -63,6 +63,13 @@ export default {
     if (!sprite.active) return
     sprite.angle += 8
 
+    // Hit an enemy last frame → expire here with optional split
+    if (sprite._spent) {
+      if (sprite._scatter && !sprite._scatterFired) doScatter(sprite, sprite.scene)
+      sprite.disableBody(true, true)
+      return
+    }
+
     const dist = Phaser.Math.Distance.Between(sprite.spawnX, sprite.spawnY, sprite.x, sprite.y)
 
     if (sprite._boomerang) {
@@ -71,12 +78,12 @@ export default {
         sprite.body.velocity.y *= -1
         sprite._reversed = true
       } else if (sprite._reversed && dist <= 30) {
-        if (sprite._scatter) doScatter(sprite, sprite.scene)
+        if (sprite._scatter && !sprite._scatterFired) doScatter(sprite, sprite.scene)
         sprite.disableBody(true, true)
       }
     } else {
       if (dist >= sprite.range) {
-        if (sprite._scatter) doScatter(sprite, sprite.scene)
+        if (sprite._scatter && !sprite._scatterFired) doScatter(sprite, sprite.scene)
         sprite.disableBody(true, true)
       }
     }
@@ -87,7 +94,7 @@ export default {
     entry.projectiles.getChildren().forEach(proj => {
       if (!proj.active || proj._spent) return
       enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
-        if (proj.hitSet.has(e)) return
+        if (proj._spent || proj.hitSet.has(e)) return
         if (Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y) < proj._hitRadius) {
           proj.hitSet.add(e)
           Enemy.takeDamage(e, proj.damage, proj.x, proj.y, affixes, proj.knockback ?? 60)

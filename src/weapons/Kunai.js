@@ -70,8 +70,16 @@ export default {
     if (!sprite.active) return
     // Rotate so image top faces travel direction
     sprite.rotation = Math.atan2(sprite.body.velocity.y, sprite.body.velocity.x) + Math.PI / 2
+
+    // Hit an enemy last frame → expire here with optional split
+    if (sprite._spent) {
+      if (sprite._scatter && !sprite._scatterFired) doScatter(sprite, sprite.scene)
+      sprite.disableBody(true, true)
+      return
+    }
+
     if (Phaser.Math.Distance.Between(sprite.spawnX, sprite.spawnY, sprite.x, sprite.y) >= sprite.range) {
-      if (sprite._scatter) doScatter(sprite, sprite.scene)
+      if (sprite._scatter && !sprite._scatterFired) doScatter(sprite, sprite.scene)
       sprite.disableBody(true, true)
     }
   },
@@ -81,7 +89,7 @@ export default {
     entry.projectiles.getChildren().forEach(proj => {
       if (!proj.active || proj._spent) return
       enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
-        if (proj.hitSet.has(e)) return
+        if (proj._spent || proj.hitSet.has(e)) return
         if (Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y) < proj._hitRadius) {
           proj.hitSet.add(e)
           Enemy.takeDamage(e, proj.damage, proj.x, proj.y, affixes, proj.knockback ?? 60)

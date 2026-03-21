@@ -12,13 +12,14 @@ export default {
   iconChar: '符',
 
   baseStats: {
-    damage:         30,
-    fireRate:       2000,
+    damage:          30,
+    fireRate:        2000,
     projectileCount: 1,
-    range:          600,
-    speed:          150,
-    penetrate:      false,
-    knockback:      80,
+    range:           600,
+    speed:           150,
+    penetrate:       false,
+    knockback:       80,
+    _explodeRadius:  60,
   },
 
   upgrades: [
@@ -47,22 +48,23 @@ export default {
       s.range         = stats.range
       s.penetrate     = stats.penetrate ?? false
       s.knockback     = stats.knockback ?? 80
-      s._target       = target
-      s._explodeRadius = 60
+      s._target        = target
+      s._explodeRadius = stats._explodeRadius
       s._explodeMult   = 1.5
-      s._speed        = stats.speed
-      s._scatter      = stats._scatter || false
-      s._scatterFired = false
-      s._linger     = stats._linger
+      s._speed         = stats.speed
+      s._scatter       = stats._scatter || false
+      s._scatterFired  = false
+      s._linger        = stats._linger
       s._pool          = pool
       s._miniExplosion = stats._miniExplosion || false
       s._ricochet      = stats._ricochet      || false
       s._ricochetDepth = 0
-      s._evoKaku    = stats._evo === 'kaku'
+      s._scorch        = stats._scorch        || false
+      s._evoKaku       = stats._evo === 'kaku'
       // 核符 evo — force linger and bigger explosion
       if (s._evoKaku) {
         s._linger = true
-        s._explodeRadius = 60 * 2.5
+        s._explodeRadius = stats._explodeRadius * 2.5
       }
       s._hitRadius = 10
 
@@ -74,18 +76,25 @@ export default {
   update(sprite) {
     if (!sprite.active) return
 
+    const scatterProps = {
+      _explodeRadius: (sprite._explodeRadius || 30) * 0.5,
+      _speed:         250,
+      _evoKaku:       false,
+      _target:        null,
+      _linger:        false,
+      range:          150,
+    }
+
+    // Hit an enemy last frame → expire here with optional split
+    if (sprite._spent) {
+      if (sprite._scatter && !sprite._scatterFired) doScatter(sprite, sprite.scene, scatterProps)
+      sprite.disableBody(true, true)
+      return
+    }
+
     // Out of range → expire (with optional split)
     if (Phaser.Math.Distance.Between(sprite.spawnX, sprite.spawnY, sprite.x, sprite.y) >= sprite.range) {
-      if (sprite._scatter && !sprite._scatterFired) {
-        doScatter(sprite, sprite.scene, {
-          _explodeRadius: (sprite._explodeRadius || 30) * 0.5,
-          _speed:         250,
-          _evoKaku:       false,
-          _target:        null,
-          _linger:        false,
-          range:          150,
-        })
-      }
+      if (sprite._scatter && !sprite._scatterFired) doScatter(sprite, sprite.scene, scatterProps)
       sprite.disableBody(true, true)
       return
     }
@@ -115,7 +124,7 @@ export default {
     entry.projectiles.getChildren().forEach(proj => {
       if (!proj.active || proj._spent) return
       enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
-        if (proj.hitSet.has(e)) return
+        if (proj._spent || proj.hitSet.has(e)) return
         if (Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y) < proj._hitRadius) {
           proj.hitSet.add(e)
           Enemy.takeDamage(e, proj.damage, proj.x, proj.y, affixes, proj.knockback ?? 80)

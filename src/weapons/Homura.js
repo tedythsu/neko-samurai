@@ -3,6 +3,7 @@ import Phaser     from 'phaser'
 import Enemy      from '../entities/Enemy.js'
 import { getOrCreate, nearestEnemies } from './_pool.js'
 import { applyExplosion, applyMiniExplosion, applyRicochet } from '../upgrades/projEffects.js'
+import { doScatter } from '../upgrades/projTraits.js'
 
 export default {
   id:       'homura',
@@ -74,7 +75,24 @@ export default {
   update(sprite) {
     if (!sprite.active) return
     sprite.rotation += 0.1
+
+    // Hit an enemy last frame → expire here with optional split
+    if (sprite._spent) {
+      if (sprite._scatter && !sprite._scatterFired) doScatter(sprite, sprite.scene, {
+        _explodeRadius: (sprite._explodeRadius || 40) * 0.5,
+        _speed:         300,
+        range:          150,
+      })
+      sprite.disableBody(true, true)
+      return
+    }
+
     if (Phaser.Math.Distance.Between(sprite.spawnX, sprite.spawnY, sprite.x, sprite.y) >= sprite.range) {
+      if (sprite._scatter && !sprite._scatterFired) doScatter(sprite, sprite.scene, {
+        _explodeRadius: (sprite._explodeRadius || 40) * 0.5,
+        _speed:         300,
+        range:          150,
+      })
       sprite.disableBody(true, true)
     }
   },
@@ -83,7 +101,7 @@ export default {
     entry.projectiles.getChildren().forEach(proj => {
       if (!proj.active || proj._spent) return
       enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
-        if (proj.hitSet.has(e)) return
+        if (proj._spent || proj.hitSet.has(e)) return
         if (Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y) < proj._hitRadius) {
           proj.hitSet.add(e)
           Enemy.takeDamage(e, proj.damage, proj.x, proj.y, affixes, proj.knockback ?? 160)
