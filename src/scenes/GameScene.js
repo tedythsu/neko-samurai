@@ -87,6 +87,8 @@ export default class GameScene extends Phaser.Scene {
     this._level    = 1
     this._xpToNext = xpThreshold(this._level)
     this._upgrading = false
+    this._displayHp = 100   // animated display values for bar rendering
+    this._displayXp = 0
     this._orbs = []
 
     this.events.on('enemy-died', ({ x, y }) => {
@@ -275,6 +277,16 @@ export default class GameScene extends Phaser.Scene {
     if (this._paused) return
     this._player.update(delta)
 
+    // Animate HP bar: instant on damage, smooth on heal
+    const realHp = this._player?.hp ?? 0
+    if (realHp < this._displayHp) {
+      this._displayHp = realHp
+    } else {
+      this._displayHp += (realHp - this._displayHp) * Math.min(1, 10 * delta / 1000)
+    }
+    // Animate XP bar: always smooth
+    this._displayXp += (this._xp - this._displayXp) * Math.min(1, 8 * delta / 1000)
+
     // 武者の気 regen — tick after combat logic
     if (this._regenActive && !this._player._dead) {
       this._regenTimer += delta
@@ -409,8 +421,8 @@ export default class GameScene extends Phaser.Scene {
 
   _drawHud() {
     const W      = this.cameras.main.width
-    const hpPct  = Math.max(0, this._player.hp / this._player.maxHp)
-    const xpPct  = Math.max(0, this._xp / this._xpToNext)
+    const hpPct  = Math.max(0, this._displayHp / this._player.maxHp)
+    const xpPct  = Math.max(0, this._displayXp / this._xpToNext)
     const BX = 52, BW = 168   // bar x, bar width (icon area occupies x=10..52)
 
     this._hud.clear()
@@ -550,6 +562,7 @@ export default class GameScene extends Phaser.Scene {
     this._xp += amount
     if (this._xp >= this._xpToNext) {
       this._xp      -= this._xpToNext
+      this._displayXp = 0   // snap to zero so bar fills from start on new level
       this._level   += 1
       this._xpToNext = xpThreshold(this._level)
       this._upgrading = true
