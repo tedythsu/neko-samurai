@@ -3,9 +3,9 @@ import Phaser from 'phaser'
 import Enemy  from '../entities/Enemy.js'
 
 export default {
-  id:   'ogi',
-  name: '扇',
-  desc: '扇型揮擊・廣域近戰',
+  id:       'ogi',
+  name:     '扇',
+  iconChar: '扇',
 
   baseStats: {
     damage:   18,

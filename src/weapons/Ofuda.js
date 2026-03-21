@@ -6,10 +6,10 @@ import { doScatter } from '../upgrades/projTraits.js'
 import { applyExplosion, applyMiniExplosion, applyRicochet } from '../upgrades/projEffects.js'
 
 export default {
-  id:     'ofuda',
-  name:   '霊符',
-  desc:   '緩速追蹤・命中爆炸',
-  texKey: 'ofuda-tex',
+  id:       'ofuda',
+  name:     '霊符',
+  texKey:   'ofuda-tex',
+  iconChar: '符',
 
   baseStats: {
     damage:         30,

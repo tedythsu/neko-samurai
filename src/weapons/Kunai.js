@@ -11,8 +11,8 @@ const HIT_HALF  = 14   // hit radius in px (approx half the visual width)
 export default {
   id: 'kunai',
   name: '苦無',
-  desc: '速射型・精確追蹤',
   texKey: 'kunai',
+  iconKey: 'kunai',
 
   baseStats: {
     damage: 8,

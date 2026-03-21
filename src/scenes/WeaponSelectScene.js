@@ -37,7 +37,7 @@ export default class WeaponSelectScene extends Phaser.Scene {
 
     // Cards
     const cardW  = Math.min(230, (W - 120) / 3)
-    const cardH  = 330
+    const cardH  = 200
     const gap    = 28
     const totalW = cardW * 3 + gap * 2
     const startX = (W - totalW) / 2 + cardW / 2
@@ -60,67 +60,29 @@ export default class WeaponSelectScene extends Phaser.Scene {
     // Top accent strip
     const strip = this.add.rectangle(0, -h / 2 + 3, w, 6, accent, 1)
 
+    // Icon
+    const iconY = -28
+    let icon
+    if (weapon.iconKey) {
+      icon = this.add.image(0, iconY, weapon.iconKey, weapon.iconFrame ?? undefined)
+      const maxDim = Math.max(icon.width, icon.height)
+      icon.setScale(72 / maxDim)
+    } else {
+      icon = this.add.text(0, iconY, weapon.iconChar ?? '?', {
+        fontSize: '52px',
+        fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
+        color: '#f0e6d0',
+      }).setOrigin(0.5, 0.5)
+    }
+
     // Weapon name
-    const nameText = this.add.text(0, -h / 2 + 22, weapon.name, {
-      fontSize: '21px', color: '#f0e6d0',
+    const nameText = this.add.text(0, h / 2 - 42, weapon.name, {
+      fontSize: '22px', color: '#f0e6d0',
       fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
       fontStyle: 'bold',
     }).setOrigin(0.5, 0)
 
-    // Description
-    const descText = this.add.text(0, -h / 2 + 54, weapon.desc, {
-      fontSize: '11px', color: '#6a6880',
-      fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
-      wordWrap: { width: w - 28 }, align: 'center',
-    }).setOrigin(0.5, 0)
-
-    // Divider
-    const divGfx = this.add.graphics()
-    divGfx.lineStyle(1, accent, 0.3)
-    divGfx.lineBetween(-w / 2 + 16, -h / 2 + 90, w / 2 - 16, -h / 2 + 90)
-
-    // Stats
-    const s = weapon.baseStats
-    const statDefs = [
-      ['傷害', String(Math.round(s.damage)),         '#e07070'],
-      ['速度', `${s.fireRate}ms`,                    '#70c070'],
-      ...(s.projectileCount != null ? [['彈數', String(s.projectileCount), '#d4d470']] : []),
-      ...(s.sickleCount     != null ? [['鎌刃', String(s.sickleCount),     '#d4a060']] : []),
-    ]
-
-    let sy = -h / 2 + 102
-    const statElems = statDefs.flatMap(([label, val, col]) => {
-      const lbl = this.add.text(-w / 2 + 18, sy, label, {
-        fontSize: '11px', color: '#555570',
-        fontFamily: '"Noto Serif JP", serif',
-      }).setOrigin(0, 0)
-      const val_ = this.add.text(w / 2 - 18, sy, val, {
-        fontSize: '11px', color: col,
-        fontFamily: '"Cinzel", "Palatino Linotype", serif',
-      }).setOrigin(1, 0)
-      sy += 19
-      return [lbl, val_]
-    })
-
-    // Upgrade header
-    const upgY = sy + 10
-    const upgHeader = this.add.text(0, upgY, '── 升級 ──', {
-      fontSize: '10px', color: '#3a384e',
-      fontFamily: '"Noto Serif JP", serif',
-    }).setOrigin(0.5, 0)
-
-    let uy = upgY + 16
-    const upgElems = weapon.upgrades.slice(0, 5).map(u => {
-      const t = this.add.text(0, uy, u.name, {
-        fontSize: '10px', color: '#4e4c66',
-        fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
-        wordWrap: { width: w - 28 }, align: 'center',
-      }).setOrigin(0.5, 0)
-      uy += 17
-      return t
-    })
-
-    container.add([bg, strip, nameText, descText, divGfx, ...statElems, upgHeader, ...upgElems])
+    container.add([bg, strip, icon, nameText])
 
     // Entrance animation
     container.setAlpha(0).setY(cy + 22)

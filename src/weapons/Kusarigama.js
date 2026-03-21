@@ -3,9 +3,9 @@ import Phaser from 'phaser'
 import Enemy  from '../entities/Enemy.js'
 
 export default {
-  id:   'kusarigama',
-  name: '鎖鎌',
-  desc: '環繞軌道・持續接觸傷害',
+  id:      'kusarigama',
+  name:    '鎖鎌',
+  iconKey: 'kusarigama',
 
   baseStats: {
     damage:      8,

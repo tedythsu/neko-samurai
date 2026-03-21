@@ -5,7 +5,8 @@ import Enemy   from '../entities/Enemy.js'
 export default {
   id: 'tachi',
   name: '太刀',
-  desc: '爆發型・近距揮砍',
+  iconKey: 'tachi-slash',
+  iconFrame: 0,
 
   baseStats: {
     damage:    20,

@@ -5,10 +5,10 @@ import { getOrCreate, nearestEnemies } from './_pool.js'
 import { applyExplosion, applyMiniExplosion, applyRicochet } from '../upgrades/projEffects.js'
 
 export default {
-  id:     'homura',
-  name:   '炎矢',
-  desc:   '大型炎彈・爆炸傷害',
-  texKey: 'homura-tex',
+  id:       'homura',
+  name:     '炎矢',
+  texKey:   'homura-tex',
+  iconChar: '炎',
 
   baseStats: {
     damage:          25,

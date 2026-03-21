@@ -17,12 +17,6 @@ export default class GameScene extends Phaser.Scene {
     this._startWeapon = data.weapon
   }
 
-  preload() {
-    this.load.image('kunai',      'assets/sprites/weapons/kunai.png')
-    this.load.image('shuriken',   'assets/sprites/weapons/shuriken.png')
-    this.load.image('kusarigama', 'assets/sprites/weapons/kusarigama.png')
-  }
-
   create() {
     this.physics.world.setBounds(0, 0, CFG.WORLD_WIDTH, CFG.WORLD_HEIGHT)
     this.cameras.main.setBounds(0, 0, CFG.WORLD_WIDTH, CFG.WORLD_HEIGHT)

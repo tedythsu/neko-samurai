@@ -55,6 +55,9 @@ export default class BootScene extends Phaser.Scene {
     this.load.spritesheet('tachi-slash', 'assets/sprites/weapons/tachi_slash.png', {
       frameWidth: 166, frameHeight: 166,
     })
+    this.load.image('kunai',      'assets/sprites/weapons/kunai.png')
+    this.load.image('shuriken',   'assets/sprites/weapons/shuriken.png')
+    this.load.image('kusarigama', 'assets/sprites/weapons/kusarigama.png')
   }
 
   create() {

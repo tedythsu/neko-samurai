@@ -10,8 +10,8 @@ const HIT_RADIUS = 28   // manual overlap radius in px (independent of body size
 export default {
   id: 'shuriken',
   name: '手裏剣',
-  desc: '均衡型・全方位放射',
   texKey: 'shuriken',
+  iconKey: 'shuriken',
 
   baseStats: {
     damage: 10,
