@@ -70,13 +70,37 @@ export default class UpgradeScene extends Phaser.Scene {
     })
   }
 
-  _buildCard(cx, cy, w, h, upg, idx) {
+  _buildCard(cx, cy, w, minH, upg, idx) {
     const cat = CATEGORY[upg.target] || CATEGORY.player
     let accent = cat.color
     // Elemental affixes use their element colour
     if (upg.target === 'affix' && upg.affix) {
       accent = AFFIX_COLOR[upg.affix.id] ?? AFFIX_COLOR[upg.id] ?? cat.color
     }
+
+    // Measure text heights first so the card can adapt to content
+    const tmpName = this.add.text(-9999, -9999, upg.name, {
+      fontSize: '15px',
+      fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
+      fontStyle: 'bold',
+      wordWrap: { width: w - 44 },
+    })
+    const tmpDesc = this.add.text(-9999, -9999, upg.desc || '', {
+      fontSize: '11px',
+      fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
+      wordWrap: { width: w - 36 },
+      lineSpacing: 3,
+    })
+    const nameH = tmpName.height
+    const descH = tmpDesc.height
+    tmpName.destroy()
+    tmpDesc.destroy()
+
+    // Layout constants (distance from card top edge)
+    const NAME_TOP = 24
+    const SEP_Y    = NAME_TOP + nameH + 10
+    const DESC_TOP = SEP_Y + 10
+    const h = Math.max(minH, DESC_TOP + descH + 14)
 
     const container = this.add.container(cx, cy)
 
@@ -95,7 +119,7 @@ export default class UpgradeScene extends Phaser.Scene {
     }).setOrigin(1, 0)
 
     // Upgrade name
-    const nameText = this.add.text(-w / 2 + 18, -h / 2 + 24, upg.name, {
+    const nameText = this.add.text(-w / 2 + 18, -h / 2 + NAME_TOP, upg.name, {
       fontSize: '15px', color: '#f0e8d0',
       fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
       fontStyle: 'bold',
@@ -105,10 +129,10 @@ export default class UpgradeScene extends Phaser.Scene {
     // Separator
     const sepGfx = this.add.graphics()
     sepGfx.lineStyle(1, accent, 0.25)
-    sepGfx.lineBetween(-w / 2 + 14, -h / 2 + 62, w / 2 - 14, -h / 2 + 62)
+    sepGfx.lineBetween(-w / 2 + 14, -h / 2 + SEP_Y, w / 2 - 14, -h / 2 + SEP_Y)
 
     // Description
-    const descText = this.add.text(-w / 2 + 18, -h / 2 + 72, upg.desc || '', {
+    const descText = this.add.text(-w / 2 + 18, -h / 2 + DESC_TOP, upg.desc || '', {
       fontSize: '11px', color: '#6a6878',
       fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
       wordWrap: { width: w - 36 },
