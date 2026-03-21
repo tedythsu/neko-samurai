@@ -1,7 +1,7 @@
 // src/weapons/Shuriken.js
 import Phaser from 'phaser'
 import Enemy  from '../entities/Enemy.js'
-import { getOrCreate } from './_pool.js'
+import { getOrCreate, nearestEnemies } from './_pool.js'
 import { doScatter } from '../upgrades/projTraits.js'
 import { applyMiniExplosion, applyRicochet, applyBurnfield } from '../upgrades/projEffects.js'
 
@@ -14,7 +14,7 @@ export default {
   iconKey: 'shuriken',
 
   baseStats: {
-    damage: 12,
+    damage: 8,
     fireRate: 800,
     projectileCount: 3,
     speed: 400,
@@ -31,7 +31,15 @@ export default {
 
   createTexture() { /* loaded in GameScene.preload() */ },
 
-  fire(scene, pool, fromX, fromY, stats /*, enemies unused */) {
+  fire(scene, pool, fromX, fromY, stats, enemies) {
+    const target = nearestEnemies(enemies, fromX, fromY, 1)[0]
+    if (!target) return
+
+    const centerAngle = Phaser.Math.RadToDeg(
+      Phaser.Math.Angle.Between(fromX, fromY, target.x, target.y)
+    )
+    const SPREAD_DEG = 20  // degrees between each projectile
+
     for (let i = 0; i < stats.projectileCount; i++) {
       const s = getOrCreate(pool, fromX, fromY, this.texKey)
       const baseW = 28, baseH = 28
@@ -54,8 +62,9 @@ export default {
       s._ricochetDepth = 0
       s._scorch        = stats._scorch        || false
 
-      const deg = (360 / stats.projectileCount) * i
-      scene.physics.velocityFromAngle(deg, stats.speed, s.body.velocity)
+      // Fan spread: centre projectile aims at target, others spread symmetrically
+      const offset = (i - (stats.projectileCount - 1) / 2) * SPREAD_DEG
+      scene.physics.velocityFromAngle(centerAngle + offset, stats.speed, s.body.velocity)
     }
   },
 
