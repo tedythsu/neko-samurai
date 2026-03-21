@@ -438,17 +438,26 @@ export default class GameScene extends Phaser.Scene {
     // Weapon icon row — rebuild only when weapon count changes
     if (this._weapons.length !== this._lastWeaponCount) {
       this._lastWeaponCount = this._weapons.length
-      const weaponColors = [0xd47c3a, 0x3a8fd4, 0x5ab84c, 0xc44ab8]
       this._hudWeaponIcons.forEach(({ icon, label }) => { icon.destroy(); label.destroy() })
       this._hudWeaponIcons = this._weapons.map((entry, i) => {
-        const cx = 22 + i * 28
-        const icon = this.add.arc(cx, 93, 12, 0, 360, false, weaponColors[i] || 0x888888)
+        const w  = entry.weapon
+        const cx = 206 - i * 32
+        const cy = 64
+        const icon = this.add.arc(cx, cy, 14, 0, 360, false, 0x000000, 0.55)
           .setScrollFactor(0).setDepth(200)
-          .setStrokeStyle(1.5, 0xffffff, 0.55)
-        const label = this.add.text(cx, 93, entry.weapon.name[0], {
-          fontSize: '10px', color: '#0a0814',
-          fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
-        }).setScrollFactor(0).setDepth(201).setOrigin(0.5)
+          .setStrokeStyle(1.5, 0xffffff, 0.35)
+
+        let label
+        if (w.iconKey) {
+          label = this.add.image(cx, cy, w.iconKey, w.iconFrame ?? undefined)
+          const maxDim = Math.max(label.width, label.height)
+          label.setScale(24 / maxDim).setScrollFactor(0).setDepth(201)
+        } else {
+          label = this.add.text(cx, cy, w.iconChar ?? w.name[0], {
+            fontSize: '15px', color: '#f0e8d0',
+            fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
+          }).setScrollFactor(0).setDepth(201).setOrigin(0.5)
+        }
         return { icon, label }
       })
     }
