@@ -160,19 +160,6 @@ export default class GameScene extends Phaser.Scene {
     this._hudWeaponIcons  = []
     this._lastWeaponCount = 0
 
-    // Affix dot row (circles, pre-create 16 slots)
-    this._hudAffixDots = Array.from({ length: 16 }, (_, i) =>
-      this.add.arc(14 + i * 16, 112, 5, 0, 360, false, 0x222244, 1)
-        .setScrollFactor(0).setDepth(200).setAlpha(0)
-    )
-
-    // Resonance glyph row
-    this._hudResonanceText = this.add.text(12, 124, '', {
-      fontSize: '12px', color: '#e8c85a',
-      fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
-      stroke: '#06060f', strokeThickness: 2,
-    }).setScrollFactor(0).setDepth(201)
-
     this._elapsed = 0
     this._killCount = 0
     this._bossActive = false
@@ -473,38 +460,6 @@ export default class GameScene extends Phaser.Scene {
         this._hudWeaponIcons = [{ label }]
       }
     }
-
-    // Affix dot row (circles, tier-2 get outer ring)
-    const affixIds   = [...this._affixCounts.keys()]
-    const affixColor = {
-      burn:    0xff6600, burn2:    0xff3300,
-      poison:  0x44cc44, poison2:  0x00ff44,
-      chain:   0xffff00, chain2:   0xffff00,
-      chill:   0x88ccff, chill2:   0x44aaff,
-      curse:   0xaa44aa, curse2:   0xcc00cc,
-      leech:   0xff4488, leech2:   0xff0066,
-      burst:   0xff4400, burst2:   0xff6600,
-      lucky:   0xffdd88, lucky2:   0xffaa00,
-    }
-    this._hudAffixDots.forEach((dot, i) => {
-      if (i < affixIds.length) {
-        const id  = affixIds[i]
-        const col = affixColor[id] || 0x888888
-        dot.setFillStyle(col, 1).setAlpha(1)
-        dot.setStrokeStyle(id.endsWith('2') ? 1.5 : 0, 0xffffff, 0.85)
-      } else {
-        dot.setAlpha(0)
-      }
-    })
-
-    // Resonance glyphs
-    const resonanceNames = {
-      explode_burn: '爆炎', toxic_chain: '毒鏈', blizzard_arc: '雪電',
-      corrosion: '腐蝕', dark_harvest: '暗刈',
-    }
-    this._hudResonanceText.setText(
-      [...this._resonances].map(id => resonanceNames[id] || id).join('  ')
-    )
 
     // Boss HP bar
     const bossAlpha = this._bossManager.activeBoss ? 1 : 0
