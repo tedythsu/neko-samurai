@@ -78,17 +78,19 @@ export default class UpgradeScene extends Phaser.Scene {
       accent = AFFIX_COLOR[upg.affix.id] ?? AFFIX_COLOR[upg.id] ?? cat.color
     }
 
-    // Measure text heights first so the card can adapt to content
+    // Measure text heights first so the card can adapt to content.
+    // useAdvancedWrap: true is required for CJK text (no spaces) to wrap
+    // at character boundaries instead of overflowing horizontally.
     const tmpName = this.add.text(-9999, -9999, upg.name, {
       fontSize: '15px',
       fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
       fontStyle: 'bold',
-      wordWrap: { width: w - 44 },
+      wordWrap: { width: w - 44, useAdvancedWrap: true },
     })
     const tmpDesc = this.add.text(-9999, -9999, upg.desc || '', {
       fontSize: '11px',
       fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
-      wordWrap: { width: w - 36 },
+      wordWrap: { width: w - 36, useAdvancedWrap: true },
       lineSpacing: 3,
     })
     const nameH = tmpName.height
@@ -123,7 +125,7 @@ export default class UpgradeScene extends Phaser.Scene {
       fontSize: '15px', color: '#f0e8d0',
       fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
       fontStyle: 'bold',
-      wordWrap: { width: w - 44 },
+      wordWrap: { width: w - 44, useAdvancedWrap: true },
     }).setOrigin(0, 0)
 
     // Separator
@@ -135,7 +137,7 @@ export default class UpgradeScene extends Phaser.Scene {
     const descText = this.add.text(-w / 2 + 18, -h / 2 + DESC_TOP, upg.desc || '', {
       fontSize: '11px', color: '#6a6878',
       fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
-      wordWrap: { width: w - 36 },
+      wordWrap: { width: w - 36, useAdvancedWrap: true },
       lineSpacing: 3,
     }).setOrigin(0, 0)
 
