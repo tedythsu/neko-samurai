@@ -52,9 +52,7 @@ export default class BootScene extends Phaser.Scene {
     this.load.image('kisotsu-run', 'assets/sprites/enemy/kisotsu/run.png')
     this.load.image('musou',       'assets/sprites/orbs/musou.png')
     this.load.image('stage',       'assets/sprites/backgrounds/stage.png')
-    this.load.spritesheet('tachi-slash', 'assets/sprites/weapons/tachi_slash.png', {
-      frameWidth: 166, frameHeight: 166,
-    })
+    this.load.image('tachi',      'assets/sprites/weapons/tachi.png')
     this.load.image('kunai',      'assets/sprites/weapons/kunai.png')
     this.load.image('shuriken',   'assets/sprites/weapons/shuriken.png')
     this.load.image('kusarigama', 'assets/sprites/weapons/kusarigama.png')

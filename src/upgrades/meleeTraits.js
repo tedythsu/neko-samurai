@@ -1,7 +1,7 @@
 // src/upgrades/meleeTraits.js
 
-export const MELEE_WEAPON_IDS = new Set(['tachi', 'ogi', 'kusarigama'])
-export const SWING_WEAPON_IDS = new Set(['tachi', 'ogi'])
+export const MELEE_WEAPON_IDS = new Set(['tachi', 'kusarigama'])
+export const SWING_WEAPON_IDS = new Set(['tachi'])
 
 export const ALL_MELEE_TRAITS = [
   // ── Universal melee ────────────────────────────────────────────────────────
@@ -27,18 +27,20 @@ export const ALL_MELEE_TRAITS = [
     apply(stats) { stats._doom = true },
   },
   {
-    id: 'mt_rapidvortex',
-    name: '疾旋',
-    desc: '周圍每有1個敵人，本次攻擊傷害+25%（最多+100%）',
+    id: 'mt_cooldown',
+    name: '迅刀 -25% 冷卻',
+    desc: '攻擊冷卻降低 25%',
     oneTime: true,
-    apply(stats) { stats._rapidVortex = true },
+    swingOnly: true,
+    apply(stats) { stats.fireRate = Math.max(300, stats.fireRate * 0.75) },
   },
   {
-    id: 'mt_afterimage',
-    name: '殘像',
-    desc: '攻擊結束後留下殘像傷害區（1s，0.5倍傷害）',
+    id: 'mt_doublestrike',
+    name: '二刀連擊',
+    desc: '命中時 35% 機率立即再次揮斬（75% 傷害）',
     oneTime: true,
-    apply(stats) { stats._afterimage = true },
+    swingOnly: true,
+    apply(stats) { stats._doubleStrike = true },
   },
   {
     id: 'mt_shockwave',

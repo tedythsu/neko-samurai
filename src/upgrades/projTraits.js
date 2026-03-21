@@ -2,7 +2,7 @@
 import Phaser from 'phaser'
 import { getOrCreate } from '../weapons/_pool.js'
 
-export const PROJ_WEAPON_IDS = new Set(['shuriken', 'kunai', 'homura', 'ofuda'])
+export const PROJ_WEAPON_IDS = new Set(['shuriken', 'kunai', 'homura'])
 
 export const ALL_PROJ_TRAITS = [
   {

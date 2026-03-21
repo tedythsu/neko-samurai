@@ -22,12 +22,4 @@ export const ALL_EVOLUTIONS = [
     id: 'dokuja', name: '毒蛇鎖鎌', weaponId: 'kusarigama', affixId: 'poison',
     desc: '鎖鎌覚醒：每次接觸施加毒疊層，軌道半徑+40px',
   },
-  {
-    id: 'kaku', name: '核符', weaponId: 'ofuda', affixId: 'burst',
-    desc: '霊符覚醒：爆炸範圍×2.5、100%觸發AoE爆炸、留下2秒輻射區',
-  },
-  {
-    id: 'shinigami', name: '死神扇', weaponId: 'ogi', affixId: 'curse',
-    desc: '扇覚醒：每次命中施加詛咒，詛咒死亡爆炸範圍×2',
-  },
 ]
