@@ -3,7 +3,7 @@ import Phaser from 'phaser'
 import Player   from '../entities/Player.js'
 import Enemy    from '../entities/Enemy.js'
 import { CFG, randomEdgePoint, xpThreshold, PLAYER_UPGRADES, PROGRESSION_BREAKPOINTS } from '../config.js'
-import { ALL_AFFIXES, ALL_TIER2_AFFIXES, ALL_MECHANICAL, ALL_EVOLUTIONS, checkResonances } from '../affixes/index.js'
+import { ALL_AFFIXES, ALL_TIER2_AFFIXES, ALL_EVOLUTIONS, checkResonances } from '../affixes/index.js'
 import { ALL_WEAPONS } from '../weapons/index.js'
 import { ALL_PROJ_TRAITS, PROJ_WEAPON_IDS }              from '../upgrades/projTraits.js'
 import { ALL_MELEE_TRAITS, MELEE_WEAPON_IDS, SWING_WEAPON_IDS } from '../upgrades/meleeTraits.js'
@@ -73,10 +73,8 @@ export default class GameScene extends Phaser.Scene {
     this._affixes       = []              // active affix objects (may have duplicates for stacks)
     this._affixCounts   = new Map()       // id → pick count
     this._resonances    = new Set()       // active resonance IDs
-    this._orbitShields  = []              // orbit_shield mechanical affix entries
     this._critBonus    = 0
     this._critDmgBonus = 0
-    this._mechanicalsOwned    = new Set()
     this._playerUpgradesOwned = new Set()
     this._offeredEvos         = new Set()
     this._projTraitsOwned  = new Set()
@@ -334,36 +332,6 @@ export default class GameScene extends Phaser.Scene {
       })
       if (entry.weapon.updateActive) {
         entry.weapon.updateActive(entry, this, this._enemies, this._player, this._affixes, delta)
-      }
-    }
-
-    // Orbit shields (mechanical affix)
-    if (this._orbitShields.length > 0) {
-      const RING_RADIUS = 60
-      const now = this.time.now
-      for (const shield of this._orbitShields) {
-        // Redraw ring each frame centered on player
-        shield.gfx.clear()
-        shield.gfx.lineStyle(3, 0xffdd44, 1)
-        shield.gfx.strokeCircle(px, py, RING_RADIUS)
-        // Inner glow fill
-        shield.gfx.fillStyle(0xffdd44, 0.08)
-        shield.gfx.fillCircle(px, py, RING_RADIUS)
-
-        // Purge stale cooldown entries for inactive enemies (pooled sprite reuse fix)
-        for (const key of shield.damageCd.keys()) {
-          if (!key.active) shield.damageCd.delete(key)
-        }
-        // Damage any enemy within ring radius
-        this._enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
-          if (Phaser.Math.Distance.Between(px, py, e.x, e.y) < RING_RADIUS + 8) {
-            const last = shield.damageCd.get(e) || 0
-            if (now - last >= 200) {
-              shield.damageCd.set(e, now)
-              Enemy.takeDamage(e, 1.2, px, py, this._affixes, 0)
-            }
-          }
-        })
       }
     }
 
@@ -661,8 +629,6 @@ export default class GameScene extends Phaser.Scene {
           }
         } else if (upgrade.target === 'affix') {
           this._applyAffix(upgrade.affix)
-        } else if (upgrade.target === 'mechanical') {
-          this._applyMechanical(upgrade)
         } else if (upgrade.target === 'new_weapon') {
           this._addWeapon(upgrade.weapon)
         } else if (upgrade.target === 'evolution') {
@@ -702,11 +668,6 @@ export default class GameScene extends Phaser.Scene {
     pool.push(...ALL_TIER2_AFFIXES
       .filter(a => this._affixCounts.has(a.requires) && !this._affixCounts.has(a.id))
       .map(a => ({ id: a.id, name: a.name, desc: a.desc, target: 'affix', affix: a })))
-
-    // Mechanical affixes — only if not yet owned
-    pool.push(...ALL_MECHANICAL
-      .filter(m => !this._mechanicalsOwned.has(m.id))
-      .map(m => ({ ...m, target: 'mechanical' })))
 
     // New weapon (if next slot is available)
     const nextSlotLevel = CFG.WEAPON_SLOT_LEVELS[this._weapons.length - 1]
@@ -788,47 +749,6 @@ export default class GameScene extends Phaser.Scene {
     const count = (this._affixCounts.get(affix.id) || 0) + 1
     this._affixCounts.set(affix.id, count)
     this._resonances = checkResonances(this._affixCounts)
-  }
-
-  _applyMechanical(mechanical) {
-    this._mechanicalsOwned.add(mechanical.id)
-    if (mechanical.id === 'multishot') {
-      for (const entry of this._weapons) {
-        if (entry.stats.projectileCount !== undefined) {
-          entry.stats.projectileCount = Math.min(5, entry.stats.projectileCount + 1)
-          if (entry.stats.range !== undefined) {
-            entry.stats.range = entry.stats.range * 1.10
-          }
-        } else {
-          entry.stats.range = (entry.stats.range || 100) * 1.15
-        }
-      }
-    } else if (mechanical.id === 'piercing') {
-      // Only weapons that declare `penetrate` in baseStats support piercing (opt-in by design)
-      for (const entry of this._weapons) {
-        if (entry.stats.penetrate !== undefined)
-          entry.stats.penetrate = true
-      }
-    } else if (mechanical.id === 'orbit_shield') {
-      this._addOrbitShield()
-    }
-  }
-
-  _addOrbitShield() {
-    const ring = this.add.graphics().setDepth(7)
-    // Pulse alpha 0.3 ↔ 0.9 continuously
-    this.tweens.add({
-      targets: ring,
-      alpha: { from: 0.3, to: 0.9 },
-      yoyo: true,
-      repeat: -1,
-      duration: 600,
-      ease: 'Sine.easeInOut',
-    })
-    this._orbitShields.push({
-      gfx:      ring,
-      damageCd: new Map(),
-    })
   }
 
   _onPlayerDead() {

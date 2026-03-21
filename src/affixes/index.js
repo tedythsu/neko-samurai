@@ -17,21 +17,3 @@ export const ALL_AFFIXES = [burn, poison, chain, chill, curse, leech, burst, luc
 export const ALL_TIER2_AFFIXES = tier2
 
 export { ALL_EVOLUTIONS }
-
-export const ALL_MECHANICAL = [
-  {
-    id:   'multishot',
-    name: '乱射',
-    desc: '所有投射型武器：投射數+1；射程型投射物另加射程+10%（近戰：射程+15%）',
-  },
-  {
-    id:   'piercing',
-    name: '貫通',
-    desc: '所有投射型武器：彈丸貫穿敵人',
-  },
-  {
-    id:   'orbit_shield',
-    name: '護盾術',
-    desc: '產生環繞護盾（60px軌道，接觸造成6傷害/秒）',
-  },
-]
