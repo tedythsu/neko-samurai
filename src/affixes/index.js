@@ -13,6 +13,7 @@ import tier2   from './tier2.js'
 export { checkResonances } from './resonances.js'
 
 export const ALL_AFFIXES = [burn, poison, chain, chill, curse, leech, burst, lucky]
+  .map(a => ({ ...a, minLevel: a.minLevel ?? 3 }))
 
 export const ALL_TIER2_AFFIXES = tier2
 

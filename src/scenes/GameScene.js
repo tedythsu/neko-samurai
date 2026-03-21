@@ -618,9 +618,9 @@ export default class GameScene extends Phaser.Scene {
       }
     }
 
-    // Tier-1 elemental affixes — only show if not yet owned
+    // Tier-1 elemental affixes — only show if not yet owned and level gate reached
     pool.push(...ALL_AFFIXES
-      .filter(a => !this._affixCounts.has(a.id))
+      .filter(a => !this._affixCounts.has(a.id) && this._level >= (a.minLevel ?? 1))
       .map(a => ({ id: a.id, name: a.name, desc: a.desc, target: 'affix', affix: a })))
 
     // Tier-2 elemental affixes — only if parent owned AND tier-2 not yet owned
@@ -653,6 +653,7 @@ export default class GameScene extends Phaser.Scene {
     if (ownedProjEntries.length > 0) {
       for (const trait of ALL_PROJ_TRAITS) {
         if (this._projTraitsOwned.has(trait.id)) continue
+        if (trait.minLevel && this._level < trait.minLevel) continue
         if (trait.relevant && !ownedProjEntries.some(e => trait.relevant(e.stats))) continue
         pool.push({ ...trait, target: 'proj_trait' })
       }
@@ -664,6 +665,7 @@ export default class GameScene extends Phaser.Scene {
     if (hasMeleeWeapon) {
       for (const trait of ALL_MELEE_TRAITS) {
         if (this._meleeTraitsOwned.has(trait.id)) continue
+        if (trait.minLevel && this._level < trait.minLevel) continue
         if (trait.swingOnly && !hasSwingWeapon) continue
         pool.push({ ...trait, target: 'melee_trait' })
       }
