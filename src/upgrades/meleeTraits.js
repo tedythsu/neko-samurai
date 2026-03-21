@@ -6,6 +6,13 @@ export const SWING_WEAPON_IDS = new Set(['tachi', 'ogi'])
 export const ALL_MELEE_TRAITS = [
   // ── Universal melee ────────────────────────────────────────────────────────
   {
+    id: 'mt_range',
+    name: '攻擊範圍 +20%',
+    desc: '所有近戰武器攻擊範圍 +20%',
+    oneTime: true,
+    apply(stats) { if (stats.range != null) stats.range *= 1.2 },
+  },
+  {
     id: 'mt_deathburst',
     name: '死爆',
     desc: '擊殺時在60px範圍內爆炸，造成100%傷害',

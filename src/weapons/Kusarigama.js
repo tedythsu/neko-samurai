@@ -8,15 +8,15 @@ export default {
   iconKey: 'kusarigama',
 
   baseStats: {
-    damage:      8,
-    fireRate:    0,      // always active — handled by updateActive()
-    sickleCount: 1,
-    knockback:   0,
+    damage:         8,
+    fireRate:       0,   // always active — handled by updateActive()
+    projectileCount: 1,  // number of orbiting sickles
+    knockback:      0,
   },
 
   upgrades: [
-    { id: 'dmg',    name: '鎖鎌 傷害 +25%', desc: '', apply: s => { s.damage      *= 1.25 } },
-    { id: 'sickle', name: '鎖鎌 鎌刃 +1',   desc: '', apply: s => { s.sickleCount = Math.min(4, s.sickleCount + 1) } },
+    { id: 'dmg',    name: '鎖鎌 傷害 +25%', desc: '', apply: s => { s.damage          *= 1.25 } },
+    { id: 'sickle', name: '鎖鎌 鎌刃 +1',   desc: '', apply: s => { s.projectileCount = Math.min(4, s.projectileCount + 1) } },
   ],
 
   createTexture(_scene) { /* sickles are drawn as rectangles in updateActive */ },
@@ -37,7 +37,7 @@ export default {
     const innerRadius = isDokuja ? 120 : SICKLE_LEN
 
     // Grow inner sickle array
-    while (entry.sickles.length < entry.stats.sickleCount) {
+    while (entry.sickles.length < entry.stats.projectileCount) {
       const img = scene.add.image(0, 0, 'kusarigama').setDepth(8)
       const aspect = img.width / img.height
       img.setDisplaySize(SICKLE_LEN * aspect, SICKLE_LEN).setOrigin(0.5, CHAIN_ATTACH_Y)

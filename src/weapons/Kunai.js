@@ -3,7 +3,7 @@ import Phaser from 'phaser'
 import Enemy  from '../entities/Enemy.js'
 import { getOrCreate, nearestEnemies } from './_pool.js'
 import { doScatter } from '../upgrades/projTraits.js'
-import { applyMiniExplosion, applyRicochet } from '../upgrades/projEffects.js'
+import { applyMiniExplosion, applyRicochet, applyBurnfield } from '../upgrades/projEffects.js'
 
 const BASE_H    = 40   // display height in px regardless of source image size
 const HIT_HALF  = 14   // hit radius in px (approx half the visual width)
@@ -56,6 +56,7 @@ export default {
       s._ricochetDepth = 0
       s._scatter       = stats._scatter       || false
       s._scatterFired  = false
+      s._scorch        = stats._scorch        || false
       s._pool          = pool
 
       const angle = Phaser.Math.Angle.Between(fromX, fromY, target.x, target.y)
@@ -92,6 +93,7 @@ export default {
           }
           applyMiniExplosion(proj, e, scene, enemies, affixes)
           applyRicochet(proj, e, scene, enemies, affixes)
+          applyBurnfield(proj, scene, affixes)
 
           // 氷刃苦無 — pierce frozen enemies (don't expire)
           const shouldPierce = proj.penetrate || (entry.stats._evo === 'koori' && e._statusEffects?.frozen?.active)

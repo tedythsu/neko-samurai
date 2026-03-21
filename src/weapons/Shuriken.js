@@ -3,7 +3,7 @@ import Phaser from 'phaser'
 import Enemy  from '../entities/Enemy.js'
 import { getOrCreate } from './_pool.js'
 import { doScatter } from '../upgrades/projTraits.js'
-import { applyMiniExplosion, applyRicochet } from '../upgrades/projEffects.js'
+import { applyMiniExplosion, applyRicochet, applyBurnfield } from '../upgrades/projEffects.js'
 
 const HIT_RADIUS = 28   // manual overlap radius in px (independent of body size)
 
@@ -52,6 +52,7 @@ export default {
       s._miniExplosion = stats._miniExplosion || false
       s._ricochet      = stats._ricochet      || false
       s._ricochetDepth = 0
+      s._scorch        = stats._scorch        || false
 
       const deg = (360 / stats.projectileCount) * i
       scene.physics.velocityFromAngle(deg, stats.speed, s.body.velocity)
@@ -92,6 +93,7 @@ export default {
           Enemy.takeDamage(e, proj.damage, proj.x, proj.y, affixes, proj.knockback ?? 60)
           applyMiniExplosion(proj, e, scene, enemies, affixes)
           applyRicochet(proj, e, scene, enemies, affixes)
+          applyBurnfield(proj, scene, affixes)
 
           // 雷轟剣 evo — 100% chain bounce, bounces = projectileCount
           if (entry.stats._evo === 'raikou') {

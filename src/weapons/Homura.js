@@ -22,11 +22,8 @@ export default {
   },
 
   upgrades: [
-    { id: 'dmg',    name: '炎矢 傷害 +25%',    desc: '', apply: s => { s.damage          *= 1.25 } },
-    { id: 'radius', name: '炎矢 爆炸範圍 +20px', desc: '', apply: s => { s._explodeRadius = Math.min(140, s._explodeRadius + 20) } },
-    { id: 'multi',  name: '炎矢 投射數 +1',     desc: '', apply: s => { s.projectileCount = Math.min(5, s.projectileCount + 1) } },
-    { id: 'scorch',       name: '焦土',    desc: '爆炸後留下3秒燃燒火場（0.15倍傷害/300ms）', apply: s => { s._scorch = true } },
-    { id: 'chainExplode', name: '連鎖爆炸', desc: '25%機率觸發二次爆炸',                      apply: s => { s._chainExplode = true } },
+    { id: 'dmg',   name: '炎矢 傷害 +25%', desc: '', apply: s => { s.damage         *= 1.25 } },
+    { id: 'multi', name: '炎矢 投射數 +1', desc: '', apply: s => { s.projectileCount = Math.min(5, s.projectileCount + 1) } },
   ],
 
   createTexture(scene) {

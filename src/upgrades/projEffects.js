@@ -51,6 +51,17 @@ export function applyExplosion(proj, hitEnemy, scene, enemies, affixes) {
 }
 
 /**
+ * 燃燒地帶 — leave a scorch zone at the projectile's hit position.
+ * No-op unless proj._scorch is set (via pt_burnfield trait).
+ * Homura/Ofuda use applyExplosion which already handles _scorch internally;
+ * this helper is for non-explosion weapons (Kunai, Shuriken).
+ */
+export function applyBurnfield(proj, scene, affixes) {
+  if (!proj._scorch) return
+  scene._createScorchZone(proj.x, proj.y, 35, proj.damage, affixes)
+}
+
+/**
  * 爆裂弾 — small AoE splash at the hit-enemy's position.
  * No-op if proj._miniExplosion is falsy.
  */

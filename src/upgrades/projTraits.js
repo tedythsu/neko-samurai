@@ -6,6 +6,20 @@ export const PROJ_WEAPON_IDS = new Set(['shuriken', 'kunai', 'homura', 'ofuda'])
 
 export const ALL_PROJ_TRAITS = [
   {
+    id: 'pt_explosionRange',
+    name: '爆炸範圍 +25px',
+    desc: '爆炸型投射物的爆炸半徑 +25px',
+    oneTime: true,
+    apply(stats) { if (stats._explodeRadius != null) stats._explodeRadius += 25 },
+  },
+  {
+    id: 'pt_burnfield',
+    name: '燃燒地帶',
+    desc: '投射物命中後在落點留下2秒燃燒地帶（0.15倍傷害/300ms）',
+    oneTime: true,
+    apply(stats) { stats._scorch = true },
+  },
+  {
     id: 'pt_boomerang',
     name: '回旋',
     desc: '投射物抵達射程後反彈飛回',

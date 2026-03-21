@@ -22,9 +22,8 @@ export default {
   },
 
   upgrades: [
-    { id: 'dmg',   name: '霊符 傷害 +25%',  desc: '', apply: s => { s.damage          *= 1.25 } },
-    { id: 'speed', name: '霊符 追蹤速度 +30%', desc: '', apply: s => { s.speed = Math.min(450, s.speed * 1.30) } },
-    { id: 'multi', name: '霊符 投射數 +1',   desc: '', apply: s => { s.projectileCount = Math.min(5, s.projectileCount + 1) } },
+    { id: 'dmg',   name: '霊符 傷害 +25%', desc: '', apply: s => { s.damage          *= 1.25 } },
+    { id: 'multi', name: '霊符 投射數 +1',  desc: '', apply: s => { s.projectileCount = Math.min(5, s.projectileCount + 1) } },
   ],
 
   createTexture(scene) {

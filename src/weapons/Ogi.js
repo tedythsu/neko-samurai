@@ -16,7 +16,6 @@ export default {
 
   upgrades: [
     { id: 'dmg',   name: '扇 傷害 +25%',    desc: '', apply: s => { s.damage   *= 1.25 } },
-    { id: 'range', name: '扇 攻擊範圍 +20%', desc: '', apply: s => { s.range    = Math.min(180, s.range * 1.20) } },
     { id: 'speed', name: '扇 攻擊速度 +20%', desc: '', apply: s => { s.fireRate = Math.max(200, s.fireRate * 0.80) } },
   ],
 
