@@ -11,7 +11,7 @@ export const CFG = {
 
   // Enemy
   ENEMY_SPEED:              80,
-  ENEMY_HP:                 60,
+  ENEMY_HP:                 35,
   ENEMY_DAMAGE:             10,
   ENEMY_SPAWN_INTERVAL:   1500,  // ms
 
@@ -36,10 +36,10 @@ export const CFG = {
 
 export const PROGRESSION_BREAKPOINTS = [
   { timeMs:  0 * 60000, spawnInterval: 1500, hpMult: 1.0, speedMult: 1.0, maxEnemies: 25 },
-  { timeMs:  2 * 60000, spawnInterval: 1200, hpMult: 1.2, speedMult: 1.1, maxEnemies: 30 },
-  { timeMs:  5 * 60000, spawnInterval: 1000, hpMult: 1.5, speedMult: 1.2, maxEnemies: 35 },
-  { timeMs:  8 * 60000, spawnInterval:  800, hpMult: 2.0, speedMult: 1.3, maxEnemies: 40 },
-  { timeMs: 12 * 60000, spawnInterval:  600, hpMult: 2.5, speedMult: 1.4, maxEnemies: 50 },
+  { timeMs:  2 * 60000, spawnInterval: 1200, hpMult: 1.4, speedMult: 1.1, maxEnemies: 30 },
+  { timeMs:  5 * 60000, spawnInterval: 1000, hpMult: 2.2, speedMult: 1.2, maxEnemies: 35 },
+  { timeMs:  8 * 60000, spawnInterval:  800, hpMult: 3.5, speedMult: 1.3, maxEnemies: 40 },
+  { timeMs: 12 * 60000, spawnInterval:  600, hpMult: 5.5, speedMult: 1.4, maxEnemies: 50 },
 ]
 
 /** XP required to reach `level + 1` */
