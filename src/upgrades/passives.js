@@ -173,4 +173,85 @@ export const ALL_PASSIVES = [
     rarity: 'rare', oneTime: true,
     apply: (_p, scene) => { scene._bloodRush = true },
   },
+
+  // ─── Trigger Passives (formerly procs) ───────────────────────────────────
+  {
+    id: 'war_cry', name: '【戰吼・威壓】', desc: '每 5 秒自動發出震波，強力推開身邊怪物，並使其 4 秒內更容易受創',
+    rarity: 'epic', oneTime: true, minLevel: 5, subtype: 'proc',
+  },
+  {
+    id: 'thorns', name: '【棘甲・反震】', desc: '怪物碰撞玩家時，反彈 300% 傷害並強制擊退',
+    rarity: 'epic', oneTime: true, minLevel: 5, subtype: 'proc',
+  },
+  {
+    id: 'life_leech', name: '【血祭・吸取】', desc: '造成傷害的 1% 轉化為生命',
+    rarity: 'epic', oneTime: true, minLevel: 5, subtype: 'proc',
+  },
+  {
+    id: 'sanctuary_aura', name: '【聖域・靈光】', desc: '腳下產生圓圈，範圍內怪物移速降低 30%，半徑隨等級成長',
+    rarity: 'epic', oneTime: true, minLevel: 5, subtype: 'proc',
+  },
+  {
+    id: 'soul_burst', name: '【魂之爆發】', desc: '每擊殺 45 隻敵人，觸發全畫面衝擊波，震飛並傷害所有怪物',
+    rarity: 'epic', oneTime: true, minLevel: 5, subtype: 'proc',
+  },
+  {
+    id: 'ration', name: '【兵糧丸・回氣】', desc: '每 20 秒恢復最大生命 6%，並進入 5 秒戰備狀態：攻速、移速、傷害提升',
+    rarity: 'epic', oneTime: true, minLevel: 5, subtype: 'proc',
+  },
+  {
+    id: 'culling', name: '【斬殺・黃泉】', desc: '直接秒殺血量低於 15% 的敵人',
+    rarity: 'epic', oneTime: true, minLevel: 8, subtype: 'proc',
+  },
+  {
+    id: 'dark_aura', name: '【邪氣・吸取】', desc: '光環內怪物承受更多傷害；在光環內死亡時，縮短戰吼、兵糧丸、月讀、替身術冷卻',
+    rarity: 'epic', oneTime: true, minLevel: 8, subtype: 'proc',
+  },
+  {
+    id: 'iron_body', name: '【不動・護盾】', desc: '站定不動 1.5 秒後獲得護盾；護盾被打破時，釋放護身震波反擊周圍敵人',
+    rarity: 'epic', oneTime: true, minLevel: 8, subtype: 'proc',
+  },
+
+  // ─── Legendary Passives (formerly keystones) ─────────────────────────────
+  {
+    id: 'iron_will', name: '【不動如山】', desc: '站定不動時每秒傷害提升 20%（最高 100%），並獲得霸體',
+    rarity: 'legendary', oneTime: true, minLevel: 10, subtype: 'keystone',
+  },
+  {
+    id: 'glass_cannon', name: '【狂戰士・誓約】', desc: '受到的傷害加倍，但輸出的傷害變為三倍',
+    rarity: 'legendary', oneTime: true, minLevel: 10, subtype: 'keystone',
+    apply(_player, scene) { scene._glassCannon = true },
+  },
+  {
+    id: 'spell_echo', name: '【萬劍歸宗】', desc: '投射物收回時，在玩家周圍觸發一次 360° 斬擊',
+    rarity: 'legendary', oneTime: true, minLevel: 10, subtype: 'keystone', requires: 'shuriken_boomerang',
+  },
+  {
+    id: 'ice_thunder', name: '【雷鼓・鳴動】', desc: '戰吼會造成傷害並施加導雷印；帶印敵人死亡時，向周圍敵人釋放連鎖雷擊',
+    rarity: 'legendary', oneTime: true, minLevel: 10, subtype: 'keystone', requires: 'war_cry',
+  },
+  {
+    id: 'gravity_burst', name: '【重力爆裂】', desc: '黑洞將敵人拉到核心時，觸發其最大生命值 8% 的重力爆裂',
+    rarity: 'legendary', oneTime: true, minLevel: 10, subtype: 'keystone', requires: 'homura_gravity',
+  },
+  {
+    id: 'amaterasu', name: '【天照・大御神】', desc: '武器命中有 10% 機率立刻重置該武器冷卻，並使後續 2 秒連鎖效果強化',
+    rarity: 'legendary', oneTime: true, minLevel: 10, subtype: 'keystone',
+    apply(_player, scene) { scene._amaterasu = true },
+  },
+  {
+    id: 'susano', name: '【須佐・守護】', desc: '受到致命傷害時，將傷害反射給周邊所有怪物（冷卻 30 秒）',
+    rarity: 'legendary', oneTime: true, minLevel: 10, subtype: 'keystone',
+    apply(_player, scene) { scene._susano = true; scene._susanoCd = 0 },
+  },
+  {
+    id: 'tsukuyomi', name: '【月讀・幻境】', desc: '每 15 秒使畫面上所有怪物短暫混亂，互相碰撞造成傷害',
+    rarity: 'legendary', oneTime: true, minLevel: 10, subtype: 'keystone',
+    apply(_player, scene) { scene._tsukuyomi = true; scene._tsukuyomiTimer = 0 },
+  },
+  {
+    id: 'yamatanoorochi', name: '【八岐・狂亂】', desc: '每次擊殺永久增加 0.5% 攻擊速度（最高 +50%）',
+    rarity: 'legendary', oneTime: true, minLevel: 10, subtype: 'keystone',
+    apply(_player, scene) { scene._yamatano = true },
+  },
 ]

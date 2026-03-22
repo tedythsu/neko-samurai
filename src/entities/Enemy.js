@@ -444,11 +444,12 @@ export default class Enemy {
         dmgMult *= (1 + (scene._globalDmgMult - 1) * (sourceType === 'weapon' ? 0.85 : 0.55))
       }
       if (scene._armorPen) dmgMult *= (1 + Math.min(0.18, scene._armorPen * 0.5))
-    if (scene._steadyStance) {
-      const vel = scene._player?.sprite?.body?.velocity
-      const isMoving = vel ? (Math.abs(vel.x) + Math.abs(vel.y)) > 5 : false
-      if (!isMoving) dmgMult *= 1.12
-    }
+      if (scene._steadyStance) {
+        const vel = scene._player?.sprite?.body?.velocity
+        const isMoving = vel ? (Math.abs(vel.x) + Math.abs(vel.y)) > 5 : false
+        if (!isMoving) dmgMult *= 1.12
+      }
+      if (scene._rationBuffUntil && scene._rationBuffUntil > scene.time.now) dmgMult *= 1.15
     } else if (sourceType === 'proc' && scene._globalDmgMult && scene._globalDmgMult !== 1) {
       dmgMult *= (1 + (scene._globalDmgMult - 1) * 0.35)
     }
@@ -465,6 +466,7 @@ export default class Enemy {
     if (scene._keystonesOwned?.has('ice_thunder') && se?.frozen?.active) dmgMult *= 1.75
     // Dark aura: +25% damage to aura-marked enemies
     if (sprite._darkAura) dmgMult *= 1.18
+    if ((sprite._warCryExposeUntil || 0) > scene.time.now) dmgMult *= 1.20
     if (scene._ailmentExpose && (se?.poison?.active || se?.bleed?.active)) dmgMult *= 1.16
     // Boss chest bonus (kijo kill reward)
     if (scene._bossChestBonus) dmgMult *= scene._bossChestBonus
@@ -609,6 +611,7 @@ export default class Enemy {
     // Iron body shield — absorb one hit
     if (scene._ironBodyShield) {
       scene._ironBodyShield = false
+      sprite.scene._triggerIronBodyPulse?.(player.x, player.y)
       sprite.damageCd = 1000
       return
     }

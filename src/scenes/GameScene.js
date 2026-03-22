@@ -4,8 +4,6 @@ import Player   from '../entities/Player.js'
 import Enemy    from '../entities/Enemy.js'
 import { CFG, randomEdgePoint, xpThreshold, getWaveConfig, getWaveIndex, WAVE_NAMES, RARITY_WEIGHTS } from '../config.js'
 import { WEAPON_UPGRADES_MAP } from '../upgrades/weaponUpgrades.js'
-import { ALL_PROCS }           from '../upgrades/procs.js'
-import { ALL_KEYSTONES }       from '../upgrades/keystones.js'
 import { ALL_PASSIVES }        from '../upgrades/passives.js'
 import { ENEMY_TYPES } from '../enemies/EnemyTypes.js'
 import BossManager from '../enemies/BossManager.js'
@@ -116,6 +114,7 @@ export default class GameScene extends Phaser.Scene {
     this._ailmentExpose     = false
     this._bloodRush         = false
     this._bloodRushUntil    = 0
+    this._rationBuffUntil   = 0
     this._caltrops          = false
     this._caltropTimer      = 0
     this._substitutionReady = false
@@ -160,6 +159,10 @@ export default class GameScene extends Phaser.Scene {
     this.events.on('enemy-died-detailed', ({ x, y, enemy }) => {
       const critSoulMult = this._critSoul && enemy?._lastHitWasCrit ? 1.8 : 1
       this._spawnOrb(x, y, this._currentWaveXp * critSoulMult)
+      if (enemy?._darkAura) this._reduceSupportCooldowns(1000)
+      if (this._keystonesOwned.has('ice_thunder') && (enemy?._warCryConductiveUntil || 0) > this.time.now) {
+        this._triggerWarCryChain(enemy.x, enemy.y, enemy)
+      }
       if (!this._bloodRush || !enemy) return
       const se = enemy._statusEffects
       if (se?.poison?.active || se?.bleed?.active) {
@@ -501,6 +504,9 @@ export default class GameScene extends Phaser.Scene {
     if (this._bloodRushUntil > 0 && this.time.now >= this._bloodRushUntil) {
       this._bloodRushUntil = 0
     }
+    if (this._rationBuffUntil > 0 && this.time.now >= this._rationBuffUntil) {
+      this._rationBuffUntil = 0
+    }
     if (this._substitutionGrace > 0) {
       this._substitutionGrace = Math.max(0, this._substitutionGrace - delta)
     }
@@ -517,9 +523,10 @@ export default class GameScene extends Phaser.Scene {
     // Ration — restore 5% HP every 30s
     if (this._procsOwned.has('ration')) {
       this._rationTimer = (this._rationTimer || 0) + delta
-      if (this._rationTimer >= this._cooldownAdjusted(30000)) {
+      if (this._rationTimer >= this._cooldownAdjusted(20000)) {
         this._rationTimer = 0
-        this._player.heal(this._player.maxHp * 0.05)
+        this._player.heal(this._player.maxHp * 0.06)
+        this._rationBuffUntil = this.time.now + 5000
       }
     }
 
@@ -556,7 +563,8 @@ export default class GameScene extends Phaser.Scene {
       if (entry.stats.fireRate > 0) {
         entry.timer += delta
         const tempAtkSpd = this._bloodRushUntil > this.time.now ? 1.12 : 1
-        const effectiveRate = Math.max(120, entry.stats.fireRate / ((this._attackSpeedMult || 1) * tempAtkSpd))
+        const rationAtkSpd = this._rationBuffUntil > this.time.now ? 1.18 : 1
+        const effectiveRate = Math.max(120, entry.stats.fireRate / ((this._attackSpeedMult || 1) * tempAtkSpd * rationAtkSpd))
         if (entry.timer >= effectiveRate) {
           entry.timer = 0
           entry.weapon.fire(this, entry.projectiles, px, py, entry.stats, this._enemies, this._player, this._affixes)
@@ -876,13 +884,9 @@ export default class GameScene extends Phaser.Scene {
           } else if (!this._weaponFinalChoiceDone) {
             this._weaponFinalChoiceDone = true
           }
-        } else if (upgrade.target === 'proc') {
-          this._procsOwned.add(upgrade.id)
-          if (upgrade.apply) upgrade.apply(this._player, this)
-        } else if (upgrade.target === 'keystone') {
-          this._keystonesOwned.add(upgrade.id)
-          if (upgrade.apply) upgrade.apply(this._player, this)
         } else if (upgrade.target === 'passive') {
+          if (upgrade.subtype === 'proc') this._procsOwned.add(upgrade.id)
+          if (upgrade.subtype === 'keystone') this._keystonesOwned.add(upgrade.id)
           upgrade.apply(this._player, this)
           if (upgrade.oneTime) {
             this._passivesOwned.add(upgrade.id)
@@ -933,23 +937,11 @@ export default class GameScene extends Phaser.Scene {
 
     const candidates = []
 
-    // Procs/Auras
-    for (const p of ALL_PROCS) {
-      if (!this._procsOwned.has(p.id) && level >= (p.minLevel || 1))
-        candidates.push({ ...p, target: 'proc' })
-    }
-
-    // Keystones — unlock at higher levels and still respect prerequisites
-    for (const k of ALL_KEYSTONES) {
-      if (this._keystonesOwned.has(k.id)) continue
-      if (level < (k.minLevel || 1)) continue
-      if (k.requires && !ownedIds.has(k.requires)) continue
-      candidates.push({ ...k, target: 'keystone' })
-    }
-
-    // Passives — filter by weapon compatibility, then by ownership
+    // Unified passive pool — common/rare/epic/legendary all share one source
     for (const p of ALL_PASSIVES) {
       if (this._passivesOwned.has(p.id)) continue
+      if (level < (p.minLevel || 1)) continue
+      if (p.requires && !ownedIds.has(p.requires)) continue
       // Skip weapon-gated passives that don't apply to the current weapon
       if (p.requiresWeapons && !p.requiresWeapons.some(id => activeWeaponIds.has(id))) continue
       if (p.maxStacks) {
@@ -1024,6 +1016,11 @@ export default class GameScene extends Phaser.Scene {
         e.body.velocity.x = (dx / len) * 400
         e.body.velocity.y = (dy / len) * 400
         e.knockbackTimer = 350
+        e._warCryExposeUntil = this.time.now + 4000
+        if (this._keystonesOwned.has('ice_thunder')) {
+          e._warCryConductiveUntil = this.time.now + 4000
+          Enemy.takeDamage(e, 70, px, py, this._affixes || [], 120, { source: 'proc' })
+        }
       }
     })
     const g = this.add.graphics().setDepth(8)
@@ -1041,7 +1038,7 @@ export default class GameScene extends Phaser.Scene {
       e.body.velocity.x = (dx / len) * 600
       e.body.velocity.y = (dy / len) * 600
       e.knockbackTimer = 400
-      Enemy.takeDamage(e, 80, px, py, this._affixes, 0, { source: 'proc' })
+      Enemy.takeDamage(e, 90, px, py, this._affixes, 0, { source: 'proc' })
     })
     const g = this.add.graphics().setDepth(8)
     g.lineStyle(4, 0xddaaff, 1.0)
@@ -1109,8 +1106,50 @@ export default class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: g, alpha: 0, duration: 220, onComplete: () => g.destroy() })
   }
 
+  _triggerIronBodyPulse(x, y) {
+    const radius = 120
+    this._enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
+      if (Phaser.Math.Distance.Between(x, y, e.x, e.y) < radius) {
+        const dx = e.x - x, dy = e.y - y
+        const len = Math.hypot(dx, dy) || 1
+        e.body.velocity.x = (dx / len) * 460
+        e.body.velocity.y = (dy / len) * 460
+        e.knockbackTimer = 260
+        Enemy.takeDamage(e, 55, x, y, this._affixes || [], 0, { source: 'proc' })
+        e._warCryExposeUntil = this.time.now + 2500
+      }
+    })
+    const g = this.add.graphics().setDepth(8)
+    g.lineStyle(3, 0xaad8ff, 0.9)
+    g.strokeCircle(x, y, radius)
+    this.tweens.add({ targets: g, alpha: 0, duration: 240, onComplete: () => g.destroy() })
+  }
+
   _cooldownAdjusted(baseMs) {
     return baseMs * (this._cdMult || 1)
+  }
+
+  _reduceSupportCooldowns(ms) {
+    this._warCryTimer = Math.min(this._cooldownAdjusted(5000), (this._warCryTimer || 0) + ms)
+    this._rationTimer = Math.min(this._cooldownAdjusted(20000), (this._rationTimer || 0) + ms)
+    this._tsukuyomiTimer = Math.min(this._cooldownAdjusted(15000), (this._tsukuyomiTimer || 0) + ms)
+    if (this._substitutionCd > 0) this._substitutionCd = Math.max(0, this._substitutionCd - ms)
+  }
+
+  _triggerWarCryChain(x, y, sourceEnemy) {
+    const targets = this._enemies.getChildren()
+      .filter(e => e.active && !e.dying && e !== sourceEnemy)
+      .filter(e => Phaser.Math.Distance.Between(x, y, e.x, e.y) < 170)
+      .sort((a, b) => Phaser.Math.Distance.Between(x, y, a.x, a.y) - Phaser.Math.Distance.Between(x, y, b.x, b.y))
+      .slice(0, 3)
+
+    targets.forEach(e => {
+      const g = this.add.graphics().setDepth(8)
+      g.lineStyle(2, 0x99ddff, 0.9)
+      g.lineBetween(x, y, e.x, e.y)
+      this.tweens.add({ targets: g, alpha: 0, duration: 160, onComplete: () => g.destroy() })
+      Enemy.takeDamage(e, 45, x, y, this._affixes || [], 40, { source: 'proc' })
+    })
   }
 
   playHitSound(weaponId) {

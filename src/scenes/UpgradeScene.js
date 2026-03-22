@@ -4,20 +4,7 @@ import { RARITY_UI } from '../config.js'
 
 const CATEGORY = {
   weapon:    { color: 0xc8a84b, label: '武器',   text: '#c8a84b' },
-  elemental: { color: 0x8888ee, label: '元素',   text: '#aaaaff' },
-  proc:      { color: 0x44ccff, label: '觸發',   text: '#66ddff' },
-  keystone:  { color: 0xff4444, label: '傳奇',   text: '#ff8888' },
   passive:   { color: 0x44ddbb, label: '被動',   text: '#55eedd' },
-}
-
-const ELEMENTAL_COLOR = {
-  ignite:      0xff4400,
-  chill:       0x88ccff,
-  shock:       0xffee00,
-  bleed:       0xcc44ff,
-  armor_shred: 0x884400,
-  poison:      0x44cc00,
-  holy:        0xffffaa,
 }
 
 const RES      = Math.min(2, Math.ceil(window?.devicePixelRatio || 1))
@@ -127,9 +114,6 @@ export default class UpgradeScene extends Phaser.Scene {
   _buildCard(cx, cy, w, upg, idx, isWeaponBranch) {
     const cat = CATEGORY[upg.target] || CATEGORY.passive
     let accent = cat.color
-    if (upg.target === 'elemental' && upg.elemental) {
-      accent = ELEMENTAL_COLOR[upg.elemental.id] ?? cat.color
-    }
     // Weapon branch: all cards share the weapon gold accent
     if (isWeaponBranch) accent = 0xc8a84b
 
