@@ -9,8 +9,8 @@ export default {
   iconKey: 'kusarigama',
 
   baseStats: {
-    damage:         26,
-    damageVariance: 0.15,
+    damage:         28,
+    damageVariance: 0.12,
     fireRate:       0,
     projectileCount: 1,
     knockback:       0,
@@ -81,19 +81,25 @@ export default {
         const hitR = entry.stats._heavyBall && i === 0 ? 35 : 20
         if (Phaser.Math.Distance.Between(sx, sy, e.x, e.y) < hitR) {
           const last = entry.damageCd.get(e) || 0
-          if (now - last >= 600) {
+          if (now - last >= 550) {
             entry.damageCd.set(e, now)
             const rolledDmg = rollDamage(entry.stats)
             // 重鎚・碎裂 — heavy ball: extra damage + strong knockback
             const dmgMult = (entry.stats._heavyBall && i === 0) ? 2.0 : 1.0
             const kb      = entry.stats._aoeKnockback ? 200 : (entry.stats._heavyBall && i === 0 ? 300 : 0)
-            Enemy.takeDamage(e, rolledDmg * dmgMult, sx, sy, affixes, kb)
+            Enemy.takeDamage(e, rolledDmg * dmgMult, sx, sy, affixes, kb, {
+              source: 'weapon',
+              weaponId: 'kusarigama',
+            })
 
             // 重鎚・碎裂 heavy ball — mini AoE splash
             if (entry.stats._heavyBall && i === 0) {
               enemies.getChildren().filter(en => en.active && !en.dying && en !== e &&
                 Phaser.Math.Distance.Between(sx, sy, en.x, en.y) < 40)
-                .forEach(en => Enemy.takeDamage(en, rolledDmg, sx, sy, affixes, 150))
+                .forEach(en => Enemy.takeDamage(en, rolledDmg, sx, sy, affixes, 150, {
+                  source: 'weapon',
+                  weaponId: 'kusarigama',
+                }))
             }
           }
         }
@@ -110,7 +116,10 @@ export default {
           const nearby = enemies.getChildren().filter(e => e.active && !e.dying &&
             Phaser.Math.Distance.Between(sx, sy, e.x, e.y) < innerRadius * 1.4)
           nearby.forEach(e => {
-            Enemy.takeDamage(e, rollDamage(entry.stats) * 0.5, sx, sy, affixes, 0)
+            Enemy.takeDamage(e, rollDamage(entry.stats) * 0.5, sx, sy, affixes, 0, {
+              source: 'weapon',
+              weaponId: 'kusarigama',
+            })
             const g = scene.add.graphics().setDepth(9)
             g.lineStyle(2, 0xffff44, 0.8)
             g.lineBetween(sx, sy, e.x, e.y)

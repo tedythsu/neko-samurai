@@ -13,11 +13,11 @@ export default {
   iconKey: 'shuriken',
 
   baseStats: {
-    damage:          15,
+    damage:          16,
     damageVariance:  0.20,
-    fireRate:        800,
+    fireRate:        760,
     projectileCount: 3,
-    speed:           400,
+    speed:           430,
     penetrate:       false,
     knockback:       60,
     _scale:          1.0,
@@ -54,7 +54,12 @@ export default {
         s._ricochet    = stats._ricochet   || false
         s._ricochetDepth = 0
         s._ricochetMax = stats._ricochetMax
-        scene.physics.velocityFromAngle(i * step, stats.speed, s.body.velocity)
+        s._weaponId    = this.id
+        s._wallBounce  = scene._ricochetWall || false
+        s._wallBounced = false
+        s._micro       = false
+        const speed = stats.speed * (scene._projSpeedMult || 1)
+        scene.physics.velocityFromAngle(i * step, speed, s.body.velocity)
       }
       return
     }
@@ -72,7 +77,7 @@ export default {
       if (!s) return
       const baseW = 28, baseH = 28
       s.setDisplaySize(baseW * stats._scale, baseH * stats._scale)
-      s.damage       = stats.damage
+      s.damage       = rollDamage(stats)
       s.hitSet       = new Set()
       s.spawnX       = fromX
       s.spawnY       = fromY
@@ -88,9 +93,14 @@ export default {
       s._ricochet    = stats._ricochet    || false
       s._ricochetDepth = 0
       s._ricochetMax = stats._ricochetMax
+      s._weaponId    = this.id
+      s._wallBounce  = scene._ricochetWall || false
+      s._wallBounced = false
+      s._micro       = false
 
       const offset = (i - (count - 1) / 2) * SPREAD_DEG
-      scene.physics.velocityFromAngle(centerAngle + offset, stats.speed, s.body.velocity)
+      const speed = stats.speed * (scene._projSpeedMult || 1)
+      scene.physics.velocityFromAngle(centerAngle + offset, speed, s.body.velocity)
     }
   },
 
@@ -101,6 +111,22 @@ export default {
     if (sprite._spent) {
       sprite.disableBody(true, true)
       return
+    }
+
+    if (sprite._wallBounce && !sprite._wallBounced) {
+      const bounds = sprite.scene.physics.world.bounds
+      let bounced = false
+      if ((sprite.x <= bounds.left + 6 && sprite.body.velocity.x < 0) ||
+          (sprite.x >= bounds.right - 6 && sprite.body.velocity.x > 0)) {
+        sprite.body.velocity.x *= -1
+        bounced = true
+      }
+      if ((sprite.y <= bounds.top + 6 && sprite.body.velocity.y < 0) ||
+          (sprite.y >= bounds.bottom - 6 && sprite.body.velocity.y > 0)) {
+        sprite.body.velocity.y *= -1
+        bounced = true
+      }
+      if (bounced) sprite._wallBounced = true
     }
 
     const dist = Phaser.Math.Distance.Between(sprite.spawnX, sprite.spawnY, sprite.x, sprite.y)
@@ -124,7 +150,7 @@ export default {
         if (sprite._lingerZone && !sprite._lingerFired) {
           sprite._lingerFired = true
           const sc = sprite.scene
-          sc._createLingerZone(sprite.x, sprite.y, 30, sprite.damage, sc._affixes || [])
+          sc._createLingerZone(sprite.x, sprite.y, 30, sprite.damage, sc._affixes || [], sprite._weaponId)
         }
         sprite.disableBody(true, true)
       }
@@ -138,7 +164,13 @@ export default {
         if (proj._spent || proj.hitSet.has(e)) return
         if (Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y) < proj._hitRadius) {
           proj.hitSet.add(e)
-          Enemy.takeDamage(e, proj.damage, proj.x, proj.y, affixes, proj.knockback ?? 60)
+          Enemy.takeDamage(e, proj.damage, proj.x, proj.y, affixes, proj.knockback ?? 60, {
+            source: 'weapon',
+            weaponId: this.id,
+          })
+          if (scene._secondSplit && !proj._micro) {
+            _spawnMicroShuriken(scene, entry.projectiles, proj, e)
+          }
           applyRicochet(proj, e, scene, enemies, affixes)
           if (!proj.penetrate) proj._spent = true
         }
@@ -155,6 +187,38 @@ function _spellEchoSlash(scene, x, y, damage, affixes, enemies) {
   scene.tweens.add({ targets: g, alpha: 0, duration: 400, onComplete: () => g.destroy() })
   enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
     if (Phaser.Math.Distance.Between(x, y, e.x, e.y) < RANGE)
-      Enemy.takeDamage(e, damage, x, y, affixes, 80)
+      Enemy.takeDamage(e, damage, x, y, affixes, 80, { source: 'weapon', weaponId: 'shuriken' })
+  })
+}
+
+function _spawnMicroShuriken(scene, pool, proj, enemy) {
+  const baseAngle = Phaser.Math.RadToDeg(
+    Phaser.Math.Angle.Between(proj.x, proj.y, enemy.x, enemy.y)
+  )
+  ;[-22, 22].forEach(offset => {
+    const micro = getOrCreate(pool, proj.x, proj.y, proj.texture.key)
+    if (!micro) return
+    micro.setDisplaySize(proj.displayWidth * 0.65, proj.displayHeight * 0.65)
+    micro.damage         = proj.damage * 0.33
+    micro.hitSet         = new Set()
+    micro.spawnX         = proj.x
+    micro.spawnY         = proj.y
+    micro.range          = 160
+    micro.penetrate      = false
+    micro.knockback      = 20
+    micro._hitRadius     = HIT_RADIUS * 0.55
+    micro._pool          = pool
+    micro._reversed      = false
+    micro._boomerang     = false
+    micro._lingerZone    = false
+    micro._lingerFired   = true
+    micro._ricochet      = false
+    micro._ricochetDepth = 0
+    micro._ricochetMax   = 0
+    micro._weaponId      = proj._weaponId
+    micro._wallBounce    = false
+    micro._wallBounced   = true
+    micro._micro         = true
+    scene.physics.velocityFromAngle(baseAngle + offset, 460, micro.body.velocity)
   })
 }

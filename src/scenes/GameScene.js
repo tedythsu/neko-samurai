@@ -98,6 +98,7 @@ export default class GameScene extends Phaser.Scene {
 
     // ── New passive/proc state ────────────────────────────────────────────────
     this._weaponChoiceDone  = false       // set true after Lv.3 weapon branch chosen
+    this._weaponFinalChoiceDone = false   // set true after Lv.12 weapon branch chosen
     this._passiveStacks     = new Map()   // passiveId → stack count
     this._globalDmgMult     = 1.0
     this._armorPen          = 0
@@ -107,6 +108,7 @@ export default class GameScene extends Phaser.Scene {
     this._critKillXpMult    = 1
     this._xpMult            = 1.0
     this._enemySpeedBuff    = 1.0
+    this._cdMult            = 1.0
     this._furyMode          = false
     this._shadowDodge       = false
     this._firstStrikeCrit   = false
@@ -121,6 +123,7 @@ export default class GameScene extends Phaser.Scene {
     this._rationTimer       = 0
     this._tsukuyomiTimer    = 0
     this._susanoCd          = 0
+    this._amaterasuUntil    = 0
     this._hitSoundThrottle  = new Map()   // weaponId → last play timestamp
     this._hitSoundKey       = null
 
@@ -148,7 +151,7 @@ export default class GameScene extends Phaser.Scene {
       }
       // Yamatanoorochi — +0.5% attack speed per kill (capped at +50%)
       if (this._yamatano) {
-        this._attackSpeedMult = Math.min(1.50, (this._attackSpeedMult || 1) + 0.005)
+        this._attackSpeedMult = Math.min(1.30, (this._attackSpeedMult || 1) + 0.002)
       }
     })
     this.events.on('player-dead', this._onPlayerDead, this)
@@ -263,15 +266,19 @@ export default class GameScene extends Phaser.Scene {
     ).setScrollFactor(0).setDepth(204).setOrigin(0, 0.5).setAlpha(0)
   }
 
-  _createScorchZone(x, y, radius, damage, affixes) {
-    this._createDamageZone(x, y, radius, damage, affixes, { color: 0xff4400, alpha: 0.30, mult: 0.15, duration: 3000 })
+  _createScorchZone(x, y, radius, damage, affixes, weaponId = 'homura') {
+    this._createDamageZone(x, y, radius, damage, affixes, {
+      color: 0xff4400, alpha: 0.30, mult: 0.12, duration: 2500, source: 'ability', weaponId,
+    })
   }
 
-  _createLingerZone(x, y, radius, damage, affixes) {
-    this._createDamageZone(x, y, radius, damage, affixes, { color: 0x8800cc, alpha: 0.25, mult: 0.20, duration: 2000 })
+  _createLingerZone(x, y, radius, damage, affixes, weaponId = 'shuriken') {
+    this._createDamageZone(x, y, radius, damage, affixes, {
+      color: 0x8800cc, alpha: 0.25, mult: 0.16, duration: 1600, source: 'ability', weaponId,
+    })
   }
 
-  _createDamageZone(x, y, radius, damage, affixes, { color, alpha, mult, duration }) {
+  _createDamageZone(x, y, radius, damage, affixes, { color, alpha, mult, duration, source = 'ability', weaponId = null }) {
     const gz = this.add.graphics().setDepth(4)
     gz.fillStyle(color, alpha)
     gz.fillCircle(x, y, radius)
@@ -283,7 +290,7 @@ export default class GameScene extends Phaser.Scene {
           const last = damageCd.get(e) || 0
           if (now - last >= 300) {
             damageCd.set(e, now)
-            Enemy.takeDamage(e, damage * mult, x, y, affixes, 0)
+            Enemy.takeDamage(e, damage * mult, x, y, affixes, 0, { source, weaponId })
           }
         }
       })
@@ -309,7 +316,10 @@ export default class GameScene extends Phaser.Scene {
         (proj, enemy) => {
           if (proj.hitSet.has(enemy)) return
           proj.hitSet.add(enemy)
-          Enemy.takeDamage(enemy, proj.damage, proj.x, proj.y, this._affixes, proj.knockback ?? 80)
+          Enemy.takeDamage(enemy, proj.damage, proj.x, proj.y, this._affixes, proj.knockback ?? 80, {
+            source: 'weapon',
+            weaponId: proj._weaponId || weapon.id,
+          })
           if (!proj.penetrate) proj._spent = true
         }
       )
@@ -369,7 +379,7 @@ export default class GameScene extends Phaser.Scene {
       this._enemies.getChildren()
         .filter(en => en.active && !en.dying &&
           Phaser.Math.Distance.Between(e.x, e.y, en.x, en.y) < radius)
-        .forEach(en => Enemy.takeDamage(en, dmg, e.x, e.y, this._affixes, 0))
+        .forEach(en => Enemy.takeDamage(en, dmg, e.x, e.y, this._affixes, 0, { source: 'ability' }))
       const g = this.add.graphics().setDepth(10)
       g.lineStyle(3, 0x9900ff, 0.9)
       g.strokeCircle(e.x, e.y, radius)
@@ -402,7 +412,7 @@ export default class GameScene extends Phaser.Scene {
     // War Cry proc — auto shockwave every 5s
     if (this._procsOwned.has('war_cry')) {
       this._warCryTimer = (this._warCryTimer || 0) + delta
-      if (this._warCryTimer >= 5000) {
+      if (this._warCryTimer >= this._cooldownAdjusted(5000)) {
         this._warCryTimer = 0
         this._doWarCry()
       }
@@ -434,7 +444,7 @@ export default class GameScene extends Phaser.Scene {
     // Caltrops — drop every 3s at player position
     if (this._caltrops) {
       this._caltropTimer = (this._caltropTimer || 0) + delta
-      if (this._caltropTimer >= 3000) {
+      if (this._caltropTimer >= this._cooldownAdjusted(3000)) {
         this._caltropTimer = 0
         this._dropCaltrops(px, py)
       }
@@ -443,7 +453,7 @@ export default class GameScene extends Phaser.Scene {
     // Ration — restore 5% HP every 30s
     if (this._procsOwned.has('ration')) {
       this._rationTimer = (this._rationTimer || 0) + delta
-      if (this._rationTimer >= 30000) {
+      if (this._rationTimer >= this._cooldownAdjusted(30000)) {
         this._rationTimer = 0
         this._player.heal(this._player.maxHp * 0.05)
       }
@@ -452,7 +462,7 @@ export default class GameScene extends Phaser.Scene {
     // Tsukuyomi — confuse enemies every 15s
     if (this._tsukuyomi) {
       this._tsukuyomiTimer = (this._tsukuyomiTimer || 0) + delta
-      if (this._tsukuyomiTimer >= 15000) {
+      if (this._tsukuyomiTimer >= this._cooldownAdjusted(15000)) {
         this._tsukuyomiTimer = 0
         this._doTsukuyomi()
       }
@@ -481,7 +491,7 @@ export default class GameScene extends Phaser.Scene {
     for (const entry of this._weapons) {
       if (entry.stats.fireRate > 0) {
         entry.timer += delta
-        const effectiveRate = entry.stats.fireRate / (this._attackSpeedMult || 1)
+        const effectiveRate = Math.max(120, entry.stats.fireRate / (this._attackSpeedMult || 1))
         if (entry.timer >= effectiveRate) {
           entry.timer = 0
           entry.weapon.fire(this, entry.projectiles, px, py, entry.stats, this._enemies, this._player, this._affixes)
@@ -777,9 +787,12 @@ export default class GameScene extends Phaser.Scene {
 
       this._upgrading = true
 
-      // Lv.3 = weapon branch (four-choice, one-time). Lv.12 = legendary milestone.
+      // Lv.3 = first weapon branch. Lv.12 = second weapon branch if upgrades remain.
       const isWeaponBranch = (this._level === 3) && !this._weaponChoiceDone
-      const upgradeMode    = isWeaponBranch ? 'weapon_branch'
+      const hasRemainingWeaponUpgrades = this._getRemainingWeaponUpgradeCount() > 0
+      const isFinalWeaponBranch = (this._level === 12) &&
+        this._weaponChoiceDone && !this._weaponFinalChoiceDone && hasRemainingWeaponUpgrades
+      const upgradeMode    = isWeaponBranch || isFinalWeaponBranch ? 'weapon_branch'
                            : (this._level === 12) ? 'legendary_milestone'
                            : 'normal'
 
@@ -792,15 +805,10 @@ export default class GameScene extends Phaser.Scene {
               this._weaponUpgradesOwned.set(upgrade.weaponId, new Set())
             this._weaponUpgradesOwned.get(upgrade.weaponId).add(upgrade.id)
           }
-          // Lv.3 branch: seal ALL weapon upgrades — none will appear again this run
           if (!this._weaponChoiceDone) {
             this._weaponChoiceDone = true
-            const wId = this._weapons[0]?.weapon.id
-            if (wId) {
-              if (!this._weaponUpgradesOwned.has(wId)) this._weaponUpgradesOwned.set(wId, new Set())
-              for (const u of (WEAPON_UPGRADES_MAP[wId] || []))
-                this._weaponUpgradesOwned.get(wId).add(u.id)
-            }
+          } else if (!this._weaponFinalChoiceDone) {
+            this._weaponFinalChoiceDone = true
           }
         } else if (upgrade.target === 'elemental') {
           this._affixes.push(upgrade.elemental)
@@ -836,13 +844,15 @@ export default class GameScene extends Phaser.Scene {
   }
 
   _buildUpgradePool(mode = 'normal') {
-    // ── Lv.3 Weapon Branch: 2 random picks from current weapon's 4 upgrades ──
+    // ── Weapon Branch: pick 2 from the currently available weapon upgrades ──
     if (mode === 'weapon_branch') {
       const entry = this._weapons[0]
       if (!entry) return []
       const wId  = entry.weapon.id
-      const pool = (WEAPON_UPGRADES_MAP[wId] || []).map(u => ({ ...u, target: 'weapon', weaponId: wId }))
-      // Equal weight random 2-of-4
+      const owned = this._weaponUpgradesOwned.get(wId) || new Set()
+      const pool = (WEAPON_UPGRADES_MAP[wId] || [])
+        .filter(u => !owned.has(u.id))
+        .map(u => ({ ...u, target: 'weapon', weaponId: wId }))
       return this._weightedSelect(pool, pool.map(() => 1), 2)
     }
 
@@ -860,9 +870,6 @@ export default class GameScene extends Phaser.Scene {
     const activeWeaponIds = new Set(this._weapons.map(e => e.weapon.id))
 
     const candidates = []
-
-    // Weapon upgrades are handled exclusively by the weapon_branch pool at Lv.3.
-    // They never appear in the normal pool (before or after the branch).
 
     // Elemental ailments
     for (const e of ALL_ELEMENTALS) {
@@ -917,6 +924,7 @@ export default class GameScene extends Phaser.Scene {
       if (needDefense && DEFENSIVE_IDS.has(u.id)) return base * 5
       if (isLegendaryMilestone && u.rarity === 'legendary') return base * 6
       if (isLegendaryMilestone && u.rarity === 'epic')      return base * 3
+      if (u.target === 'weapon') return base * 0.65
       return base
     })
 
@@ -947,6 +955,13 @@ export default class GameScene extends Phaser.Scene {
     return result
   }
 
+  _getRemainingWeaponUpgradeCount() {
+    const wId = this._weapons[0]?.weapon?.id
+    if (!wId) return 0
+    const owned = this._weaponUpgradesOwned.get(wId) || new Set()
+    return (WEAPON_UPGRADES_MAP[wId] || []).filter(u => !owned.has(u.id)).length
+  }
+
   _doWarCry() {
     const px = this._player.x, py = this._player.y
     const radius = 150
@@ -974,7 +989,7 @@ export default class GameScene extends Phaser.Scene {
       e.body.velocity.x = (dx / len) * 600
       e.body.velocity.y = (dy / len) * 600
       e.knockbackTimer = 400
-      Enemy.takeDamage(e, 80, px, py, this._affixes, 0)
+      Enemy.takeDamage(e, 80, px, py, this._affixes, 0, { source: 'proc' })
     })
     const g = this.add.graphics().setDepth(8)
     g.lineStyle(4, 0xddaaff, 1.0)
@@ -1002,7 +1017,7 @@ export default class GameScene extends Phaser.Scene {
             const last = damageCd.get(e) || 0
             if (now - last >= 500) {
               damageCd.set(e, now)
-              Enemy.takeDamage(e, 15, x, y, this._affixes, 0)
+              Enemy.takeDamage(e, 15, x, y, this._affixes, 0, { source: 'proc' })
               // Slow enemy
               const se = e._statusEffects
               if (se) {
@@ -1028,6 +1043,10 @@ export default class GameScene extends Phaser.Scene {
     const flash = this.add.rectangle(W / 2, H / 2, W, H, 0x220066, 0.35)
       .setScrollFactor(0).setDepth(299)
     this.tweens.add({ targets: flash, alpha: 0, duration: 800, onComplete: () => flash.destroy() })
+  }
+
+  _cooldownAdjusted(baseMs) {
+    return baseMs * (this._cdMult || 1)
   }
 
   playHitSound(weaponId) {
@@ -1058,10 +1077,11 @@ export default class GameScene extends Phaser.Scene {
     })
   }
 
-  _createGravityField(x, y, radius, affixes) {
+  _createGravityField(x, y, radius, affixes, weaponId = 'homura') {
     const dur = 1500
     let elapsed = 0
     const g = this.add.graphics().setDepth(4)
+    const burstSet = new WeakSet()
     const tick = (_, delta) => {
       elapsed += delta
       const alpha = 0.4 * (1 - elapsed / dur)
@@ -1076,6 +1096,13 @@ export default class GameScene extends Phaser.Scene {
           const pull = 120 * (1 - dist / radius)
           e.body.velocity.x += (dx / len) * pull * delta / 1000
           e.body.velocity.y += (dy / len) * pull * delta / 1000
+          if (this._keystonesOwned.has('gravity_burst') && dist < Math.max(24, radius * 0.20) && !burstSet.has(e)) {
+            burstSet.add(e)
+            Enemy.takeDamage(e, Math.max(12, e.maxHp * 0.08), x, y, affixes, 0, {
+              source: 'ability',
+              weaponId,
+            })
+          }
         }
       })
       if (elapsed >= dur) {

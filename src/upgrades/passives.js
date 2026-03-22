@@ -41,35 +41,35 @@ export const ALL_PASSIVES = [
   },
   {
     id: 'daimyo', name: '【大名・増幅】', desc: '每升一級全傷害 +5%',
-    rarity: 'common',
+    rarity: 'common', oneTime: true,
     apply: (_p, scene) => { scene._daimyoStacks = (scene._daimyoStacks || 0) + 1 },
   },
 
   // ─── Stackable stat reinforcements (maxStacks: 3) ────────────────────────
   {
-    id: 'power_up', name: '【武魂‧剛力】', desc: '全局傷害 +30%（可疊 3 層）',
-    rarity: 'common', maxStacks: 3,
-    apply: (_p, scene) => { scene._globalDmgMult = (scene._globalDmgMult || 1) * 1.30 },
+    id: 'power_up', name: '【武魂‧剛力】', desc: '全局傷害 +18%（可疊 2 層）',
+    rarity: 'common', maxStacks: 2,
+    apply: (_p, scene) => { scene._globalDmgMult = (scene._globalDmgMult || 1) * 1.18 },
   },
   {
-    id: 'crit_eye', name: '【隙見‧心眼】', desc: '爆擊率 +10%（可疊 3 層）',
-    rarity: 'common', maxStacks: 3,
-    apply: (_p, scene) => { scene._critBonus = (scene._critBonus || 0) + 0.10 },
+    id: 'crit_eye', name: '【隙見‧心眼】', desc: '爆擊率 +8%（可疊 2 層）',
+    rarity: 'common', maxStacks: 2,
+    apply: (_p, scene) => { scene._critBonus = (scene._critBonus || 0) + 0.08 },
   },
   {
-    id: 'crit_blade', name: '【痛擊‧一刀】', desc: '爆擊傷害 +50%（可疊 3 層）',
-    rarity: 'common', maxStacks: 3,
-    apply: (_p, scene) => { scene._critDmgBonus = (scene._critDmgBonus || 0) + 0.50 },
+    id: 'crit_blade', name: '【痛擊‧一刀】', desc: '爆擊傷害 +35%（可疊 2 層）',
+    rarity: 'common', maxStacks: 2,
+    apply: (_p, scene) => { scene._critDmgBonus = (scene._critDmgBonus || 0) + 0.35 },
   },
   {
-    id: 'attack_spd', name: '【速斬‧無間】', desc: '攻擊頻率 +15%（可疊 3 層）',
-    rarity: 'rare', maxStacks: 3,
-    apply: (_p, scene) => { scene._attackSpeedMult = (scene._attackSpeedMult || 1) * 1.15 },
+    id: 'attack_spd', name: '【速斬‧無間】', desc: '攻擊頻率 +12%（可疊 2 層）',
+    rarity: 'rare', maxStacks: 2,
+    apply: (_p, scene) => { scene._attackSpeedMult = (scene._attackSpeedMult || 1) * 1.12 },
   },
   {
-    id: 'armor_pen', name: '【破甲‧貫穿】', desc: '無視敵人 20% 防禦（可疊 3 層）',
-    rarity: 'rare', maxStacks: 3,
-    apply: (_p, scene) => { scene._armorPen = (scene._armorPen || 0) + 0.20 },
+    id: 'armor_pen', name: '【破甲‧貫穿】', desc: '無視敵人 12% 防禦（可疊 2 層）',
+    rarity: 'rare', maxStacks: 2,
+    apply: (_p, scene) => { scene._armorPen = (scene._armorPen || 0) + 0.12 },
   },
   {
     id: 'vitality', name: '【頑強‧不屈】', desc: '最大生命 +30%（可疊 3 層）',
@@ -77,16 +77,16 @@ export const ALL_PASSIVES = [
     apply: (player) => { player.maxHp *= 1.30; player.heal(player.maxHp * 0.10) },
   },
   {
-    id: 'ailment_dur', name: '【長久‧咒印】', desc: '元素異常持續時間 +50%（可疊 3 層）',
-    rarity: 'rare', maxStacks: 3,
-    apply: (_p, scene) => { scene._ailmentDurMult = (scene._ailmentDurMult || 1) * 1.50 },
+    id: 'ailment_dur', name: '【長久‧咒印】', desc: '元素異常持續時間 +30%（可疊 2 層）',
+    rarity: 'rare', maxStacks: 2,
+    apply: (_p, scene) => { scene._ailmentDurMult = (scene._ailmentDurMult || 1) * 1.30 },
   },
   {
-    id: 'swift', name: '【靈動‧疾風】', desc: '移速 +10%、投射物速度 +10%（可疊 3 層）',
-    rarity: 'common', maxStacks: 3,
+    id: 'swift', name: '【靈動‧疾風】', desc: '移速 +8%、投射物速度 +8%（可疊 2 層）',
+    rarity: 'common', maxStacks: 2,
     apply: (player, scene) => {
-      player.speed *= 1.10
-      scene._projSpeedMult = (scene._projSpeedMult || 1) * 1.10
+      player.speed *= 1.08
+      scene._projSpeedMult = (scene._projSpeedMult || 1) * 1.08
     },
   },
 
@@ -145,19 +145,19 @@ export const ALL_PASSIVES = [
     apply: (_p, scene) => { scene._daimyoTax = true },
   },
   {
-    id: 'ki_blast', name: '【空振‧氣勁】', desc: '近戰攻擊末端發出氣勁，距離翻倍但傷害減半',
+    id: 'ki_blast', name: '【空振‧氣勁】', desc: '太刀揮砍末端追加真空波，距離翻倍、傷害 55%',
     rarity: 'rare', oneTime: true,
     requiresWeapons: ['tachi'],   // melee swing only
     apply: (_p, scene) => { scene._kiBlast = true },
   },
   {
-    id: 'ricochet_arc', name: '【折射‧弧刃】', desc: '投射物在螢幕邊緣反彈一次',
+    id: 'ricochet_arc', name: '【折射‧弧刃】', desc: '投射物首次碰到場地邊緣時反彈一次',
     rarity: 'rare', oneTime: true,
     requiresWeapons: ['kunai', 'shuriken', 'homura'],   // projectile only
     apply: (_p, scene) => { scene._ricochetWall = true },
   },
   {
-    id: 'second_split', name: '【分裂‧二次】', desc: '分裂子彈命中後再次分裂為兩枚微型子彈',
+    id: 'second_split', name: '【分裂‧二次】', desc: '苦無與手裡劍命中後分裂出兩枚微型彈',
     rarity: 'epic', oneTime: true,
     requiresWeapons: ['kunai', 'shuriken'],   // multi-projectile weapons only
     apply: (_p, scene) => { scene._secondSplit = true },

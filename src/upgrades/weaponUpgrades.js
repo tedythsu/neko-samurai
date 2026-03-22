@@ -17,12 +17,12 @@ export const WEAPON_UPGRADES_MAP = {
     {
       id: 'tachi_chain',
       name: '【極意・連斬】',
-      desc: '每次攻擊有 25% 機率觸發第二次斬擊，連斬瞬間獲得 20% 減傷',
+      desc: '每次攻擊有 20% 機率觸發第二次斬擊，連斬瞬間獲得 20% 減傷',
       rarity: 'rare',
       oneTime: true,
       apply(stats) {
         stats._doubleStrike       = true
-        stats._doubleStrikeChance = 0.25
+        stats._doubleStrikeChance = 0.20
         stats._comboGuard         = 0.20
       },
     },
@@ -48,7 +48,7 @@ export const WEAPON_UPGRADES_MAP = {
     {
       id: 'kunai_multi',
       name: '【影分身・量】',
-      desc: '額外增加 2 個投射物（平行發射）',
+      desc: '額外增加 2 個投射物（扇形發射）',
       rarity: 'rare',
       oneTime: true,
       apply(stats) { stats.projectileCount = (stats.projectileCount || 1) + 2 },
@@ -64,12 +64,12 @@ export const WEAPON_UPGRADES_MAP = {
     {
       id: 'kunai_pierce',
       name: '【穿雲・貫通】',
-      desc: '苦無可穿透 3 個目標，每穿透一個目標傷害提升 15%',
+      desc: '苦無可穿透 3 個目標，每穿透一個目標傷害提升 10%',
       rarity: 'rare',
       oneTime: true,
       apply(stats) {
         stats.penetrate    = true
-        stats._pierceBonus = 0.15
+        stats._pierceBonus = 0.10
         stats._pierceMax   = 3
       },
     },
@@ -95,12 +95,12 @@ export const WEAPON_UPGRADES_MAP = {
     {
       id: 'shuriken_chain',
       name: '【彈跳・亂舞】',
-      desc: '命中後自動彈向附近目標，最多彈射 4 次',
+      desc: '命中後自動彈向附近目標，最多彈射 3 次',
       rarity: 'rare',
       oneTime: true,
       apply(stats) {
         stats._ricochet    = true
-        stats._ricochetMax = 4
+        stats._ricochetMax = 3
       },
     },
     {
@@ -125,7 +125,7 @@ export const WEAPON_UPGRADES_MAP = {
     {
       id: 'homura_burnfield',
       name: '【業火・殘留】',
-      desc: '爆炸後留下燃燒火海 3 秒，對衝鋒怪造成持續傷害',
+      desc: '爆炸後留下燃燒火海 2.5 秒，持續灼燒範圍內敵人',
       rarity: 'rare',
       oneTime: true,
       apply(stats) { stats._scorch = true },
@@ -133,11 +133,12 @@ export const WEAPON_UPGRADES_MAP = {
     {
       id: 'homura_pierceburst',
       name: '【貫穿・連爆】',
-      desc: '箭矢穿透每個目標時都觸發一次小爆炸',
+      desc: '箭矢最多穿透 3 個目標，且每次穿透都觸發一次小爆炸',
       rarity: 'rare',
       oneTime: true,
       apply(stats) {
         stats.penetrate     = true
+        stats._pierceMax    = 3
         stats._chainExplode = true
       },
     },
@@ -152,11 +153,11 @@ export const WEAPON_UPGRADES_MAP = {
     {
       id: 'homura_doubleburst',
       name: '【連爆・擴散】',
-      desc: '爆炸範圍 +50%，且有 30% 機率在原位引發二次爆炸',
+      desc: '爆炸範圍 +35%，且有 25% 機率在原位引發二次爆炸',
       rarity: 'rare',
       oneTime: true,
       apply(stats) {
-        stats._explodeRadius = (stats._explodeRadius || 80) * 1.5
+        stats._explodeRadius = (stats._explodeRadius || 80) * 1.35
         stats._secondBurst   = true
       },
     },

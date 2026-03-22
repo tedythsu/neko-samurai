@@ -384,56 +384,71 @@ export default class Enemy {
     })
   }
 
-  static takeDamage(sprite, amount, fromX, fromY, affixes = [], knockback = 80) {
+  static takeDamage(sprite, amount, fromX, fromY, affixes = [], knockback = 80, meta = {}) {
     if (sprite.dying) return false
 
     const se    = sprite._statusEffects
     const scene = sprite.scene
+    const sourceType = meta.source || 'weapon'
 
     // Global damage multipliers
     let dmgMult = 1.0
-    if (scene._glassCannon) dmgMult *= 3.0
-    if (scene._ironWillMult) dmgMult *= scene._ironWillMult
-    // Daimyo: +5% per stack per level
-    if (scene._daimyoStacks) dmgMult *= (1 + scene._daimyoStacks * 0.05 * ((scene._level || 1) - 1))
-    // Global damage multiplier (from power_up passive stacks)
-    if (scene._globalDmgMult && scene._globalDmgMult !== 1) dmgMult *= scene._globalDmgMult
-    // Armor penetration — bonus damage
-    if (scene._armorPen) dmgMult *= (1 + scene._armorPen)
-    // Fury mode — +50% damage when player HP < 30%
-    if (scene._furyMode) {
+    if (sourceType === 'weapon' || sourceType === 'ability') {
+      if (scene._glassCannon) dmgMult *= 2.4
+      if (scene._ironWillMult) dmgMult *= scene._ironWillMult
+      if (scene._daimyoStacks) dmgMult *= (1 + scene._daimyoStacks * 0.03 * ((scene._level || 1) - 1))
+      if (scene._globalDmgMult && scene._globalDmgMult !== 1) {
+        dmgMult *= (1 + (scene._globalDmgMult - 1) * (sourceType === 'weapon' ? 0.85 : 0.55))
+      }
+      if (scene._armorPen) dmgMult *= (1 + Math.min(0.18, scene._armorPen * 0.5))
+    } else if (sourceType === 'proc' && scene._globalDmgMult && scene._globalDmgMult !== 1) {
+      dmgMult *= (1 + (scene._globalDmgMult - 1) * 0.35)
+    }
+    if (scene._furyMode && sourceType !== 'status') {
       const playerHp    = scene._player?.hp    || 100
       const playerMaxHp = scene._player?.maxHp || 100
-      if (playerHp / playerMaxHp < 0.30) dmgMult *= 1.50
+      if (playerHp / playerMaxHp < 0.30) dmgMult *= sourceType === 'weapon' ? 1.35 : 1.15
     }
     // Shock: +30% damage taken
-    if (se?.shock?.active) dmgMult *= 1.30
+    if (se?.shock?.active) dmgMult *= 1.20
     // Armor shred: amplify by shred amount
-    if (sprite._armorShred) dmgMult *= (1 + sprite._armorShred)
+    if (sprite._armorShred) dmgMult *= (1 + sprite._armorShred * 0.75)
     // Ice-Thunder keystone: double damage on frozen targets
-    if (scene._keystonesOwned?.has('ice_thunder') && se?.frozen?.active) dmgMult *= 2.0
+    if (scene._keystonesOwned?.has('ice_thunder') && se?.frozen?.active) dmgMult *= 1.75
     // Dark aura: +25% damage to aura-marked enemies
-    if (sprite._darkAura) dmgMult *= 1.25
+    if (sprite._darkAura) dmgMult *= 1.18
     // Boss chest bonus (kijo kill reward)
     if (scene._bossChestBonus) dmgMult *= scene._bossChestBonus
 
     const critBonus  = scene._critBonus   || 0
     const critDmgBon = scene._critDmgBonus || 0
     const critChance = Math.min(1.0, CFG.CRIT_CHANCE + critBonus)
-    const critMult   = CFG.CRIT_MULTIPLIER + critDmgBon
+    let critMult     = CFG.CRIT_MULTIPLIER + critDmgBon
+
+    if (meta.weaponId === 'tachi') {
+      if (sourceType === 'weapon') dmgMult *= 0.82
+      if (sourceType === 'ability') dmgMult *= 0.78
+      critMult = 1 + (critMult - 1) * 0.72
+    }
 
     // First strike — guaranteed crit + 2× bonus damage on full-HP enemies
     const isFullHp      = sprite.hp >= sprite.maxHp * 0.99
-    const firstStrike   = scene._firstStrikeCrit && isFullHp
-    const isCrit        = firstStrike || (Math.random() < critChance)
+    const firstStrike   = sourceType === 'weapon' && scene._firstStrikeCrit && isFullHp
+    const isCrit        = sourceType === 'weapon' && (firstStrike || (Math.random() < critChance))
     const firstStrikeMult = firstStrike ? 2.0 : 1.0
 
     const damage = Math.round(amount * dmgMult * (isCrit ? critMult : 1) * firstStrikeMult)
     sprite.hp -= damage
     scene.playHitSound?.(scene._hitSoundKey)
 
+    if ((sourceType === 'weapon' || sourceType === 'ability') && scene._amaterasu && meta.weaponId && Math.random() < 0.10) {
+      const weaponEntry = scene._weapons?.find(entry => entry.weapon.id === meta.weaponId)
+      if (weaponEntry) weaponEntry.timer = weaponEntry.stats.fireRate
+      scene._amaterasuUntil = scene.time.now + 2000
+    }
+
     // Culling — execute below 15% of base HP
-    if (scene._procsOwned?.has('culling') && sprite.hp > 0 && sprite.maxHp > 0 && sprite.hp < sprite.maxHp * 0.15) {
+    if (!sprite._bossId && scene._procsOwned?.has('culling') && sprite.hp > 0 && sprite.maxHp > 0 && sprite.hp < sprite.maxHp * 0.15) {
       sprite.hp = 0
     }
 
@@ -494,8 +509,10 @@ export default class Enemy {
     sprite.scene.time.delayedCall(400, () => sparks.destroy())
 
     // Affix pipeline (elemental onHit hooks)
-    for (const affix of affixes) {
-      if (affix.onHit) affix.onHit(sprite, damage, sprite.scene)
+    if (sourceType === 'weapon' || sourceType === 'ability') {
+      for (const affix of affixes) {
+        if (affix.onHit) affix.onHit(sprite, damage, sprite.scene)
+      }
     }
 
     if (sprite.hp <= 0) {
@@ -557,7 +574,7 @@ export default class Enemy {
       sprite.body.velocity.x = (dx / len) * 250
       sprite.body.velocity.y = (dy / len) * 250
       sprite.knockbackTimer  = 200
-      Enemy.takeDamage(sprite, thornsDmg, player.x, player.y, scene._affixes || [], 0)
+      Enemy.takeDamage(sprite, thornsDmg, player.x, player.y, scene._affixes || [], 0, { source: 'proc' })
     }
   }
 }

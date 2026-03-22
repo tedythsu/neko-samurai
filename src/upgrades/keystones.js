@@ -41,7 +41,7 @@ export const ALL_KEYSTONES = [
   {
     id:         'gravity_burst',
     name:       '【重力爆裂】',
-    desc:       '黑洞吸入怪物瞬間，觸發最大生命值 10% 的真實傷害爆炸',
+    desc:       '黑洞將敵人拉到核心時，觸發其最大生命值 8% 的重力爆裂',
     rarity:     'legendary',
     minTimeMs:  5 * 60 * 1000,
     requires:   'homura_gravity',       // 需先持有陰陽・黑洞
@@ -50,7 +50,7 @@ export const ALL_KEYSTONES = [
   {
     id:         'amaterasu',
     name:       '【天照・大御神】',
-    desc:       '每次命中有 10% 機率立即重置武器冷卻，連鎖攻擊效果翻倍',
+    desc:       '武器命中有 10% 機率立刻重置該武器冷卻，並使後續 2 秒連鎖效果強化',
     rarity:     'legendary',
     minTimeMs:  5 * 60 * 1000,
     oneTime:    true,

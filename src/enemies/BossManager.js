@@ -11,7 +11,7 @@ const BOSS_DEFS = [
     triggerMs: 5 * 60 * 1000,
     tint:      0x8844cc,
     scale:     2.5,
-    hp:        CFG.ENEMY_HP * 15,
+    hp:        4200,
     speed:     CFG.ENEMY_SPEED * 0.8,
   },
   {
@@ -20,7 +20,7 @@ const BOSS_DEFS = [
     triggerMs: 10 * 60 * 1000,
     tint:      0x2266ff,
     scale:     2.5,
-    hp:        CFG.ENEMY_HP * 25,
+    hp:        12000,
     speed:     CFG.ENEMY_SPEED * 0.9,
   },
   {
@@ -29,7 +29,7 @@ const BOSS_DEFS = [
     triggerMs: 15 * 60 * 1000,
     tint:      0xcc1133,
     scale:     3.0,
-    hp:        CFG.ENEMY_HP * 40,
+    hp:        22000,
     speed:     CFG.ENEMY_SPEED * 0.7,
   },
 ]
@@ -317,11 +317,11 @@ export default class BossManager {
       ))
     }
 
-    // kijo chest: global +50% damage bonus
+    // kijo chest: global +25% damage bonus
     if (def.id === 'kijo') {
-      scene._bossChestBonus = (scene._bossChestBonus || 1) * 1.5
+      scene._bossChestBonus = (scene._bossChestBonus || 1) * 1.25
       const W = scene.cameras.main.width, H = scene.cameras.main.height
-      const msg = scene.add.text(W / 2, H * 0.35, '全局傷害提升 50%！', {
+      const msg = scene.add.text(W / 2, H * 0.35, '全局傷害提升 25%！', {
         fontSize: '28px', color: '#ffaa00',
         fontFamily: '"Noto Serif JP", serif',
         stroke: '#3a2800', strokeThickness: 4,

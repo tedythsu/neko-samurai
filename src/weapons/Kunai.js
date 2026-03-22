@@ -14,9 +14,9 @@ export default {
   iconKey: 'kunai',
 
   baseStats: {
-    damage:          20,
+    damage:          18,
     damageVariance:  0.20,
-    fireRate:        500,
+    fireRate:        550,
     projectileCount: 1,
     speed:           600,
     penetrate:       false,
@@ -29,11 +29,15 @@ export default {
   createTexture() {},
 
   fire(scene, pool, fromX, fromY, stats, enemies) {
-    const targets = nearestEnemies(enemies, fromX, fromY, stats.projectileCount)
-    if (targets.length === 0) return
-    targets.forEach(target => {
+    const target = nearestEnemies(enemies, fromX, fromY, 1)[0]
+    if (!target) return
+    const centerAngle = Phaser.Math.RadToDeg(
+      Phaser.Math.Angle.Between(fromX, fromY, target.x, target.y)
+    )
+    const spreadStep = 10
+    for (let i = 0; i < stats.projectileCount; i++) {
       const s = getOrCreate(pool, fromX, fromY, this.texKey)
-      if (!s) return
+      if (!s) continue
       const nativeH = s.frame.realHeight
       const nativeW = s.frame.realWidth
       const h = BASE_H * stats._scale
@@ -54,13 +58,19 @@ export default {
       s._ricochetDepth = 0
       s._ricochetMax   = stats._ricochetMax
       s._pool          = pool
+      s._weaponId      = this.id
+      s._wallBounce    = scene._ricochetWall || false
+      s._wallBounced   = false
+      s._micro         = false
       s._spent         = false
 
-      const angle = Phaser.Math.Angle.Between(fromX, fromY, target.x, target.y)
+      const offset = (i - (stats.projectileCount - 1) / 2) * spreadStep
+      const speed = stats.speed * (scene._projSpeedMult || 1)
+      const angle = Phaser.Math.DegToRad(centerAngle + offset)
       scene.physics.velocityFromAngle(
-        Phaser.Math.RadToDeg(angle), stats.speed, s.body.velocity
+        Phaser.Math.RadToDeg(angle), speed, s.body.velocity
       )
-    })
+    }
   },
 
   update(sprite) {
@@ -70,6 +80,22 @@ export default {
     if (sprite._spent) {
       sprite.disableBody(true, true)
       return
+    }
+
+    if (sprite._wallBounce && !sprite._wallBounced) {
+      const bounds = sprite.scene.physics.world.bounds
+      let bounced = false
+      if ((sprite.x <= bounds.left + 6 && sprite.body.velocity.x < 0) ||
+          (sprite.x >= bounds.right - 6 && sprite.body.velocity.x > 0)) {
+        sprite.body.velocity.x *= -1
+        bounced = true
+      }
+      if ((sprite.y <= bounds.top + 6 && sprite.body.velocity.y < 0) ||
+          (sprite.y >= bounds.bottom - 6 && sprite.body.velocity.y > 0)) {
+        sprite.body.velocity.y *= -1
+        bounced = true
+      }
+      if (bounced) sprite._wallBounced = true
     }
 
     // 咒印・自動 — homing: steer toward nearest enemy each frame
@@ -108,11 +134,18 @@ export default {
           const pierceCount = proj.hitSet.size
           const dmg = proj.damage * (1 + pierceCount * (proj._pierceBonus || 0))
           proj.hitSet.add(e)
-          Enemy.takeDamage(e, dmg, proj.x, proj.y, affixes, proj.knockback ?? 60)
+          Enemy.takeDamage(e, dmg, proj.x, proj.y, affixes, proj.knockback ?? 60, {
+            source: 'weapon',
+            weaponId: this.id,
+          })
 
           // 影縫・定身 — stun on hit
           if (proj._stun && Math.random() < 0.40) {
             e._stunTimer = Math.max(e._stunTimer || 0, 1000)
+          }
+
+          if (scene._secondSplit && !proj._micro) {
+            _spawnMicroKunai(scene, entry.projectiles, proj, e, entry.stats)
           }
 
           applyRicochet(proj, e, scene, enemies, affixes)
@@ -123,4 +156,39 @@ export default {
       })
     })
   },
+}
+
+function _spawnMicroKunai(scene, pool, proj, enemy, stats) {
+  const baseAngle = Phaser.Math.RadToDeg(
+    Phaser.Math.Angle.Between(proj.x, proj.y, enemy.x, enemy.y)
+  )
+  ;[-18, 18].forEach(offset => {
+    const micro = getOrCreate(pool, proj.x, proj.y, proj.texture.key)
+    if (!micro) return
+    const nativeH = micro.frame.realHeight
+    const nativeW = micro.frame.realWidth
+    const h = BASE_H * 0.6 * stats._scale
+    micro.setDisplaySize(h * (nativeW / nativeH), h)
+    micro.damage         = proj.damage * 0.35
+    micro.hitSet         = new Set()
+    micro.spawnX         = proj.x
+    micro.spawnY         = proj.y
+    micro.range          = 180
+    micro.penetrate      = false
+    micro.knockback      = 25
+    micro._hitRadius     = HIT_HALF * 0.55 * stats._scale
+    micro._homing        = false
+    micro._pierceBonus   = 0
+    micro._stun          = false
+    micro._ricochet      = false
+    micro._ricochetDepth = 0
+    micro._ricochetMax   = 0
+    micro._pool          = pool
+    micro._weaponId      = proj._weaponId
+    micro._wallBounce    = false
+    micro._wallBounced   = true
+    micro._micro         = true
+    micro._spent         = false
+    scene.physics.velocityFromAngle(baseAngle + offset, 520, micro.body.velocity)
+  })
 }

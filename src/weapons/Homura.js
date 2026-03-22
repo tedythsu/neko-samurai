@@ -11,15 +11,15 @@ export default {
   iconChar: '炎',
 
   baseStats: {
-    damage:          55,
-    damageVariance:  0.45,
-    fireRate:        2000,
+    damage:          50,
+    damageVariance:  0.30,
+    fireRate:        2200,
     projectileCount: 1,
     range:           700,
-    speed:           200,
+    speed:           240,
     penetrate:       false,
-    knockback:       160,
-    _explodeRadius:  80,
+    knockback:       140,
+    _explodeRadius:  72,
   },
 
   upgrades: [],
@@ -53,11 +53,15 @@ export default {
       s._gravity       = stats._gravity       || false
       s._secondBurst   = stats._secondBurst   || false
       s._pool          = pool
+      s._wallBounce    = scene._ricochetWall || false
+      s._wallBounced   = false
+      s._weaponId      = this.id
       s._hitRadius     = s.displayWidth * 0.5
       s._chainDepth    = 0
 
       const angle = Phaser.Math.Angle.Between(fromX, fromY, target.x, target.y)
-      scene.physics.velocityFromAngle(Phaser.Math.RadToDeg(angle), stats.speed, s.body.velocity)
+      const speed = stats.speed * (scene._projSpeedMult || 1)
+      scene.physics.velocityFromAngle(Phaser.Math.RadToDeg(angle), speed, s.body.velocity)
     })
   },
 
@@ -65,6 +69,21 @@ export default {
     if (!sprite.active) return
     sprite.rotation += 0.1
     if (sprite._spent) { sprite.disableBody(true, true); return }
+    if (sprite._wallBounce && !sprite._wallBounced) {
+      const bounds = sprite.scene.physics.world.bounds
+      let bounced = false
+      if ((sprite.x <= bounds.left + 6 && sprite.body.velocity.x < 0) ||
+          (sprite.x >= bounds.right - 6 && sprite.body.velocity.x > 0)) {
+        sprite.body.velocity.x *= -1
+        bounced = true
+      }
+      if ((sprite.y <= bounds.top + 6 && sprite.body.velocity.y < 0) ||
+          (sprite.y >= bounds.bottom - 6 && sprite.body.velocity.y > 0)) {
+        sprite.body.velocity.y *= -1
+        bounced = true
+      }
+      if (bounced) sprite._wallBounced = true
+    }
     if (Phaser.Math.Distance.Between(sprite.spawnX, sprite.spawnY, sprite.x, sprite.y) >= sprite.range) {
       sprite.disableBody(true, true)
     }
@@ -77,9 +96,13 @@ export default {
         if (proj._spent || proj.hitSet.has(e)) return
         if (Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y) < proj._hitRadius) {
           proj.hitSet.add(e)
-          Enemy.takeDamage(e, proj.damage, proj.x, proj.y, affixes, proj.knockback ?? 160)
+          Enemy.takeDamage(e, proj.damage, proj.x, proj.y, affixes, proj.knockback ?? 160, {
+            source: 'weapon',
+            weaponId: this.id,
+          })
           applyExplosion(proj, e, scene, enemies, affixes)
-          if (!proj.penetrate) proj._spent = true
+          const shouldPierce = proj.penetrate && proj.hitSet.size < (entry.stats._pierceMax || 999)
+          if (!shouldPierce) proj._spent = true
         }
       })
     })
