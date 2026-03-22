@@ -19,7 +19,7 @@ export const ALL_PASSIVES = [
     apply: (_p, scene) => { scene._defenseBonus = (scene._defenseBonus || 0) + 0.15 },
   },
   {
-    id: 'aoe', name: '【靈力・擴張】', desc: '所有武器 AoE / 鎖鏈半徑 +25%',
+    id: 'aoe', name: '【靈力・擴張】', desc: '所有武器 AoE / 鎖鎌半徑 +25%',
     rarity: 'common', oneTime: true,
     apply: (_p, scene) => {
       for (const entry of scene._weapons || []) {

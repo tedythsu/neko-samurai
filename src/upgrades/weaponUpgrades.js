@@ -166,7 +166,7 @@ export const WEAPON_UPGRADES_MAP = {
     {
       id: 'kusa_arc',
       name: '【雷獄・連結】',
-      desc: '鎖鏈間產生電弧，自動電擊進入旋轉範圍的怪',
+      desc: '鎖鎌間產生電弧，自動電擊進入旋轉範圍的怪',
       rarity: 'rare',
       oneTime: true,
       apply(stats) { stats._arcLightning = true },
@@ -174,7 +174,7 @@ export const WEAPON_UPGRADES_MAP = {
     {
       id: 'kusa_radius',
       name: '【不動・重力】',
-      desc: '鎖鏈半徑增大，並附帶強力擊退效果',
+      desc: '鎖鎌半徑增大，並附帶強力擊退效果',
       rarity: 'rare',
       oneTime: true,
       apply(stats) {
@@ -193,7 +193,7 @@ export const WEAPON_UPGRADES_MAP = {
     {
       id: 'kusa_heavyball',
       name: '【重鎚・碎裂】',
-      desc: '鎖鏈末端增加重型鐵球，造成範圍粉碎傷害與翻倍擊退',
+      desc: '鎖鎌末端增加重型鐵球，造成範圍粉碎傷害與翻倍擊退',
       rarity: 'rare',
       oneTime: true,
       apply(stats) { stats._heavyBall = true },
