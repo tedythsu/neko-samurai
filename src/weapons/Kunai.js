@@ -2,11 +2,10 @@
 import Phaser from 'phaser'
 import Enemy  from '../entities/Enemy.js'
 import { getOrCreate, nearestEnemies } from './_pool.js'
-import { doScatter } from '../upgrades/projTraits.js'
-import { applyMiniExplosion, applyRicochet, applyBurnfield } from '../upgrades/projEffects.js'
+import { applyRicochet } from '../upgrades/projEffects.js'
 
-const BASE_H    = 40   // display height in px regardless of source image size
-const HIT_HALF  = 14   // hit radius in px (approx half the visual width)
+const BASE_H    = 40
+const HIT_HALF  = 14
 
 export default {
   id: 'kunai',
@@ -15,18 +14,18 @@ export default {
   iconKey: 'kunai',
 
   baseStats: {
-    damage: 8,
-    fireRate: 500,
+    damage:          8,
+    fireRate:        500,
     projectileCount: 1,
-    speed: 600,
-    penetrate: false,
-    knockback: 60,
-    _scale: 1.0,
+    speed:           600,
+    penetrate:       false,
+    knockback:       60,
+    _scale:          1.0,
   },
 
   upgrades: [],
 
-  createTexture() { /* loaded in GameScene.preload() */ },
+  createTexture() {},
 
   fire(scene, pool, fromX, fromY, stats, enemies) {
     const targets = nearestEnemies(enemies, fromX, fromY, stats.projectileCount)
@@ -34,27 +33,27 @@ export default {
     targets.forEach(target => {
       const s = getOrCreate(pool, fromX, fromY, this.texKey)
       if (!s) return
-      // Use native frame dimensions so pooled scale doesn't affect sizing
       const nativeH = s.frame.realHeight
       const nativeW = s.frame.realWidth
       const h = BASE_H * stats._scale
       const w = h * (nativeW / nativeH)
       s.setDisplaySize(w, h)
-      s.damage      = stats.damage
-      s.hitSet      = new Set()
-      s.spawnX      = fromX
-      s.spawnY      = fromY
-      s.range       = 500
-      s.penetrate   = stats.penetrate || false
-      s.knockback   = stats.knockback ?? 60
-      s._hitRadius  = HIT_HALF * stats._scale
-      s._miniExplosion = stats._miniExplosion || false
+      s.damage         = stats.damage
+      s.hitSet         = new Set()
+      s.spawnX         = fromX
+      s.spawnY         = fromY
+      s.range          = 500
+      s.penetrate      = stats.penetrate || false
+      s.knockback      = stats.knockback ?? 60
+      s._hitRadius     = HIT_HALF * stats._scale
+      s._homing        = stats._homing        || false
+      s._pierceBonus   = stats._pierceBonus   || 0
+      s._stun          = stats._stun          || false
       s._ricochet      = stats._ricochet      || false
       s._ricochetDepth = 0
-      s._scatter       = stats._scatter       || false
-      s._scatterFired  = false
-      s._scorch        = stats._scorch        || false
+      s._ricochetMax   = stats._ricochetMax
       s._pool          = pool
+      s._spent         = false
 
       const angle = Phaser.Math.Angle.Between(fromX, fromY, target.x, target.y)
       scene.physics.velocityFromAngle(
@@ -65,43 +64,59 @@ export default {
 
   update(sprite) {
     if (!sprite.active) return
-    // Rotate so image top faces travel direction
     sprite.rotation = Math.atan2(sprite.body.velocity.y, sprite.body.velocity.x) + Math.PI / 2
 
-    // Hit an enemy last frame → expire here with optional split
     if (sprite._spent) {
-      if (sprite._scatter && !sprite._scatterFired) doScatter(sprite, sprite.scene)
       sprite.disableBody(true, true)
       return
     }
 
+    // 咒印・自動 — homing: steer toward nearest enemy each frame
+    if (sprite._homing) {
+      const scene   = sprite.scene
+      const enemies = scene._enemies
+      if (enemies) {
+        const nearest = enemies.getChildren()
+          .filter(e => e.active && !e.dying && !sprite.hitSet.has(e))
+          .sort((a, b) =>
+            Phaser.Math.Distance.Between(sprite.x, sprite.y, a.x, a.y) -
+            Phaser.Math.Distance.Between(sprite.x, sprite.y, b.x, b.y))[0]
+        if (nearest) {
+          const speed = Math.hypot(sprite.body.velocity.x, sprite.body.velocity.y)
+          const angle = Phaser.Math.Angle.Between(sprite.x, sprite.y, nearest.x, nearest.y)
+          const tx = Math.cos(angle) * speed
+          const ty = Math.sin(angle) * speed
+          // Gradual steering (lerp velocity)
+          sprite.body.velocity.x += (tx - sprite.body.velocity.x) * 0.12
+          sprite.body.velocity.y += (ty - sprite.body.velocity.y) * 0.12
+        }
+      }
+    }
+
     if (Phaser.Math.Distance.Between(sprite.spawnX, sprite.spawnY, sprite.x, sprite.y) >= sprite.range) {
-      if (sprite._scatter && !sprite._scatterFired) doScatter(sprite, sprite.scene)
       sprite.disableBody(true, true)
     }
   },
 
-  // Manual hit detection — bypasses physics overlap body-size issues
   updateActive(entry, scene, enemies, _player, affixes) {
     entry.projectiles.getChildren().forEach(proj => {
       if (!proj.active || proj._spent) return
       enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
         if (proj._spent || proj.hitSet.has(e)) return
         if (Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y) < proj._hitRadius) {
+          const pierceCount = proj.hitSet.size
+          const dmg = proj.damage * (1 + pierceCount * (proj._pierceBonus || 0))
           proj.hitSet.add(e)
-          Enemy.takeDamage(e, proj.damage, proj.x, proj.y, affixes, proj.knockback ?? 60)
+          Enemy.takeDamage(e, dmg, proj.x, proj.y, affixes, proj.knockback ?? 60)
 
-          // 氷刃苦無 evo — freeze on hit
-          if (entry.stats._evo === 'koori' && e._statusEffects && e._statusEffects.frozen) {
-            e._statusEffects.frozen.active = true
-            e._statusEffects.frozen.timer  = 2000
+          // 影縫・定身 — stun on hit
+          if (proj._stun && Math.random() < 0.40) {
+            e._stunTimer = Math.max(e._stunTimer || 0, 1000)
           }
-          applyMiniExplosion(proj, e, scene, enemies, affixes)
-          applyRicochet(proj, e, scene, enemies, affixes)
-          applyBurnfield(proj, scene, affixes)
 
-          // 氷刃苦無 — pierce frozen enemies (don't expire)
-          const shouldPierce = proj.penetrate || (entry.stats._evo === 'koori' && e._statusEffects?.frozen?.active)
+          applyRicochet(proj, e, scene, enemies, affixes)
+
+          const shouldPierce = proj.penetrate && proj.hitSet.size < (entry.stats._pierceMax || 999)
           if (!shouldPierce) proj._spent = true
         }
       })

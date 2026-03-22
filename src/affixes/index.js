@@ -1,20 +1,8 @@
 // src/affixes/index.js
-import { ALL_EVOLUTIONS } from './evolutions.js'
-import burn    from './burn.js'
-import poison  from './poison.js'
-import chain   from './chain.js'
-import chill   from './chill.js'
-import curse   from './curse.js'
-import leech   from './leech.js'
-import burst   from './burst.js'
-import lucky   from './lucky.js'
-import tier2   from './tier2.js'
+// DEPRECATED — elemental system moved to src/upgrades/elementals.js
+// Kept as empty stub so any stray imports don't break
 
-export { checkResonances } from './resonances.js'
-
-export const ALL_AFFIXES = [burn, poison, chain, chill, curse, leech, burst, lucky]
-  .map(a => ({ ...a, minLevel: a.minLevel ?? 3 }))
-
-export const ALL_TIER2_AFFIXES = tier2
-
-export { ALL_EVOLUTIONS }
+export const ALL_AFFIXES      = []
+export const ALL_TIER2_AFFIXES = []
+export const ALL_EVOLUTIONS   = []
+export function checkResonances() { return new Set() }

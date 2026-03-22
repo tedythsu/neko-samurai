@@ -2,11 +2,12 @@
 import Phaser from 'phaser'
 import Player   from '../entities/Player.js'
 import Enemy    from '../entities/Enemy.js'
-import { CFG, randomEdgePoint, xpThreshold, PLAYER_UPGRADES, PROGRESSION_BREAKPOINTS } from '../config.js'
-import { ALL_AFFIXES, ALL_TIER2_AFFIXES, ALL_EVOLUTIONS, checkResonances } from '../affixes/index.js'
-import { ALL_PROJ_TRAITS, PROJ_WEAPON_IDS }              from '../upgrades/projTraits.js'
-import { ALL_MELEE_TRAITS, MELEE_WEAPON_IDS, SWING_WEAPON_IDS } from '../upgrades/meleeTraits.js'
-import { WEAPON_STAT_UPGRADES } from '../upgrades/weaponStatUpgrades.js'
+import { CFG, randomEdgePoint, xpThreshold, PROGRESSION_BREAKPOINTS } from '../config.js'
+import { WEAPON_UPGRADES_MAP } from '../upgrades/weaponUpgrades.js'
+import { ALL_ELEMENTALS }      from '../upgrades/elementals.js'
+import { ALL_PROCS }           from '../upgrades/procs.js'
+import { ALL_KEYSTONES }       from '../upgrades/keystones.js'
+import { ALL_PASSIVES }        from '../upgrades/passives.js'
 import { ENEMY_TYPES, getDifficultyMult } from '../enemies/EnemyTypes.js'
 import BossManager from '../enemies/BossManager.js'
 
@@ -69,16 +70,27 @@ export default class GameScene extends Phaser.Scene {
     })
 
     // Multi-weapon state
-    this._weapons       = []
-    this._affixes       = []              // active affix objects (may have duplicates for stacks)
-    this._affixCounts   = new Map()       // id → pick count
-    this._resonances    = new Set()       // active resonance IDs
-    this._critBonus    = 0
-    this._critDmgBonus = 0
-    this._playerUpgradesOwned = new Set()
-    this._offeredEvos         = new Set()
-    this._projTraitsOwned  = new Set()
-    this._meleeTraitsOwned = new Set()
+    this._weapons              = []
+    this._affixes              = []          // active elemental ailments
+    this._affixCounts          = new Map()   // elemental id → 1 (one-time)
+    this._weaponUpgradesOwned  = new Map()   // weaponId → Set(upgradeId)
+    this._procsOwned           = new Set()
+    this._keystonesOwned       = new Set()
+    this._passivesOwned        = new Set()
+    this._glassCannon          = false
+    this._defenseBonus         = 0
+    this._soulDrain            = false
+    this._daimyoStacks         = 0
+    this._ironWillMult         = 1.0
+    this._ironBodyShield       = false
+    this._orbAttractRadius     = CFG.ORB_ATTRACT_RADIUS
+    this._critBonus            = 0
+    this._critDmgBonus         = 0
+    this._warCryTimer          = 0
+    this._ironBodyTimer        = 0
+    this._ironWillTimer        = 0
+    this._tachiComboGuardActive = false
+    this._tachiComboGuardMult   = 1.0
 
     this._addWeapon(this._startWeapon)
 
@@ -256,20 +268,14 @@ export default class GameScene extends Phaser.Scene {
 
     const entry = { weapon, stats: { ...weapon.baseStats }, timer: 0, projectiles, takenUpgrades: new Set(), lastTrailTime: 0 }
 
-    // Retroactively apply owned Layer P traits to new weapon
-    if (PROJ_WEAPON_IDS.has(weapon.id)) {
-      for (const trait of ALL_PROJ_TRAITS) {
-        if (this._projTraitsOwned.has(trait.id)) trait.apply(entry.stats)
+    // Retroactively apply owned weapon upgrades
+    const owned = this._weaponUpgradesOwned?.get(weapon.id)
+    if (owned) {
+      for (const u of (WEAPON_UPGRADES_MAP[weapon.id] || [])) {
+        if (owned.has(u.id)) u.apply(entry.stats)
       }
     }
-    // Retroactively apply owned Layer M traits to new weapon
-    if (MELEE_WEAPON_IDS.has(weapon.id)) {
-      for (const trait of ALL_MELEE_TRAITS) {
-        if (!this._meleeTraitsOwned.has(trait.id)) continue
-        if (trait.swingOnly && !SWING_WEAPON_IDS.has(weapon.id)) continue
-        trait.apply(entry.stats)
-      }
-    }
+
     this._weapons.push(entry)
   }
 
@@ -316,6 +322,62 @@ export default class GameScene extends Phaser.Scene {
 
     const px = this._player.x
     const py = this._player.y
+
+    // Iron Will keystone — boost damage when standing still
+    if (this._keystonesOwned.has('iron_will')) {
+      const dx = Math.abs(px - (this._iwPX || px))
+      const dy = Math.abs(py - (this._iwPY || py))
+      this._iwPX = px; this._iwPY = py
+      if (dx > 2 || dy > 2) {
+        this._ironWillTimer = 0
+        this._ironWillMult  = 1.0
+      } else {
+        this._ironWillTimer = (this._ironWillTimer || 0) + delta
+        this._ironWillMult  = Math.min(2.0, 1.0 + (this._ironWillTimer / 1000) * 0.20)
+      }
+    }
+
+    // War Cry proc — auto shockwave every 5s
+    if (this._procsOwned.has('war_cry')) {
+      this._warCryTimer = (this._warCryTimer || 0) + delta
+      if (this._warCryTimer >= 5000) {
+        this._warCryTimer = 0
+        this._doWarCry()
+      }
+    }
+
+    // Sanctuary Aura — mark nearby enemies for speed reduction
+    if (this._procsOwned.has('sanctuary_aura')) {
+      const auraRadius = 100 + this._level * 3
+      this._enemies.getChildren().forEach(e => {
+        e._inSanctuaryAura = e.active && !e.dying &&
+          Phaser.Math.Distance.Between(px, py, e.x, e.y) < auraRadius
+      })
+    }
+
+    // Dark Aura — mark nearby enemies for damage amplification
+    if (this._procsOwned.has('dark_aura')) {
+      const darkRadius = 120 + this._level * 2
+      this._enemies.getChildren().forEach(e => {
+        e._darkAura = e.active && !e.dying &&
+          Phaser.Math.Distance.Between(px, py, e.x, e.y) < darkRadius
+      })
+    }
+
+    // Iron Body proc — stand still shield
+    if (this._procsOwned.has('iron_body')) {
+      const dx = Math.abs(px - (this._ibPX || px))
+      const dy = Math.abs(py - (this._ibPY || py))
+      this._ibPX = px; this._ibPY = py
+      if (dx > 2 || dy > 2) {
+        this._ironBodyTimer = 0
+      } else {
+        this._ironBodyTimer = (this._ironBodyTimer || 0) + delta
+        if (this._ironBodyTimer >= 1500 && !this._ironBodyShield) {
+          this._ironBodyShield = true
+        }
+      }
+    }
 
     for (const entry of this._weapons) {
       if (entry.stats.fireRate > 0) {
@@ -383,7 +445,8 @@ export default class GameScene extends Phaser.Scene {
         continue
       }
 
-      if (dist < CFG.ORB_ATTRACT_RADIUS) {
+      const attractRadius = this._orbAttractRadius || CFG.ORB_ATTRACT_RADIUS
+      if (dist < attractRadius) {
         // First frame entering attract zone — stop floating tween
         if (!orb._attracted) {
           orb._attracted = true
@@ -391,7 +454,7 @@ export default class GameScene extends Phaser.Scene {
           orb.setScale(orb.scaleX * 1.3)  // slight grow to signal attraction
         }
         // Fly toward player, faster the closer it gets
-        const speed = Phaser.Math.Linear(500, 200, dist / CFG.ORB_ATTRACT_RADIUS)
+        const speed = Phaser.Math.Linear(500, 200, dist / attractRadius)
         const angle = Phaser.Math.Angle.Between(orb.x, orb.y, px, py)
         orb.x += Math.cos(angle) * speed * (delta / 1000)
         orb.y += Math.sin(angle) * speed * (delta / 1000)
@@ -572,29 +635,22 @@ export default class GameScene extends Phaser.Scene {
           const entry = this._weapons.find(e => e.weapon.id === upgrade.weaponId)
           if (entry) {
             upgrade.apply(entry.stats)
-            if (upgrade.oneTime) entry.takenUpgrades.add(upgrade.id)
+            if (!this._weaponUpgradesOwned.has(upgrade.weaponId))
+              this._weaponUpgradesOwned.set(upgrade.weaponId, new Set())
+            this._weaponUpgradesOwned.get(upgrade.weaponId).add(upgrade.id)
           }
-        } else if (upgrade.target === 'proj_trait') {
-          this._projTraitsOwned.add(upgrade.id)
-          for (const entry of this._weapons) {
-            if (PROJ_WEAPON_IDS.has(entry.weapon.id)) upgrade.apply(entry.stats)
-          }
-        } else if (upgrade.target === 'melee_trait') {
-          this._meleeTraitsOwned.add(upgrade.id)
-          for (const entry of this._weapons) {
-            if (MELEE_WEAPON_IDS.has(entry.weapon.id)) {
-              if (!upgrade.swingOnly || SWING_WEAPON_IDS.has(entry.weapon.id))
-                upgrade.apply(entry.stats)
-            }
-          }
-        } else if (upgrade.target === 'affix') {
-          this._applyAffix(upgrade.affix)
-        } else if (upgrade.target === 'evolution') {
-          const entry = this._weapons.find(e => e.weapon.id === upgrade.weaponId)
-          if (entry) entry.stats._evo = upgrade.id
-        } else {
+        } else if (upgrade.target === 'elemental') {
+          this._affixes.push(upgrade.elemental)
+          this._affixCounts.set(upgrade.elemental.id, 1)
+        } else if (upgrade.target === 'proc') {
+          this._procsOwned.add(upgrade.id)
+          if (upgrade.apply) upgrade.apply(this._player, this)
+        } else if (upgrade.target === 'keystone') {
+          this._keystonesOwned.add(upgrade.id)
+          if (upgrade.apply) upgrade.apply(this._player, this)
+        } else if (upgrade.target === 'passive') {
           upgrade.apply(this._player, this)
-          if (upgrade.oneTime) this._playerUpgradesOwned.add(upgrade.id)
+          if (upgrade.oneTime) this._passivesOwned.add(upgrade.id)
         }
         this._upgrading = false
         this.scene.resume('GameScene')
@@ -609,70 +665,40 @@ export default class GameScene extends Phaser.Scene {
   _buildUpgradePool() {
     const pool = []
 
-    // Universal weapon stat upgrades — filtered by what the active weapon supports
+    // Weapon-specific upgrades (4 per weapon)
     const entry = this._weapons[0]
     if (entry) {
-      for (const u of WEAPON_STAT_UPGRADES) {
-        if (u.relevant && !u.relevant(entry.stats)) continue
-        pool.push({ ...u, target: 'weapon', weaponId: entry.weapon.id })
+      const wId = entry.weapon.id
+      const upgrades = WEAPON_UPGRADES_MAP[wId] || []
+      const owned = this._weaponUpgradesOwned.get(wId) || new Set()
+      for (const u of upgrades) {
+        if (!owned.has(u.id))
+          pool.push({ ...u, target: 'weapon', weaponId: wId })
       }
     }
 
-    // Tier-1 elemental affixes — only show if not yet owned and level gate reached
-    pool.push(...ALL_AFFIXES
-      .filter(a => !this._affixCounts.has(a.id) && this._level >= (a.minLevel ?? 1))
-      .map(a => ({ id: a.id, name: a.name, desc: a.desc, target: 'affix', affix: a })))
+    // Elemental ailments (one-time)
+    pool.push(...ALL_ELEMENTALS
+      .filter(e => !this._affixCounts.has(e.id))
+      .map(e => ({ id: e.id, name: e.name, desc: e.desc, target: 'elemental', elemental: e })))
 
-    // Tier-2 elemental affixes — only if parent owned AND tier-2 not yet owned
-    pool.push(...ALL_TIER2_AFFIXES
-      .filter(a => this._affixCounts.has(a.requires) && !this._affixCounts.has(a.id))
-      .map(a => ({ id: a.id, name: a.name, desc: a.desc, target: 'affix', affix: a })))
+    // Procs/Auras
+    pool.push(...ALL_PROCS
+      .filter(p => !this._procsOwned.has(p.id) && this._level >= (p.minLevel ?? 1))
+      .map(p => ({ ...p, target: 'proc' })))
 
-    // Player upgrades — filter out already-owned one-time upgrades; non-one-time always present
-    pool.push(...PLAYER_UPGRADES
-      .filter(u => !u.oneTime || !this._playerUpgradesOwned.has(u.id))
-      .map(u => ({ ...u, target: 'player' })))
+    // Keystones
+    pool.push(...ALL_KEYSTONES
+      .filter(k => !this._keystonesOwned.has(k.id) && this._level >= (k.minLevel ?? 5))
+      .map(k => ({ ...k, target: 'keystone' })))
 
-    // NOTE: Tier-1 elemental affixes are now one-time only (filtered above). This intentionally
-    // removes stacking for all tier-1 affixes including `lucky`. Tier-2 affixes (e.g. lucky2,
-    // burn2) provide the next power step. Dead stacking branches in affix files are harmless.
+    // Passives (stackable unless oneTime)
+    pool.push(...ALL_PASSIVES
+      .filter(p => !p.oneTime || !this._passivesOwned.has(p.id))
+      .map(p => ({ ...p, target: 'passive' })))
 
-    // Weapon evolutions — offered once per run when weapon + affix both held
-    for (const evo of ALL_EVOLUTIONS) {
-      if (this._offeredEvos.has(evo.id)) continue
-      const hasWeapon = this._weapons.some(w => w.weapon.id === evo.weaponId)
-      const hasAffix  = (this._affixCounts.get(evo.affixId) || 0) >= 1
-      if (hasWeapon && hasAffix) {
-        pool.push({ ...evo, target: 'evolution' })
-        this._offeredEvos.add(evo.id)   // mark offered NOW so re-roll never re-offers it
-      }
-    }
-
-    // Layer P — projectile universal traits
-    const ownedProjEntries = this._weapons.filter(w => PROJ_WEAPON_IDS.has(w.weapon.id))
-    if (ownedProjEntries.length > 0) {
-      for (const trait of ALL_PROJ_TRAITS) {
-        if (this._projTraitsOwned.has(trait.id)) continue
-        if (trait.minLevel && this._level < trait.minLevel) continue
-        if (trait.relevant && !ownedProjEntries.some(e => trait.relevant(e.stats))) continue
-        pool.push({ ...trait, target: 'proj_trait' })
-      }
-    }
-
-    // Layer M — melee universal traits
-    const hasMeleeWeapon = this._weapons.some(w => MELEE_WEAPON_IDS.has(w.weapon.id))
-    const hasSwingWeapon = this._weapons.some(w => SWING_WEAPON_IDS.has(w.weapon.id))
-    if (hasMeleeWeapon) {
-      for (const trait of ALL_MELEE_TRAITS) {
-        if (this._meleeTraitsOwned.has(trait.id)) continue
-        if (trait.minLevel && this._level < trait.minLevel) continue
-        if (trait.swingOnly && !hasSwingWeapon) continue
-        pool.push({ ...trait, target: 'melee_trait' })
-      }
-    }
-
-    // Deduplicate by id+weaponId before shuffling to prevent duplicate choices
-    const seen    = new Set()
+    // Deduplicate
+    const seen = new Set()
     const deduped = pool.filter(u => {
       const key = u.id + (u.weaponId ?? '')
       if (seen.has(key)) return false
@@ -680,30 +706,58 @@ export default class GameScene extends Phaser.Scene {
       return true
     })
 
-    // Resolve {weapon} placeholder in desc using active weapon name
-    const weaponName = this._weapons[0]?.weapon.name ?? ''
-    deduped.forEach(u => {
-      if (u.desc?.includes('{weapon}'))
-        u.desc = u.desc.replace('{weapon}', weaponName)
-    })
-
-    // Safety: pool should never be empty with current upgrade definitions, but
-    // if it somehow is, fall back to repeatable player upgrades
     if (deduped.length === 0) {
-      return PLAYER_UPGRADES
-        .filter(u => !u.oneTime)
-        .map(u => ({ ...u, target: 'player' }))
-        .slice(0, 3)
+      return ALL_PASSIVES.slice(0, 3).map(p => ({ ...p, target: 'passive' }))
     }
 
     return Phaser.Utils.Array.Shuffle(deduped).slice(0, 3)
   }
 
-  _applyAffix(affix) {
-    this._affixes.push(affix)
-    const count = (this._affixCounts.get(affix.id) || 0) + 1
-    this._affixCounts.set(affix.id, count)
-    this._resonances = checkResonances(this._affixCounts)
+  _doWarCry() {
+    const px = this._player.x, py = this._player.y
+    const radius = 150
+    this._enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
+      if (Phaser.Math.Distance.Between(px, py, e.x, e.y) < radius) {
+        const dx = e.x - px, dy = e.y - py
+        const len = Math.hypot(dx, dy) || 1
+        e.body.velocity.x = (dx / len) * 400
+        e.body.velocity.y = (dy / len) * 400
+        e.knockbackTimer = 350
+      }
+    })
+    const g = this.add.graphics().setDepth(8)
+    g.lineStyle(3, 0xffcc44, 0.9)
+    g.strokeCircle(px, py, radius)
+    this.tweens.add({ targets: g, alpha: 0, scaleX: 1.5, scaleY: 1.5, duration: 400, onComplete: () => g.destroy() })
+  }
+
+  _createGravityField(x, y, radius, affixes) {
+    const dur = 1500
+    let elapsed = 0
+    const g = this.add.graphics().setDepth(4)
+    const tick = (_, delta) => {
+      elapsed += delta
+      const alpha = 0.4 * (1 - elapsed / dur)
+      g.clear()
+      g.fillStyle(0x220044, alpha)
+      g.fillCircle(x, y, radius)
+      this._enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
+        const dist = Phaser.Math.Distance.Between(x, y, e.x, e.y)
+        if (dist < radius && dist > 2) {
+          const dx = x - e.x, dy = y - e.y
+          const len = Math.hypot(dx, dy)
+          const pull = 120 * (1 - dist / radius)
+          e.body.velocity.x += (dx / len) * pull * delta / 1000
+          e.body.velocity.y += (dy / len) * pull * delta / 1000
+        }
+      })
+      if (elapsed >= dur) {
+        this.events.off('update', tick)
+        g.destroy()
+      }
+    }
+    this.events.on('update', tick)
+    this.events.once('shutdown', () => { this.events.off('update', tick); g.destroy() })
   }
 
   _onPlayerDead() {

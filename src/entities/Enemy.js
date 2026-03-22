@@ -3,11 +3,9 @@ import Phaser from 'phaser'
 import { CFG } from '../config.js'
 
 export default class Enemy {
-  // Slice kisotsu-run (6×6) into numbered frames and generate dust-particle texture.
-  // Call once in GameScene.create() before creating the enemy group.
   static createTexture(scene) {
     const tex = scene.textures.get('kisotsu-run')
-    if (tex.has(0)) return   // already sliced (guard for scene restart)
+    if (tex.has(0)) return
     const src = tex.source[0]
     const fw  = Math.floor(src.width  / 6)
     const fh  = Math.floor(src.height / 6)
@@ -25,25 +23,26 @@ export default class Enemy {
     }
   }
 
-  /**
-   * Activate a pooled enemy at position (x, y).
-   * typeConfig — one of ENEMY_TYPES entries (defaults to kisotsu if omitted)
-   * diffMult   — { hpMult, speedMult } from getDifficultyMult()
-   */
   static activate(sprite, x, y, typeConfig = null, diffMult = null) {
     const type = typeConfig || { id: 'kisotsu', baseTint: null, hpMult: 1.0, speedMult: 1.0, sizeMult: 1.0, behaviorFlags: {} }
     const dm   = diffMult   || { hpMult: 1.0, speedMult: 1.0 }
 
     sprite.enableBody(true, x, y, true, true)
     sprite.hp             = CFG.ENEMY_HP * type.hpMult * dm.hpMult
+    sprite.maxHp          = sprite.hp
     sprite.damageCd       = 0
     sprite.knockbackTimer = 0
     sprite.dying          = false
     sprite._frame         = 0
     sprite._timer         = 0
-    sprite._baseTint      = type.baseTint    // store for tint pipeline restore
-    sprite._typeConfig    = type             // store for behavior checks (e.g. bakuha explode)
+    sprite._baseTint      = type.baseTint
+    sprite._typeConfig    = type
     sprite._speed         = CFG.ENEMY_SPEED * type.speedMult * dm.speedMult
+    sprite._stunTimer     = 0
+    sprite._armorShred    = 0
+    sprite._outputMult    = 1.0
+    sprite._inSanctuaryAura = false
+    sprite._darkAura        = false
 
     sprite.setAlpha(1)
     if (type.baseTint !== null) {
@@ -53,11 +52,11 @@ export default class Enemy {
     }
 
     sprite._statusEffects = {
-      burn:   { stacks: 0, timer: 0, dps: 5, _accum: 0 },
-      poison: { stacks: 0, timer: 0, _accum: 0 },
-      chill:  { active: false, timer: 0 },
-      curse:  { active: false, timer: 0 },
+      chill:  { active: false, timer: 0, stacks: 0 },
       frozen: { active: false, timer: 0 },
+      ignite: { active: false, timer: 0, dps: 0, _accum: 0 },
+      shock:  { active: false, timer: 0 },
+      bleed:  { active: false, timer: 0, _accum: 0 },
     }
 
     const frame0 = sprite.scene.textures.get('kisotsu-run').frames[0]
@@ -65,12 +64,10 @@ export default class Enemy {
     const dW = Math.round(dH * frame0.realWidth / frame0.realHeight)
     sprite.setTexture('kisotsu-run', 0).setDisplaySize(dW, dH)
 
-    // Scale physics body proportionally (base body is 18×38 for 64px height)
     const bodyW = Math.round(18 * type.sizeMult)
     const bodyH = Math.round(38 * type.sizeMult)
     sprite.body.setSize(bodyW, bodyH)
 
-    // 爆炸型: pulsing alpha tween
     if (type.behaviorFlags.explode) {
       sprite._pulseTween = sprite.scene.tweens.add({
         targets: sprite, alpha: { from: 0.6, to: 1.0 },
@@ -81,33 +78,33 @@ export default class Enemy {
     }
   }
 
-  /**
-   * Per-frame update. Call in GameScene.update() for each active enemy.
-   */
   static update(sprite, player, delta) {
     if (!sprite.active || sprite.dying) return
 
     if (sprite.knockbackTimer > 0) {
       sprite.knockbackTimer -= delta
     } else {
-      const frozen  = sprite._statusEffects && sprite._statusEffects.frozen.active
-      const chilled = sprite._statusEffects && sprite._statusEffects.chill.active
+      const se      = sprite._statusEffects
+      const stunned = (sprite._stunTimer || 0) > 0
+      if (stunned) sprite._stunTimer -= delta
+      const frozen  = se && se.frozen.active
+      const chilled = se && se.chill.active
+      const inAura  = sprite._inSanctuaryAura
       const baseSpeed = sprite._speed ?? CFG.ENEMY_SPEED
-      const speed     = frozen ? 0 : (chilled ? baseSpeed * 0.5 : baseSpeed)
-      // Frozen: skip moveToObject (avoids unnecessary physics call each frame).
-      // Note: knockback impulses still apply to frozen enemies by design.
+      const speed     = stunned ? 0
+                      : frozen  ? 0
+                      : chilled ? baseSpeed * 0.5
+                      : inAura  ? baseSpeed * 0.7
+                      : baseSpeed
       if (speed > 0) sprite.scene.physics.moveToObject(sprite, player.sprite, speed)
     }
 
     sprite.setFlipX(player.x < sprite.x)
 
-    // 爆炸型: explode when within range of player
     if (!sprite.dying && sprite._typeConfig?.behaviorFlags?.explode) {
       const dist = Phaser.Math.Distance.Between(sprite.x, sprite.y, player.x, player.y)
       if (dist < sprite._typeConfig.behaviorFlags.explodeRange) {
-        // AoE damage to player
         player.takeDamage(CFG.ENEMY_DAMAGE * 2)
-        // Kill pulse tween then die
         if (sprite._pulseTween) { sprite._pulseTween.stop(); sprite._pulseTween = null }
         Enemy._triggerDeath(sprite)
         return
@@ -118,7 +115,7 @@ export default class Enemy {
     Enemy.updateStatus(sprite, delta)
 
     const frozen = sprite._statusEffects && sprite._statusEffects.frozen.active
-    if (!frozen) {
+    if (!frozen && !(sprite._stunTimer > 0)) {
       sprite._timer += delta
       while (sprite._timer >= 1000 / 12) {
         sprite._timer -= 1000 / 12
@@ -131,71 +128,68 @@ export default class Enemy {
   static updateStatus(sprite, delta) {
     const se = sprite._statusEffects
     if (!se) return
+    const scene = sprite.scene
 
-    const scene      = sprite.scene
-    const corrosion  = scene._resonances && scene._resonances.has('corrosion')
-    const corrMult   = corrosion ? 1.5 : 1.0
-
-    // Burn DoT
-    if (se.burn.stacks > 0 && se.burn.timer > 0) {
-      se.burn.timer -= delta
-      const dmg = se.burn.dps * corrMult * (delta / 1000)
+    // Ignite DoT
+    if (se.ignite && se.ignite.active) {
+      se.ignite.timer -= delta
+      const dmg = se.ignite.dps * (delta / 1000)
       sprite.hp -= dmg
-      se.burn._accum += dmg
-      if (se.burn._accum >= 1) {
-        const shown = Math.floor(se.burn._accum)
-        se.burn._accum -= shown
+      se.ignite._accum = (se.ignite._accum || 0) + dmg
+      if (se.ignite._accum >= 1) {
+        const shown = Math.floor(se.ignite._accum)
+        se.ignite._accum -= shown
         Enemy.showDamageNumber(sprite, shown, '#ff6600')
       }
-      if (se.burn.timer <= 0) se.burn.stacks = 0
+      if (se.ignite.timer <= 0) { se.ignite.active = false; se.ignite.dps = 0 }
       if (sprite.hp <= 0 && !sprite.dying) Enemy._triggerDeath(sprite)
     }
 
-    // Poison DoT
-    if (se.poison.stacks > 0 && se.poison.timer > 0 && !sprite.dying) {
-      se.poison.timer -= delta
-      const dmg = 3 * se.poison.stacks * corrMult * (delta / 1000)
+    // Bleed DoT — scales with enemy speed
+    if (se.bleed && se.bleed.active) {
+      se.bleed.timer -= delta
+      const speedRatio = (sprite._speed || CFG.ENEMY_SPEED) / CFG.ENEMY_SPEED
+      const dmg = 4 * speedRatio * (delta / 1000)
       sprite.hp -= dmg
-      se.poison._accum += dmg
-      if (se.poison._accum >= 1) {
-        const shown = Math.floor(se.poison._accum)
-        se.poison._accum -= shown
-        Enemy.showDamageNumber(sprite, shown, '#44cc44')
+      se.bleed._accum = (se.bleed._accum || 0) + dmg
+      if (se.bleed._accum >= 1) {
+        const shown = Math.floor(se.bleed._accum)
+        se.bleed._accum -= shown
+        Enemy.showDamageNumber(sprite, shown, '#cc88ff')
       }
-      if (se.poison.timer <= 0) se.poison.stacks = 0
+      if (se.bleed.timer <= 0) se.bleed.active = false
       if (sprite.hp <= 0 && !sprite.dying) Enemy._triggerDeath(sprite)
+    }
+
+    // Shock timer
+    if (se.shock && se.shock.active) {
+      se.shock.timer -= delta
+      if (se.shock.timer <= 0) se.shock.active = false
     }
 
     // Chill timer
     if (se.chill.active) {
       se.chill.timer -= delta
-      if (se.chill.timer <= 0) se.chill.active = false
+      if (se.chill.timer <= 0) { se.chill.active = false; se.chill.stacks = 0 }
     }
 
-    // Curse timer
-    if (se.curse.active) {
-      se.curse.timer -= delta
-      if (se.curse.timer <= 0) se.curse.active = false
-    }
-
-    // Frozen timer (chill2)
+    // Frozen timer
     if (se.frozen.active) {
       se.frozen.timer -= delta
       if (se.frozen.timer <= 0) se.frozen.active = false
     }
 
-    // Update visible tint based on status priority
     Enemy._applyStatusTint(sprite)
   }
 
   static _applyStatusTint(sprite) {
-    if (sprite.dying)                                    { sprite.clearTint(); return }
+    if (sprite.dying) { sprite.clearTint(); return }
     const se = sprite._statusEffects
-    if (!se)                                             return
-    if (se.burn.stacks > 0 && se.burn.timer > 0)        { sprite.setTint(0xff6600); return }
-    if (se.poison.stacks > 0 && se.poison.timer > 0)    { sprite.setTint(0x44cc44); return }
-    if (se.chill.active || se.frozen.active)            { sprite.setTint(0x88ccff); return }
-    if (se.curse.active)                                 { sprite.setTint(0xaa44aa); return }
+    if (!se) return
+    if (se.ignite && se.ignite.active)           { sprite.setTint(0xff4400); return }
+    if (se.bleed  && se.bleed.active)            { sprite.setTint(0xcc44ff); return }
+    if (se.shock  && se.shock.active)            { sprite.setTint(0xffff44); return }
+    if (se.chill.active || se.frozen.active)     { sprite.setTint(0x88ccff); return }
     if (sprite._baseTint !== null && sprite._baseTint !== undefined) {
       sprite.setTint(sprite._baseTint)
     } else {
@@ -206,9 +200,8 @@ export default class Enemy {
   static _hasStatusTint(sprite) {
     const se = sprite._statusEffects
     if (!se) return false
-    return (se.burn.stacks > 0 && se.burn.timer > 0)    ||
-           (se.poison.stacks > 0 && se.poison.timer > 0) ||
-           se.chill.active || se.frozen.active || se.curse.active
+    return (se.ignite?.active) || (se.bleed?.active) || (se.shock?.active) ||
+           se.chill.active || se.frozen.active
   }
 
   static _triggerDeath(sprite) {
@@ -222,67 +215,15 @@ export default class Enemy {
     if (sprite._pulseTween) { sprite._pulseTween.stop(); sprite._pulseTween = null }
     sprite.clearTint()
 
-    // Resonance: explode_burn — burning enemies explode on death
-    if (scene._resonances && scene._resonances.has('explode_burn') &&
-        sprite._statusEffects && sprite._statusEffects.burn.stacks > 0) {
-      scene._enemies.getChildren()
-        .filter(e => e.active && !e.dying && e !== sprite &&
-          Phaser.Math.Distance.Between(x, y, e.x, e.y) < 60)
-        .forEach(e => Enemy.takeDamage(e, CFG.ENEMY_HP * 0.3, x, y, scene._affixes || [], 0))
+    // Soul drain proc
+    if (scene._soulDrain && Math.random() < 0.02) {
+      scene._player?.heal(1)
     }
 
-    // Resonance: dark_harvest — cursed enemies explode on death + heal
-    if (scene._resonances && scene._resonances.has('dark_harvest') &&
-        sprite._statusEffects && sprite._statusEffects.curse.active) {
-      scene._enemies.getChildren()
-        .filter(e => e.active && !e.dying && e !== sprite &&
-          Phaser.Math.Distance.Between(x, y, e.x, e.y) < 50)
-        .forEach(e => Enemy.takeDamage(e, 15, x, y, scene._affixes || [], 0))
-      if (scene._player) scene._player.heal(5)
-    }
-
-    // Tier-2: poison2 — spread poison to nearby 3 enemies on death
-    if (scene._affixCounts?.has('poison2') &&
-        sprite._statusEffects && sprite._statusEffects.poison.stacks > 0) {
-      const spreadStacks = Math.max(1, Math.floor(sprite._statusEffects.poison.stacks * 0.5))
-      scene._enemies.getChildren()
-        .filter(e => e.active && !e.dying && e !== sprite &&
-          Phaser.Math.Distance.Between(x, y, e.x, e.y) < 100)
-        .sort((ea, eb) =>
-          Phaser.Math.Distance.Between(x, y, ea.x, ea.y) -
-          Phaser.Math.Distance.Between(x, y, eb.x, eb.y))
-        .slice(0, 3)
-        .forEach(e => {
-          if (e._statusEffects) {
-            e._statusEffects.poison.stacks = Math.min(5,
-              e._statusEffects.poison.stacks + spreadStacks)
-            e._statusEffects.poison.timer  = Math.max(
-              e._statusEffects.poison.timer, 3000)
-          }
-        })
-    }
-
-    // Tier-2: curse2 — cursed enemy death causes AoE damage
-    if (scene._affixCounts?.has('curse2') &&
-        sprite._statusEffects && sprite._statusEffects.curse.active) {
-      scene._enemies.getChildren()
-        .filter(e => e.active && !e.dying && e !== sprite &&
-          Phaser.Math.Distance.Between(x, y, e.x, e.y) < 80)
-        .forEach(e => Enemy.takeDamage(e, 15, x, y, scene._affixes || [], 0))
-      // Visual: fear pulse ring
-      const g = scene.add.graphics().setDepth(10)
-      g.lineStyle(2, 0xaa44aa, 0.9)
-      g.strokeCircle(x, y, 80)
-      scene.tweens.add({ targets: g, alpha: 0, scaleX: 1.3, scaleY: 1.3,
-        duration: 300, onComplete: () => g.destroy() })
-    }
-
-    // Delay physics disable so knockback plays out
     scene.time.delayedCall(150, () => {
       if (sprite.dying) sprite.body.enable = false
     })
 
-    // Dust particle burst
     const emitter = scene.add.particles(x, y, 'dust-particle', {
       speed:    { min: 60, max: 220 },
       angle:    { min: 0, max: 360 },
@@ -297,28 +238,25 @@ export default class Enemy {
     emitter.explode(12)
     scene.time.delayedCall(600, () => emitter.destroy())
 
-    // Fade out then return to pool
     scene.tweens.add({
       targets:  sprite,
       alpha:    0,
       duration: 100,
       ease:     'Linear',
       onComplete: () => {
-        // Full reset — activate() will re-initialize on next spawn, but clear here
-        // to prevent stale state if any code path bypasses activate()
-        if (sprite._statusEffects) {
-          sprite._statusEffects.burn.stacks   = 0
-          sprite._statusEffects.burn.timer    = 0
-          sprite._statusEffects.burn._accum   = 0
-          sprite._statusEffects.poison.stacks = 0
-          sprite._statusEffects.poison.timer  = 0
-          sprite._statusEffects.poison._accum = 0
-          sprite._statusEffects.chill.active  = false
-          sprite._statusEffects.chill.timer   = 0
-          sprite._statusEffects.curse.active  = false
-          sprite._statusEffects.curse.timer   = 0
-          sprite._statusEffects.frozen.active = false
-          sprite._statusEffects.frozen.timer  = 0
+        // Reset all status effects
+        sprite._armorShred = 0
+        sprite._outputMult = 1.0
+        sprite._stunTimer  = 0
+        sprite._inSanctuaryAura = false
+        sprite._darkAura   = false
+        const se = sprite._statusEffects
+        if (se) {
+          se.chill.active = false; se.chill.timer = 0; se.chill.stacks = 0
+          se.frozen.active = false; se.frozen.timer = 0
+          if (se.ignite) { se.ignite.active = false; se.ignite.timer = 0; se.ignite.dps = 0; se.ignite._accum = 0 }
+          if (se.shock)  { se.shock.active  = false; se.shock.timer  = 0 }
+          if (se.bleed)  { se.bleed.active  = false; se.bleed.timer  = 0; se.bleed._accum = 0 }
         }
         sprite.dying = false
         sprite.setAlpha(1)
@@ -327,9 +265,6 @@ export default class Enemy {
     })
   }
 
-  /**
-   * Display a floating damage number above the enemy.
-   */
   static showDamageNumber(sprite, amount, color) {
     if (!amount || amount < 1) return
     const scene = sprite.scene
@@ -345,29 +280,45 @@ export default class Enemy {
     })
   }
 
-  /**
-   * Reduce enemy HP. Returns true if enemy died.
-   */
   static takeDamage(sprite, amount, fromX, fromY, affixes = [], knockback = 80) {
     if (sprite.dying) return false
 
-    const se = sprite._statusEffects
+    const se    = sprite._statusEffects
+    const scene = sprite.scene
 
-    // Lucky affix: passive crit boost (handle before damage calc)
-    const luckyCount  = affixes.filter(a => a.id === 'lucky').length
-    const lucky2Count = affixes.filter(a => a.id === 'lucky2').length
-    const scene       = sprite.scene
-    const critBonus   = (scene._critBonus    || 0)
-    const critDmgBon  = (scene._critDmgBonus || 0)
-    const critChance  = Math.min(1.0, CFG.CRIT_CHANCE + luckyCount * 0.15 + critBonus)
-    const critMult    = (CFG.CRIT_MULTIPLIER + luckyCount * 0.5 + critDmgBon) * (lucky2Count > 0 ? 1.5 : 1)
+    // Global damage multipliers
+    let dmgMult = 1.0
+    if (scene._glassCannon) dmgMult *= 3.0
+    if (scene._ironWillMult) dmgMult *= scene._ironWillMult
+    // Daimyo: +2% per stack per level
+    if (scene._daimyoStacks) dmgMult *= (1 + scene._daimyoStacks * 0.02 * ((scene._level || 1) - 1))
+    // Shock: +30% damage taken
+    if (se?.shock?.active) dmgMult *= 1.30
+    // Armor shred: amplify by shred amount
+    if (sprite._armorShred) dmgMult *= (1 + sprite._armorShred)
+    // Ice-Thunder keystone: double damage on frozen targets
+    if (scene._keystonesOwned?.has('ice_thunder') && se?.frozen?.active) dmgMult *= 2.0
+    // Dark aura: +25% damage to aura-marked enemies
+    if (sprite._darkAura) dmgMult *= 1.25
+
+    const critBonus  = scene._critBonus   || 0
+    const critDmgBon = scene._critDmgBonus || 0
+    const critChance = Math.min(1.0, CFG.CRIT_CHANCE + critBonus)
+    const critMult   = CFG.CRIT_MULTIPLIER + critDmgBon
     const isCrit     = Math.random() < critChance
 
-    // Curse: +25% damage if target is cursed
-    const curseMult = (se && se.curse.active) ? 1.25 : 1.0
-
-    const damage = Math.round(amount * curseMult * (isCrit ? critMult : 1))
+    const damage = Math.round(amount * dmgMult * (isCrit ? critMult : 1))
     sprite.hp -= damage
+
+    // Culling — execute below 15% of base HP
+    if (scene._procsOwned?.has('culling') && sprite.hp > 0 && sprite.maxHp > 0 && sprite.hp < sprite.maxHp * 0.15) {
+      sprite.hp = 0
+    }
+
+    // Life leech — recover 1% of damage as HP
+    if (scene._procsOwned?.has('life_leech') && scene._player) {
+      scene._player.heal(damage * 0.01)
+    }
 
     // Floating damage number
     const txt = sprite.scene.add.text(
@@ -387,7 +338,7 @@ export default class Enemy {
       onComplete: () => txt.destroy(),
     })
 
-    // Knockback impulse — per-weapon force defined in each weapon's baseStats.knockback.
+    // Knockback
     if (knockback > 0 && fromX !== undefined && fromY !== undefined) {
       const dx  = sprite.x - fromX
       const dy  = sprite.y - fromY
@@ -397,7 +348,7 @@ export default class Enemy {
       sprite.knockbackTimer  = knockback > 150 ? 240 : 140
     }
 
-    // Hit flash (red tint, 120ms)
+    // Hit flash
     if (!Enemy._hasStatusTint(sprite)) {
       sprite.setTint(0xff4444)
       sprite.scene.time.delayedCall(120, () => {
@@ -405,7 +356,7 @@ export default class Enemy {
       })
     }
 
-    // Hit spark burst
+    // Hit spark
     const sparks = sprite.scene.add.particles(sprite.x, sprite.y, 'dust-particle', {
       speed:    { min: 120, max: 280 },
       angle:    { min: 0, max: 360 },
@@ -420,9 +371,9 @@ export default class Enemy {
     sparks.explode(8)
     sprite.scene.time.delayedCall(400, () => sparks.destroy())
 
-    // Affix pipeline
+    // Affix pipeline (elemental onHit hooks)
     for (const affix of affixes) {
-      if (affix.id !== 'lucky') affix.onHit(sprite, damage, sprite.scene)
+      if (affix.onHit) affix.onHit(sprite, damage, sprite.scene)
     }
 
     if (sprite.hp <= 0) {
@@ -432,12 +383,42 @@ export default class Enemy {
     return false
   }
 
-  /**
-   * Deal contact damage to player (with cooldown).
-   */
   static dealDamage(sprite, player) {
     if (sprite.damageCd > 0 || sprite.dying) return
-    player.takeDamage(CFG.ENEMY_DAMAGE)
+    const scene = sprite.scene
+
+    let dmgToPlayer = CFG.ENEMY_DAMAGE * (sprite._outputMult ?? 1.0)
+
+    // Glass cannon — player takes double damage
+    if (scene._glassCannon) dmgToPlayer *= 2
+
+    // Iron body shield — absorb one hit
+    if (scene._ironBodyShield) {
+      scene._ironBodyShield = false
+      sprite.damageCd = 1000
+      return
+    }
+
+    // Tachi combo guard — reduce damage during combo
+    if (scene._tachiComboGuardActive && scene._tachiComboGuardMult != null) {
+      dmgToPlayer *= scene._tachiComboGuardMult
+    }
+
+    // Defense bonus — reduce incoming damage
+    if (scene._defenseBonus) dmgToPlayer *= (1 - scene._defenseBonus)
+
+    player.takeDamage(Math.max(1, Math.round(dmgToPlayer)))
     sprite.damageCd = 1000
+
+    // Thorns — reflect 300% damage back to enemy
+    if (scene._procsOwned?.has('thorns')) {
+      const thornsDmg = CFG.ENEMY_DAMAGE * 3
+      const dx = sprite.x - player.x, dy = sprite.y - player.y
+      const len = Math.hypot(dx, dy) || 1
+      sprite.body.velocity.x = (dx / len) * 250
+      sprite.body.velocity.y = (dy / len) * 250
+      sprite.knockbackTimer  = 200
+      Enemy.takeDamage(sprite, thornsDmg, player.x, player.y, scene._affixes || [], 0)
+    }
   }
 }
