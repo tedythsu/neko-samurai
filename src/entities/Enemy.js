@@ -394,8 +394,8 @@ export default class Enemy {
     let dmgMult = 1.0
     if (scene._glassCannon) dmgMult *= 3.0
     if (scene._ironWillMult) dmgMult *= scene._ironWillMult
-    // Daimyo: +2% per stack per level
-    if (scene._daimyoStacks) dmgMult *= (1 + scene._daimyoStacks * 0.02 * ((scene._level || 1) - 1))
+    // Daimyo: +5% per stack per level
+    if (scene._daimyoStacks) dmgMult *= (1 + scene._daimyoStacks * 0.05 * ((scene._level || 1) - 1))
     // Global damage multiplier (from power_up passive stacks)
     if (scene._globalDmgMult && scene._globalDmgMult !== 1) dmgMult *= scene._globalDmgMult
     // Armor penetration — bonus damage

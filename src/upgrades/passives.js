@@ -40,7 +40,7 @@ export const ALL_PASSIVES = [
     apply: (_p, scene) => { scene._soulDrain = true },
   },
   {
-    id: 'daimyo', name: '【大名・増幅】', desc: '每升一級全傷害 +2%（疊加無上限）',
+    id: 'daimyo', name: '【大名・増幅】', desc: '每升一級全傷害 +5%',
     rarity: 'common',
     apply: (_p, scene) => { scene._daimyoStacks = (scene._daimyoStacks || 0) + 1 },
   },
