@@ -145,7 +145,7 @@ export default class UpgradeScene extends Phaser.Scene {
     const BOTTOM_PAD = isWeaponBranch ? 14 : 16
 
     const tmpName = this.add.text(-9999, -9999, upg.name, {
-      fontSize: isWeaponBranch ? '13px' : '14px',
+      fontSize: '11px',
       fontFamily: SERIF_JP, fontStyle: 'bold',
       wordWrap: { width: CONTENT_W, useAdvancedWrap: true },
     }).setResolution(RES)
@@ -237,7 +237,7 @@ export default class UpgradeScene extends Phaser.Scene {
     )
 
     // Name
-    const nameFontSize = isWeaponBranch ? '13px' : '14px'
+    const nameFontSize = '11px'
     const nameColor    = isWeaponBranch ? '#f5e8c0' : '#ede4cc'
     const nameText = this.add.text(
       Math.round(-halfW + 14), Math.round(-halfH + NAME_Y),
