@@ -56,6 +56,12 @@ export default class BootScene extends Phaser.Scene {
     this.load.image('kunai',      'assets/sprites/weapons/kunai.png')
     this.load.image('shuriken',   'assets/sprites/weapons/shuriken.png')
     this.load.image('kusarigama', 'assets/sprites/weapons/kusarigama.png')
+
+    this.load.audio('sfx_tachi',      'assets/sounds/tachi.mp3')
+    this.load.audio('sfx_kunai',      'assets/sounds/kunai.mp3')
+    this.load.audio('sfx_shuriken',   'assets/sounds/shuriken.mp3')
+    this.load.audio('sfx_homura',     'assets/sounds/homura.mp3')
+    this.load.audio('sfx_kusarigama', 'assets/sounds/kusarigama.mp3')
   }
 
   create() {

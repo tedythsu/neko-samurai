@@ -90,6 +90,7 @@ export default {
         }
         g.strokePath()
 
+        scene._hitSoundKey = 'tachi'
         enemies.getChildren()
           .filter(e => e.active && !e.dying && !hitSet.has(e))
           .forEach(e => {

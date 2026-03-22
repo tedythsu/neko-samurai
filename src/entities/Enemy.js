@@ -382,6 +382,7 @@ export default class Enemy {
 
     const damage = Math.round(amount * dmgMult * (isCrit ? critMult : 1) * firstStrikeMult)
     sprite.hp -= damage
+    scene.playHitSound?.(scene._hitSoundKey)
 
     // Culling — execute below 15% of base HP
     if (scene._procsOwned?.has('culling') && sprite.hp > 0 && sprite.maxHp > 0 && sprite.hp < sprite.maxHp * 0.15) {

@@ -121,6 +121,8 @@ export default class GameScene extends Phaser.Scene {
     this._rationTimer       = 0
     this._tsukuyomiTimer    = 0
     this._susanoCd          = 0
+    this._hitSoundThrottle  = new Map()   // weaponId → last play timestamp
+    this._hitSoundKey       = null
 
     this._addWeapon(this._startWeapon)
 
@@ -486,6 +488,7 @@ export default class GameScene extends Phaser.Scene {
         entry.weapon.update(s)
       })
       if (entry.weapon.updateActive) {
+        this._hitSoundKey = entry.weapon.id
         entry.weapon.updateActive(entry, this, this._enemies, this._player, this._affixes, delta)
       }
     }
@@ -1021,6 +1024,18 @@ export default class GameScene extends Phaser.Scene {
     const flash = this.add.rectangle(W / 2, H / 2, W, H, 0x220066, 0.35)
       .setScrollFactor(0).setDepth(299)
     this.tweens.add({ targets: flash, alpha: 0, duration: 800, onComplete: () => flash.destroy() })
+  }
+
+  playHitSound(weaponId) {
+    if (!weaponId) return
+    const now  = this.time.now
+    const last = this._hitSoundThrottle.get(weaponId) || 0
+    if (now - last < 80) return
+    this._hitSoundThrottle.set(weaponId, now)
+    const key = `sfx_${weaponId}`
+    if (this.sound.get(key) || this.cache.audio.exists(key)) {
+      this.sound.play(key, { volume: 0.5 })
+    }
   }
 
   _showWaveAnnouncement(name) {
