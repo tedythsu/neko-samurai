@@ -47,9 +47,9 @@ export const ALL_PASSIVES = [
 
   // ─── Stackable stat reinforcements (maxStacks: 3) ────────────────────────
   {
-    id: 'power_up', name: '【武魂‧剛力】', desc: '全局傷害 +20%（可疊 3 層）',
+    id: 'power_up', name: '【武魂‧剛力】', desc: '全局傷害 +30%（可疊 3 層）',
     rarity: 'common', maxStacks: 3,
-    apply: (_p, scene) => { scene._globalDmgMult = (scene._globalDmgMult || 1) * 1.20 },
+    apply: (_p, scene) => { scene._globalDmgMult = (scene._globalDmgMult || 1) * 1.30 },
   },
   {
     id: 'crit_eye', name: '【隙見‧心眼】', desc: '爆擊率 +10%（可疊 3 層）',

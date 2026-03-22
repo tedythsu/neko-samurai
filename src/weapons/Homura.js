@@ -1,7 +1,7 @@
 // src/weapons/Homura.js
 import Phaser     from 'phaser'
 import Enemy      from '../entities/Enemy.js'
-import { getOrCreate, nearestEnemies } from './_pool.js'
+import { getOrCreate, nearestEnemies, rollDamage } from './_pool.js'
 import { applyExplosion } from '../upgrades/projEffects.js'
 
 export default {
@@ -11,7 +11,8 @@ export default {
   iconChar: '炎',
 
   baseStats: {
-    damage:          25,
+    damage:          55,
+    damageVariance:  0.45,
     fireRate:        2000,
     projectileCount: 1,
     range:           700,
@@ -38,7 +39,7 @@ export default {
       const s = getOrCreate(pool, fromX, fromY, this.texKey)
       if (!s) return
       s.setDisplaySize(24, 24)
-      s.damage         = stats.damage
+      s.damage         = rollDamage(stats)
       s.hitSet         = new Set()
       s.spawnX         = fromX
       s.spawnY         = fromY

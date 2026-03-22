@@ -1,7 +1,7 @@
 // src/weapons/Shuriken.js
 import Phaser from 'phaser'
 import Enemy  from '../entities/Enemy.js'
-import { getOrCreate, nearestEnemies } from './_pool.js'
+import { getOrCreate, nearestEnemies, rollDamage } from './_pool.js'
 import { applyRicochet } from '../upgrades/projEffects.js'
 
 const HIT_RADIUS = 28
@@ -13,7 +13,8 @@ export default {
   iconKey: 'shuriken',
 
   baseStats: {
-    damage:          8,
+    damage:          15,
+    damageVariance:  0.20,
     fireRate:        800,
     projectileCount: 3,
     speed:           400,
@@ -37,7 +38,7 @@ export default {
         if (!s) return
         const baseW = 28, baseH = 28
         s.setDisplaySize(baseW * stats._scale, baseH * stats._scale)
-        s.damage       = stats.damage
+        s.damage       = rollDamage(stats)
         s.hitSet       = new Set()
         s.spawnX       = fromX
         s.spawnY       = fromY

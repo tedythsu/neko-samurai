@@ -19,6 +19,17 @@ export function getOrCreate(pool, fromX, fromY, texKey) {
 }
 
 /**
+ * Roll a damage value within the weapon's variance band.
+ * stats.damage is the base (affected by upgrades); damageVariance is a fixed ±fraction.
+ * e.g. variance=0.35, damage=20 → rolls U(13, 27), average stays 20.
+ */
+export function rollDamage(stats) {
+  const v = stats.damageVariance || 0
+  if (!v) return stats.damage
+  return stats.damage * (1 - v + Math.random() * v * 2)
+}
+
+/**
  * Return up to `count` nearest active enemies sorted by distance.
  */
 export function nearestEnemies(enemies, x, y, count) {

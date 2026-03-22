@@ -38,23 +38,23 @@ export const WAVE_CONFIGS = [
   // 第壱波 (0-1min)  極速割草：一刀死，開場立刻塞滿螢幕
   { timeMs:       0, hp:    30, speed:  64, damage:   1, scale: 1.0, spawnInterval:  600, maxEnemies: 50, xpDrop:  10, surgeSize: 24 },
   // 第弐波 (1-2min)  追逐感：跑速略超玩家，全面衝鋒
-  { timeMs:   60000, hp:    60, speed:  88, damage:   1, scale: 1.0, spawnInterval:  700, maxEnemies: 55, xpDrop:  15, surgeSize: 27 },
+  { timeMs:   60000, hp:    65, speed:  88, damage:   1, scale: 1.0, spawnInterval:  700, maxEnemies: 55, xpDrop:  15, surgeSize: 27 },
   // 第参波 (2-3min)  生存壓力：血厚，持續壓迫
-  { timeMs:  120000, hp:   150, speed:  80, damage:   5, scale: 1.0, spawnInterval:  900, maxEnemies: 55, xpDrop:  30, surgeSize: 18 },
+  { timeMs:  120000, hp:   120, speed:  80, damage:   5, scale: 1.0, spawnInterval:  900, maxEnemies: 55, xpDrop:  30, surgeSize: 18 },
   // 第肆波 (3-4min)  重裝壓境：硬且慢，螢幕被塞滿
-  { timeMs:  180000, hp:   450, speed:  64, damage:  15, scale: 1.0, spawnInterval: 1000, maxEnemies: 50, xpDrop:  40, surgeSize: 15 },
+  { timeMs:  180000, hp:   220, speed:  64, damage:  15, scale: 1.0, spawnInterval: 1000, maxEnemies: 50, xpDrop:  40, surgeSize: 15 },
   // 第伍波 (4-5min)  中場高潮：精英群體型 1.5×，數量仍多
-  { timeMs:  240000, hp:   900, speed:  96, damage:  20, scale: 1.5, spawnInterval: 1000, maxEnemies: 40, xpDrop:  50, surgeSize: 18 },
+  { timeMs:  240000, hp:   380, speed:  96, damage:  20, scale: 1.5, spawnInterval: 1000, maxEnemies: 40, xpDrop:  50, surgeSize: 18 },
   // 第陸波 (5-6min)  閃擊波次：極快衝鋒，密集如雨
-  { timeMs:  300000, hp:   240, speed: 120, damage:  10, scale: 1.0, spawnInterval:  500, maxEnemies: 65, xpDrop:  60, surgeSize: 30 },
+  { timeMs:  300000, hp:   200, speed: 120, damage:  10, scale: 1.0, spawnInterval:  500, maxEnemies: 65, xpDrop:  60, surgeSize: 30 },
   // 第漆波 (6-7min)  死亡威脅：撞一次扣大量血，仍大量出現
-  { timeMs:  360000, hp:   600, speed:  80, damage:  50, scale: 1.0, spawnInterval:  800, maxEnemies: 60, xpDrop:  75, surgeSize: 18 },
+  { timeMs:  360000, hp:   320, speed:  80, damage:  50, scale: 1.0, spawnInterval:  800, maxEnemies: 60, xpDrop:  75, surgeSize: 18 },
   // 第捌波 (7-8min)  全面衝突：數值全面提升，螢幕爆炸
-  { timeMs:  420000, hp:  1500, speed:  96, damage:  30, scale: 1.0, spawnInterval:  700, maxEnemies: 70, xpDrop:  80, surgeSize: 21 },
+  { timeMs:  420000, hp:   600, speed:  96, damage:  30, scale: 1.0, spawnInterval:  700, maxEnemies: 70, xpDrop:  80, surgeSize: 21 },
   // 第玖波 (8-9min)  百鬼夜行：鋪天蓋地，割草高潮
-  { timeMs:  480000, hp:   450, speed: 128, damage:  15, scale: 1.0, spawnInterval:  300, maxEnemies: 90, xpDrop:  90, surgeSize: 45 },
+  { timeMs:  480000, hp:   360, speed: 128, damage:  15, scale: 1.0, spawnInterval:  300, maxEnemies: 90, xpDrop:  90, surgeSize: 45 },
   // 第拾波 (9-10min) 終極死鬥：2.5×巨敵 + 快速補充
-  { timeMs:  540000, hp:  6000, speed:  72, damage: 100, scale: 2.5, spawnInterval: 1200, maxEnemies: 30, xpDrop: 100, surgeSize: 15 },
+  { timeMs:  540000, hp:  2200, speed:  72, damage: 100, scale: 2.5, spawnInterval: 1200, maxEnemies: 30, xpDrop: 100, surgeSize: 15 },
 ]
 
 /** Return the active wave config for the given elapsed time (step function). */

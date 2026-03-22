@@ -1,6 +1,7 @@
 // src/weapons/Tachi.js
 import Phaser from 'phaser'
 import Enemy  from '../entities/Enemy.js'
+import { rollDamage } from './_pool.js'
 
 export default {
   id: 'tachi',
@@ -8,10 +9,11 @@ export default {
   iconKey: 'tachi',
 
   baseStats: {
-    damage:    20,
-    fireRate:  1100,
-    range:     90,
-    knockback: 120,
+    damage:         42,
+    damageVariance: 0.35,
+    fireRate:       1100,
+    range:          90,
+    knockback:      120,
   },
 
   upgrades: [],
@@ -22,7 +24,7 @@ export default {
     const doSlash = (chainMult = 1) => {
       const isChain  = chainMult < 1
       const range    = stats.range
-      const damage   = stats.damage * chainMult
+      const damage   = rollDamage(stats) * chainMult
       const arcMult  = isChain ? 1 : (stats._arcMult || 1)
       const sweepTotal = Math.min(360, 180 * arcMult)
       const duration   = sweepTotal >= 360 ? 560 : 280

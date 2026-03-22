@@ -1,7 +1,7 @@
 // src/weapons/Kunai.js
 import Phaser from 'phaser'
 import Enemy  from '../entities/Enemy.js'
-import { getOrCreate, nearestEnemies } from './_pool.js'
+import { getOrCreate, nearestEnemies, rollDamage } from './_pool.js'
 import { applyRicochet } from '../upgrades/projEffects.js'
 
 const BASE_H    = 40
@@ -14,7 +14,8 @@ export default {
   iconKey: 'kunai',
 
   baseStats: {
-    damage:          8,
+    damage:          20,
+    damageVariance:  0.20,
     fireRate:        500,
     projectileCount: 1,
     speed:           600,
@@ -38,7 +39,7 @@ export default {
       const h = BASE_H * stats._scale
       const w = h * (nativeW / nativeH)
       s.setDisplaySize(w, h)
-      s.damage         = stats.damage
+      s.damage         = rollDamage(stats)
       s.hitSet         = new Set()
       s.spawnX         = fromX
       s.spawnY         = fromY
