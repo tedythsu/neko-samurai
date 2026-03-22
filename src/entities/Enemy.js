@@ -300,6 +300,8 @@ export default class Enemy {
     if (scene._keystonesOwned?.has('ice_thunder') && se?.frozen?.active) dmgMult *= 2.0
     // Dark aura: +25% damage to aura-marked enemies
     if (sprite._darkAura) dmgMult *= 1.25
+    // Boss chest bonus (kijo kill reward)
+    if (scene._bossChestBonus) dmgMult *= scene._bossChestBonus
 
     const critBonus  = scene._critBonus   || 0
     const critDmgBon = scene._critDmgBonus || 0

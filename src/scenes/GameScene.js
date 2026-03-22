@@ -2,7 +2,7 @@
 import Phaser from 'phaser'
 import Player   from '../entities/Player.js'
 import Enemy    from '../entities/Enemy.js'
-import { CFG, randomEdgePoint, xpThreshold, PROGRESSION_BREAKPOINTS } from '../config.js'
+import { CFG, randomEdgePoint, xpThreshold, PROGRESSION_BREAKPOINTS, RARITY_WEIGHTS } from '../config.js'
 import { WEAPON_UPGRADES_MAP } from '../upgrades/weaponUpgrades.js'
 import { ALL_ELEMENTALS }      from '../upgrades/elementals.js'
 import { ALL_PROCS }           from '../upgrades/procs.js'
@@ -84,6 +84,8 @@ export default class GameScene extends Phaser.Scene {
     this._ironWillMult         = 1.0
     this._ironBodyShield       = false
     this._orbAttractRadius     = CFG.ORB_ATTRACT_RADIUS
+    this._bossChestBonus       = 1.0
+    this._hasDefensive         = false
     this._critBonus            = 0
     this._critDmgBonus         = 0
     this._warCryTimer          = 0
@@ -652,6 +654,9 @@ export default class GameScene extends Phaser.Scene {
           upgrade.apply(this._player, this)
           if (upgrade.oneTime) this._passivesOwned.add(upgrade.id)
         }
+        // Track defensive pickup for guarantee logic
+        const DEFENSIVE_IDS = new Set(['defense','soul_drain','life_leech','thorns','sanctuary_aura','war_cry','iron_body'])
+        if (DEFENSIVE_IDS.has(upgrade.id)) this._hasDefensive = true
         this._upgrading = false
         this.scene.resume('GameScene')
       })
@@ -663,9 +668,19 @@ export default class GameScene extends Phaser.Scene {
   }
 
   _buildUpgradePool() {
-    const pool = []
+    const elapsed = this._elapsed || 0
+    const ownedIds = new Set()
 
-    // Weapon-specific upgrades (4 per weapon)
+    // Collect all owned upgrade IDs for dedup and prereq checks
+    this._affixCounts.forEach((_, id) => ownedIds.add(id))
+    this._procsOwned.forEach(id => ownedIds.add(id))
+    this._keystonesOwned.forEach(id => ownedIds.add(id))
+    this._passivesOwned.forEach(id => ownedIds.add(id))
+    this._weaponUpgradesOwned.forEach(set => set.forEach(id => ownedIds.add(id)))
+
+    const candidates = []
+
+    // Weapon-specific upgrades
     const entry = this._weapons[0]
     if (entry) {
       const wId = entry.weapon.id
@@ -673,44 +688,85 @@ export default class GameScene extends Phaser.Scene {
       const owned = this._weaponUpgradesOwned.get(wId) || new Set()
       for (const u of upgrades) {
         if (!owned.has(u.id))
-          pool.push({ ...u, target: 'weapon', weaponId: wId })
+          candidates.push({ ...u, target: 'weapon', weaponId: wId })
       }
     }
 
-    // Elemental ailments (one-time)
-    pool.push(...ALL_ELEMENTALS
-      .filter(e => !this._affixCounts.has(e.id))
-      .map(e => ({ id: e.id, name: e.name, desc: e.desc, target: 'elemental', elemental: e })))
+    // Elemental ailments — unlock at 2 min
+    if (elapsed >= 2 * 60 * 1000) {
+      for (const e of ALL_ELEMENTALS) {
+        if (!this._affixCounts.has(e.id) && elapsed >= (e.minTimeMs || 0))
+          candidates.push({ id: e.id, name: e.name, desc: e.desc, rarity: e.rarity,
+            target: 'elemental', elemental: e })
+      }
+    }
 
-    // Procs/Auras
-    pool.push(...ALL_PROCS
-      .filter(p => !this._procsOwned.has(p.id) && this._level >= (p.minLevel ?? 1))
-      .map(p => ({ ...p, target: 'proc' })))
+    // Procs/Auras — unlock at 2 min
+    if (elapsed >= 2 * 60 * 1000) {
+      for (const p of ALL_PROCS) {
+        if (!this._procsOwned.has(p.id) && elapsed >= (p.minTimeMs || 0))
+          candidates.push({ ...p, target: 'proc' })
+      }
+    }
 
-    // Keystones
-    pool.push(...ALL_KEYSTONES
-      .filter(k => !this._keystonesOwned.has(k.id) && this._level >= (k.minLevel ?? 5))
-      .map(k => ({ ...k, target: 'keystone' })))
+    // Keystones — unlock at 5 min, require prereqs
+    if (elapsed >= 5 * 60 * 1000) {
+      for (const k of ALL_KEYSTONES) {
+        if (this._keystonesOwned.has(k.id)) continue
+        if (k.requires && !ownedIds.has(k.requires)) continue
+        candidates.push({ ...k, target: 'keystone' })
+      }
+    }
 
-    // Passives (stackable unless oneTime)
-    pool.push(...ALL_PASSIVES
-      .filter(p => !p.oneTime || !this._passivesOwned.has(p.id))
-      .map(p => ({ ...p, target: 'passive' })))
+    // Passives — always available
+    for (const p of ALL_PASSIVES) {
+      if (!p.oneTime || !this._passivesOwned.has(p.id))
+        candidates.push({ ...p, target: 'passive' })
+    }
 
-    // Deduplicate
-    const seen = new Set()
-    const deduped = pool.filter(u => {
-      const key = u.id + (u.weaponId ?? '')
-      if (seen.has(key)) return false
-      seen.add(key)
-      return true
-    })
-
-    if (deduped.length === 0) {
+    if (candidates.length === 0) {
       return ALL_PASSIVES.slice(0, 3).map(p => ({ ...p, target: 'passive' }))
     }
 
-    return Phaser.Utils.Array.Shuffle(deduped).slice(0, 3)
+    // Build weights
+    const DEFENSIVE_IDS = new Set(['defense','soul_drain','life_leech','thorns','sanctuary_aura','war_cry','iron_body'])
+    const earlyGame   = elapsed < 2 * 60 * 1000
+    const needDefense = elapsed >= 4 * 60 * 1000 && !this._hasDefensive
+
+    const weights = candidates.map(u => {
+      const base = RARITY_WEIGHTS[u.rarity] ?? RARITY_WEIGHTS.common
+      // Early game: strongly favour weapon + passive, suppress others
+      if (earlyGame && u.target !== 'weapon' && u.target !== 'passive')
+        return base * 0.1
+      // Defensive guarantee boost
+      if (needDefense && DEFENSIVE_IDS.has(u.id))
+        return base * 5
+      return base
+    })
+
+    return this._weightedSelect(candidates, weights, 3)
+  }
+
+  // Weighted random sampling without replacement
+  _weightedSelect(items, weights, count) {
+    const result = []
+    const w = [...weights]
+    const pool = [...items]
+    const n = Math.min(count, pool.length)
+    for (let i = 0; i < n; i++) {
+      const total = w.reduce((s, x) => s + x, 0)
+      if (total <= 0) break
+      let r = Math.random() * total
+      let idx = 0
+      for (; idx < w.length - 1; idx++) {
+        r -= w[idx]
+        if (r <= 0) break
+      }
+      result.push(pool[idx])
+      pool.splice(idx, 1)
+      w.splice(idx, 1)
+    }
+    return result
   }
 
   _doWarCry() {

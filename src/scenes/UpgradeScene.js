@@ -1,5 +1,6 @@
 // src/scenes/UpgradeScene.js
 import Phaser from 'phaser'
+import { RARITY_UI } from '../config.js'
 
 const CATEGORY = {
   weapon:    { color: 0xc8a84b, label: '武器',   text: '#c8a84b' },
@@ -90,13 +91,24 @@ export default class UpgradeScene extends Phaser.Scene {
 
     const container = this.add.container(cx, cy)
 
+    const rui = RARITY_UI[upg.rarity] || RARITY_UI.common
+    const rarityBorder = rui.border
+
     const bg = this.add.rectangle(0, 0, w, h, 0x0b0b1c)
-      .setStrokeStyle(1, 0x2a2a42)
+      .setStrokeStyle(1.5, rarityBorder)
       .setInteractive()
 
     const strip = this.add.rectangle(-w / 2 + 2, 0, 4, h - 2, accent, 1)
 
-    const badge = this.add.text(w / 2 - 10, -h / 2 + 12, cat.label, {
+    // Rarity badge (top-right)
+    const rarityBadge = this.add.text(w / 2 - 8, -h / 2 + 8, rui.label, {
+      fontSize: '9px', color: rui.text,
+      fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
+      fontStyle: 'bold',
+    }).setOrigin(1, 0)
+
+    // Category label below rarity
+    const badge = this.add.text(w / 2 - 8, -h / 2 + 20, cat.label, {
       fontSize: '9px', color: cat.text,
       fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
     }).setOrigin(1, 0)
@@ -119,7 +131,7 @@ export default class UpgradeScene extends Phaser.Scene {
       lineSpacing: 3,
     }).setOrigin(0, 0)
 
-    container.add([bg, strip, badge, nameText, sepGfx, descText])
+    container.add([bg, strip, rarityBadge, badge, nameText, sepGfx, descText])
     this._containers.push(container)
 
     container.setAlpha(0).setY(cy + 26)
@@ -129,11 +141,11 @@ export default class UpgradeScene extends Phaser.Scene {
     })
 
     bg.on('pointerover', () => {
-      bg.setFillStyle(0x14142a).setStrokeStyle(1.5, accent, 0.9)
+      bg.setFillStyle(0x14142a).setStrokeStyle(2, rarityBorder, 1.0)
       this.tweens.add({ targets: container, scaleX: 1.04, scaleY: 1.04, duration: 100 })
     })
     bg.on('pointerout', () => {
-      bg.setFillStyle(0x0b0b1c).setStrokeStyle(1, 0x2a2a42)
+      bg.setFillStyle(0x0b0b1c).setStrokeStyle(1.5, rarityBorder)
       this.tweens.add({ targets: container, scaleX: 1, scaleY: 1, duration: 120 })
     })
     bg.on('pointerdown', () => this._choose(upg))

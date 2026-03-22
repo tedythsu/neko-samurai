@@ -1,12 +1,14 @@
 // src/upgrades/elementals.js
-// Elemental ailment system — 5 elements, each with onHit hook
-// Replaces the old affix system; used by Enemy.takeDamage()
+// Elemental ailment system
+// ignite / chill → rarity: 'rare'  (出現自遊戲開始)
+// shock / bleed / armor_shred → rarity: 'epic' (minTimeMs 2 分鐘後解鎖)
 
 export const ALL_ELEMENTALS = [
   {
-    id:   'ignite',
-    name: '【火：點燃】',
-    desc: '攻擊有 40% 機率造成燃燒（攻擊力 20%），持續 4 秒',
+    id:     'ignite',
+    name:   '【火：點燃】',
+    desc:   '攻擊有 40% 機率造成燃燒（攻擊力 20%），持續 4 秒',
+    rarity: 'rare',
     onHit(enemy, damage) {
       if (Math.random() < 0.40) {
         const se = enemy._statusEffects
@@ -19,9 +21,10 @@ export const ALL_ELEMENTALS = [
     },
   },
   {
-    id:   'chill',
-    name: '【冰：遲緩／霜凍】',
-    desc: '降低怪物移速 50%，疊滿 5 層觸發凍結 2 秒',
+    id:     'chill',
+    name:   '【冰：遲緩／霜凍】',
+    desc:   '降低怪物移速 50%，疊滿 5 層觸發凍結 2 秒',
+    rarity: 'rare',
     onHit(enemy) {
       const se = enemy._statusEffects
       if (!se) return
@@ -36,9 +39,11 @@ export const ALL_ELEMENTALS = [
     },
   },
   {
-    id:   'shock',
-    name: '【雷：感電／超載】',
-    desc: '受影響的怪物承受傷害提升 30%，偶爾產生 0.1 秒停頓',
+    id:         'shock',
+    name:       '【雷：感電／超載】',
+    desc:       '受影響的怪物承受傷害提升 30%，偶爾產生 0.1 秒停頓',
+    rarity:     'epic',
+    minTimeMs:  2 * 60 * 1000,   // 2 分鐘後解鎖
     onHit(enemy) {
       const se = enemy._statusEffects
       if (!se) return
@@ -51,9 +56,11 @@ export const ALL_ELEMENTALS = [
     },
   },
   {
-    id:   'bleed',
-    name: '【風：撕裂／流血】',
-    desc: '怪物移動速度越快，受到的流血傷害越高',
+    id:         'bleed',
+    name:       '【風：撕裂／流血】',
+    desc:       '怪物移動速度越快，受到的流血傷害越高',
+    rarity:     'epic',
+    minTimeMs:  2 * 60 * 1000,
     onHit(enemy) {
       const se = enemy._statusEffects
       if (!se) return
@@ -63,9 +70,11 @@ export const ALL_ELEMENTALS = [
     },
   },
   {
-    id:   'armor_shred',
-    name: '【暗：腐蝕／破甲】',
-    desc: '每次命中降低敵人防禦力（最高 50%），並降低怪物 15% 輸出',
+    id:         'armor_shred',
+    name:       '【暗：腐蝕／破甲】',
+    desc:       '每次命中降低敵人防禦力（最高 50%），並降低怪物 15% 輸出',
+    rarity:     'epic',
+    minTimeMs:  2 * 60 * 1000,
     onHit(enemy) {
       if (enemy._armorShred === undefined) enemy._armorShred = 0
       enemy._armorShred = Math.min(0.50, (enemy._armorShred || 0) + 0.10)

@@ -33,17 +33,39 @@ export const CFG = {
   MAX_WEAPONS: 1,
 }
 
+// 10 分鐘遊戲用難度曲線 — 前快後重
 export const PROGRESSION_BREAKPOINTS = [
-  { timeMs:  0 * 60000, spawnInterval: 1500, hpMult: 1.0, speedMult: 1.0, maxEnemies: 25 },
-  { timeMs:  2 * 60000, spawnInterval: 1200, hpMult: 1.4, speedMult: 1.1, maxEnemies: 30 },
-  { timeMs:  5 * 60000, spawnInterval: 1000, hpMult: 2.2, speedMult: 1.2, maxEnemies: 35 },
-  { timeMs:  8 * 60000, spawnInterval:  800, hpMult: 3.5, speedMult: 1.3, maxEnemies: 40 },
-  { timeMs: 12 * 60000, spawnInterval:  600, hpMult: 5.5, speedMult: 1.4, maxEnemies: 50 },
+  { timeMs:  0 * 60000, spawnInterval: 1500, hpMult: 1.0, speedMult: 1.0,  maxEnemies: 25 },
+  { timeMs:  2 * 60000, spawnInterval: 1200, hpMult: 1.8, speedMult: 1.1,  maxEnemies: 35 },
+  { timeMs:  5 * 60000, spawnInterval:  900, hpMult: 3.5, speedMult: 1.25, maxEnemies: 45 },
+  { timeMs:  7 * 60000, spawnInterval:  700, hpMult: 5.5, speedMult: 1.35, maxEnemies: 55 },
+  { timeMs:  9 * 60000, spawnInterval:  500, hpMult: 8.0, speedMult: 1.45, maxEnemies: 65 },
 ]
 
-/** XP required to reach `level + 1` */
+/**
+ * XP required to reach `level + 1`
+ * 四段式曲線配合 10 分鐘 50 級節奏：
+ *   Phase 1 (Lv  1-12) ~10s/lv  — 快速成型
+ *   Phase 2 (Lv 13-35) ~15s/lv  — 機制擴張
+ *   Phase 3 (Lv 36-45) ~30s/lv  — 質變收割
+ *   Phase 4 (Lv 46-50) ~50s/lv  — 最終決戰
+ */
 export function xpThreshold(level) {
-  return Math.floor(CFG.XP_BASE * Math.pow(level, CFG.XP_SCALE))
+  if (level <= 12) return 80  + level * 15                    // 95 → 260
+  if (level <= 35) return 500 + (level - 12) * 75            // 575 → 2225
+  if (level <= 45) return 2500 + (level - 35) * 300          // 2800 → 5500
+  return 5500 + (level - 45) * 500                            // 6000 → 7500
+}
+
+// 稀有度：基礎抽取權重
+export const RARITY_WEIGHTS = { common: 6.0, rare: 2.5, epic: 1.2, legendary: 0.3 }
+
+// 稀有度：UI 顏色
+export const RARITY_UI = {
+  common:    { border: 0x666666, text: '#aaaaaa', label: '普通' },
+  rare:      { border: 0x2266cc, text: '#4488ff', label: '稀有' },
+  epic:      { border: 0x8822cc, text: '#cc66ff', label: '史詩' },
+  legendary: { border: 0xcc8800, text: '#ffaa00', label: '傳奇' },
 }
 
 /** Random edge spawn point — returns { x, y } inside world bounds */

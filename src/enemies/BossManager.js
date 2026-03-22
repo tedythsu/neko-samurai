@@ -119,12 +119,16 @@ export default class BossManager {
     sprite._bossId        = def.id
     sprite._pulseTween    = null
     sprite.setAlpha(1).setTint(def.tint)
+    sprite.maxHp          = def.hp
+    sprite._armorShred    = 0
+    sprite._outputMult    = 1.0
+    sprite._stunTimer     = 0
     sprite._statusEffects = {
-      burn:   { stacks: 0, timer: 0, dps: 5, _accum: 0 },
-      poison: { stacks: 0, timer: 0, _accum: 0 },
-      chill:  { active: false, timer: 0 },
-      curse:  { active: false, timer: 0 },
+      ignite: { active: false, timer: 0, dps: 0, _accum: 0 },
+      chill:  { active: false, timer: 0, stacks: 0 },
       frozen: { active: false, timer: 0 },
+      shock:  { active: false, timer: 0 },
+      bleed:  { active: false, timer: 0, _accum: 0 },
     }
 
     // Size the boss
@@ -298,7 +302,7 @@ export default class BossManager {
     this.activeBoss   = null
     this._bossHpPct   = 0
 
-    if (def.id === 'daiyoma') {
+    if (def.id === 'raiki' || def.id === 'daiyoma') {
       // Victory!
       scene.time.delayedCall(500, () => scene._onVictory())
       return
@@ -311,6 +315,21 @@ export default class BossManager {
         x + Phaser.Math.Between(-80, 80),
         y + Phaser.Math.Between(-80, 80)
       ))
+    }
+
+    // kijo chest: global +50% damage bonus
+    if (def.id === 'kijo') {
+      scene._bossChestBonus = (scene._bossChestBonus || 1) * 1.5
+      const W = scene.cameras.main.width, H = scene.cameras.main.height
+      const msg = scene.add.text(W / 2, H * 0.35, '全局傷害提升 50%！', {
+        fontSize: '28px', color: '#ffaa00',
+        fontFamily: '"Noto Serif JP", serif',
+        stroke: '#3a2800', strokeThickness: 4,
+      }).setScrollFactor(0).setDepth(500).setOrigin(0.5).setAlpha(0)
+      scene.tweens.add({ targets: msg, alpha: 1, duration: 400 })
+      scene.time.delayedCall(2000, () =>
+        scene.tweens.add({ targets: msg, alpha: 0, duration: 400, onComplete: () => msg.destroy() })
+      )
     }
 
     // Resume spawning after short pause
