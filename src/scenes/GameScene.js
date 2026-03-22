@@ -273,10 +273,43 @@ export default class GameScene extends Phaser.Scene {
     })
   }
 
-  _createLingerZone(x, y, radius, damage, affixes, weaponId = 'shuriken') {
-    this._createDamageZone(x, y, radius, damage, affixes, {
-      color: 0x8800cc, alpha: 0.25, mult: 0.16, duration: 1600, source: 'ability', weaponId,
-    })
+  _createLingerZone(x, y, radius, damage, affixes, weaponId = 'shuriken', bladeSize = null) {
+    const duration = 1500
+    const hitCd = new Map()
+    const blade = this.add.image(x, y, 'shuriken').setDepth(8)
+    if (bladeSize?.width && bladeSize?.height) {
+      blade.setDisplaySize(bladeSize.width, bladeSize.height)
+    } else {
+      const scale = radius / 28
+      blade.setScale(scale)
+    }
+
+    const aura = this.add.graphics().setDepth(7)
+    const tick = () => {
+      aura.clear()
+      aura.lineStyle(2, 0xb48cff, 0.35)
+      aura.strokeCircle(x, y, radius)
+      blade.angle += 18
+
+      const now = this.time.now
+      this._enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
+        if (Phaser.Math.Distance.Between(x, y, e.x, e.y) >= radius) return
+        const key = e.body?.id ?? e.x
+        const last = hitCd.get(key) || 0
+        if (now - last < 220) return
+        hitCd.set(key, now)
+        Enemy.takeDamage(e, damage * 0.16, x, y, affixes, 0, { source: 'ability', weaponId })
+      })
+    }
+
+    this.events.on('update', tick)
+    const cleanup = () => {
+      this.events.off('update', tick)
+      blade.destroy()
+      aura.destroy()
+    }
+    this.time.delayedCall(duration, cleanup)
+    this.events.once('shutdown', cleanup)
   }
 
   _createDamageZone(x, y, radius, damage, affixes, { color, alpha, mult, duration, source = 'ability', weaponId = null }) {

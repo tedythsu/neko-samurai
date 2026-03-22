@@ -5,10 +5,11 @@ import { getOrCreate, nearestEnemies, rollDamage } from './_pool.js'
 import { applyRicochet } from '../upgrades/projEffects.js'
 
 const HIT_RADIUS = 28
+const BOOMERANG_HIT_CD = 500
 
 export default {
   id: 'shuriken',
-  name: '手裡劍',
+  name: '手裏劍',
   texKey: 'shuriken',
   iconKey: 'shuriken',
 
@@ -30,37 +31,8 @@ export default {
   fire(scene, pool, fromX, fromY, stats, enemies) {
     const count = stats.projectileCount
 
-    // 六道・全周 — 360° omni spread, ignores target
+    // 六道・全周 — converted into orbiting blades, so no fired projectile is created.
     if (stats._omni) {
-      const step = 360 / count
-      for (let i = 0; i < count; i++) {
-        const s = getOrCreate(pool, fromX, fromY, this.texKey)
-        if (!s) return
-        const baseW = 28, baseH = 28
-        s.setDisplaySize(baseW * stats._scale, baseH * stats._scale)
-        s.damage       = rollDamage(stats)
-        s.hitSet       = new Set()
-        s.spawnX       = fromX
-        s.spawnY       = fromY
-        s.range        = 300
-        s.penetrate    = stats.penetrate
-        s.knockback    = stats.knockback ?? 60
-        s._hitRadius   = HIT_RADIUS * stats._scale
-        s._pool        = pool
-        s._reversed    = false
-        s._boomerang   = false
-        s._lingerZone  = stats._lingerZone || false
-        s._lingerFired = false
-        s._ricochet    = stats._ricochet   || false
-        s._ricochetDepth = 0
-        s._ricochetMax = stats._ricochetMax
-        s._weaponId    = this.id
-        s._wallBounce  = scene._ricochetWall || false
-        s._wallBounced = false
-        s._micro       = false
-        const speed = stats.speed * (scene._projSpeedMult || 1)
-        scene.physics.velocityFromAngle(i * step, speed, s.body.velocity)
-      }
       return
     }
 
@@ -87,6 +59,7 @@ export default {
       s._hitRadius   = HIT_RADIUS * stats._scale
       s._pool        = pool
       s._reversed    = false
+      s._returning   = false
       s._boomerang   = stats._boomerang   || false
       s._lingerZone  = stats._lingerZone  || false
       s._lingerFired = false
@@ -97,6 +70,7 @@ export default {
       s._wallBounce  = scene._ricochetWall || false
       s._wallBounced = false
       s._micro       = false
+      s._hitCooldowns = new Map()
 
       const offset = (i - (count - 1) / 2) * SPREAD_DEG
       const speed = stats.speed * (scene._projSpeedMult || 1)
@@ -106,6 +80,7 @@ export default {
 
   update(sprite) {
     if (!sprite.active) return
+    if (sprite._orbiting) return
     sprite.angle += 8
 
     if (sprite._spent) {
@@ -133,10 +108,8 @@ export default {
 
     if (sprite._boomerang) {
       if (!sprite._reversed && dist >= sprite.range) {
-        sprite.body.velocity.x *= -1
-        sprite.body.velocity.y *= -1
-        sprite._reversed = true
-      } else if (sprite._reversed && dist <= 30) {
+        _reverseBoomerang(sprite)
+      } else if (sprite._reversed && dist >= sprite.range) {
         // 萬劍歸宗 keystone — 360 slash on return
         const s = sprite.scene
         if (s._keystonesOwned && s._keystonesOwned.has('spell_echo')) {
@@ -150,7 +123,15 @@ export default {
         if (sprite._lingerZone && !sprite._lingerFired) {
           sprite._lingerFired = true
           const sc = sprite.scene
-          sc._createLingerZone(sprite.x, sprite.y, 30, sprite.damage, sc._affixes || [], sprite._weaponId)
+          sc._createLingerZone(
+            sprite.x,
+            sprite.y,
+            30,
+            sprite.damage,
+            sc._affixes || [],
+            sprite._weaponId,
+            { width: sprite.displayWidth, height: sprite.displayHeight }
+          )
         }
         sprite.disableBody(true, true)
       }
@@ -158,25 +139,62 @@ export default {
   },
 
   updateActive(entry, scene, enemies, _player, affixes) {
+    if (entry.stats._omni) {
+      _updateOrbitingShuriken(entry, scene, enemies, _player, affixes)
+      return
+    }
+
     entry.projectiles.getChildren().forEach(proj => {
       if (!proj.active || proj._spent) return
       enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
         if (proj._spent || proj.hitSet.has(e)) return
         if (Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y) < proj._hitRadius) {
+          if (proj._boomerang) {
+            const key = e.body?.id ?? e.x
+            const last = proj._hitCooldowns?.get(key) || 0
+            const now = scene.time.now
+            if (now - last < BOOMERANG_HIT_CD) return
+            proj._hitCooldowns.set(key, now)
+          }
           proj.hitSet.add(e)
           Enemy.takeDamage(e, proj.damage, proj.x, proj.y, affixes, proj.knockback ?? 60, {
             source: 'weapon',
             weaponId: this.id,
           })
+          if (proj._lingerZone && !proj._lingerFired) {
+            proj._lingerFired = true
+            scene._createLingerZone(
+              proj.x,
+              proj.y,
+              30,
+              proj.damage,
+              affixes,
+              proj._weaponId,
+              { width: proj.displayWidth, height: proj.displayHeight }
+            )
+          }
           if (scene._secondSplit && !proj._micro) {
             _spawnMicroShuriken(scene, entry.projectiles, proj, e)
           }
           applyRicochet(proj, e, scene, enemies, affixes)
+          if (proj._boomerang && !proj._reversed) {
+            _reverseBoomerang(proj)
+            return
+          }
           if (!proj.penetrate) proj._spent = true
         }
       })
     })
   },
+}
+
+function _reverseBoomerang(sprite) {
+  sprite.body.velocity.x *= -1
+  sprite.body.velocity.y *= -1
+  sprite._reversed = true
+  sprite._returning = true
+  sprite.spawnX = sprite.x
+  sprite.spawnY = sprite.y
 }
 
 function _spellEchoSlash(scene, x, y, damage, affixes, enemies) {
@@ -188,6 +206,65 @@ function _spellEchoSlash(scene, x, y, damage, affixes, enemies) {
   enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
     if (Phaser.Math.Distance.Between(x, y, e.x, e.y) < RANGE)
       Enemy.takeDamage(e, damage, x, y, affixes, 80, { source: 'weapon', weaponId: 'shuriken' })
+  })
+}
+
+function _updateOrbitingShuriken(entry, scene, enemies, player, affixes) {
+  const count = Math.max(1, entry.stats.projectileCount || 1)
+  const radius = entry.stats._orbitRadius || 92
+  const baseW = 28 * entry.stats._scale
+  const baseH = 28 * entry.stats._scale
+  const now = scene.time.now
+  const angularSpeed = 210
+
+  while (entry.projectiles.getChildren().filter(s => s.active && s._orbiting).length < count) {
+    const s = getOrCreate(entry.projectiles, player.x, player.y, entry.weapon.texKey)
+    if (!s) break
+    s.setDisplaySize(baseW, baseH)
+    s.damage       = rollDamage(entry.stats) * 0.80
+    s.hitSet       = new Set()
+    s.spawnX       = player.x
+    s.spawnY       = player.y
+    s.range        = 0
+    s.penetrate    = true
+    s.knockback    = entry.stats.knockback ?? 60
+    s._hitRadius   = HIT_RADIUS * entry.stats._scale
+    s._pool        = entry.projectiles
+    s._reversed    = false
+    s._boomerang   = false
+    s._lingerZone  = false
+    s._lingerFired = true
+    s._ricochet    = false
+    s._ricochetDepth = 0
+    s._ricochetMax = 0
+    s._weaponId    = entry.weapon.id
+    s._wallBounce  = false
+    s._wallBounced = true
+    s._micro       = false
+    s._orbiting    = true
+    s._orbitId     = Phaser.Utils.String.UUID()
+    s._orbitHitCd  = new Map()
+    s.body.enable  = false
+  }
+
+  const orbiting = entry.projectiles.getChildren().filter(s => s.active && s._orbiting)
+  orbiting.forEach((proj, i) => {
+    const angle = Phaser.Math.DegToRad((now / 1000) * angularSpeed + (360 / orbiting.length) * i)
+    proj.x = player.x + Math.cos(angle) * radius
+    proj.y = player.y + Math.sin(angle) * radius
+    proj.angle += 10
+    proj.damage = rollDamage(entry.stats) * 0.80
+
+    enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
+      if (Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y) >= proj._hitRadius) return
+      const lastHit = proj._orbitHitCd.get(e) || 0
+      if (now - lastHit < 500) return
+      proj._orbitHitCd.set(e, now)
+      Enemy.takeDamage(e, proj.damage, proj.x, proj.y, [], proj.knockback ?? 60, {
+        source: 'weapon',
+        weaponId: entry.weapon.id,
+      })
+    })
   })
 }
 

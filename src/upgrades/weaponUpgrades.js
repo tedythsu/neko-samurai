@@ -87,7 +87,7 @@ export const WEAPON_UPGRADES_MAP = {
     {
       id: 'shuriken_boomerang',
       name: '【回旋・歸刃】',
-      desc: '到達射程終點後原路飛回，造成二次傷害',
+      desc: '命中敵人或到達射程終點後，原路飛回並造成二次傷害',
       rarity: 'rare',
       oneTime: true,
       apply(stats) { stats._boomerang = true },
@@ -114,10 +114,14 @@ export const WEAPON_UPGRADES_MAP = {
     {
       id: 'shuriken_omni',
       name: '【六道・全周】',
-      desc: '向角色四周 360° 均勻發射，防止被包圍',
+      desc: '手裏劍化為環身刃陣，持續繞行角色周圍並切割靠近的敵人',
       rarity: 'rare',
       oneTime: true,
-      apply(stats) { stats._omni = true },
+      apply(stats) {
+        stats._omni = true
+        stats.fireRate = 0
+        stats._orbitRadius = 92
+      },
     },
   ],
 

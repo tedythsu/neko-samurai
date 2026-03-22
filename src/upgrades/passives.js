@@ -157,7 +157,7 @@ export const ALL_PASSIVES = [
     apply: (_p, scene) => { scene._ricochetWall = true },
   },
   {
-    id: 'second_split', name: '【分裂‧二次】', desc: '苦無與手裡劍命中後分裂出兩枚微型彈',
+    id: 'second_split', name: '【分裂‧二次】', desc: '苦無與手裏劍命中後分裂出兩枚微型彈',
     rarity: 'epic', oneTime: true,
     requiresWeapons: ['kunai', 'shuriken'],   // multi-projectile weapons only
     apply: (_p, scene) => { scene._secondSplit = true },
