@@ -920,7 +920,7 @@ export default class GameScene extends Phaser.Scene {
     }
 
     // ── Normal / Legendary-Milestone pool ─────────────────────────────────────
-    const elapsed = this._elapsed || 0
+    const level = this._level || 1
     const ownedIds = new Set()
 
     this._procsOwned.forEach(id => ownedIds.add(id))
@@ -934,20 +934,17 @@ export default class GameScene extends Phaser.Scene {
     const candidates = []
 
     // Procs/Auras
-    if (elapsed >= 2 * 60 * 1000) {
-      for (const p of ALL_PROCS) {
-        if (!this._procsOwned.has(p.id) && elapsed >= (p.minTimeMs || 0))
-          candidates.push({ ...p, target: 'proc' })
-      }
+    for (const p of ALL_PROCS) {
+      if (!this._procsOwned.has(p.id) && level >= (p.minLevel || 1))
+        candidates.push({ ...p, target: 'proc' })
     }
 
-    // Keystones — unlock at 5 min, require prereqs
-    if (elapsed >= 5 * 60 * 1000) {
-      for (const k of ALL_KEYSTONES) {
-        if (this._keystonesOwned.has(k.id)) continue
-        if (k.requires && !ownedIds.has(k.requires)) continue
-        candidates.push({ ...k, target: 'keystone' })
-      }
+    // Keystones — unlock at higher levels and still respect prerequisites
+    for (const k of ALL_KEYSTONES) {
+      if (this._keystonesOwned.has(k.id)) continue
+      if (level < (k.minLevel || 1)) continue
+      if (k.requires && !ownedIds.has(k.requires)) continue
+      candidates.push({ ...k, target: 'keystone' })
     }
 
     // Passives — filter by weapon compatibility, then by ownership
