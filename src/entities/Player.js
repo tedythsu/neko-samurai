@@ -78,8 +78,9 @@ export default class Player {
       // Substitution — negate lethal hit once (60s cooldown)
       const sc = this.scene
       if (sc._substitutionReady && sc._substitutionCd <= 0) {
-        this.hp = 1
-        sc._substitutionCd = 60000
+        this.hp = Math.max(1, this.maxHp * 0.20)
+        sc._substitutionCd = sc._cooldownAdjusted ? sc._cooldownAdjusted(45000) : 45000
+        sc._substitutionGrace = 1500
         // Flash white to signal activation
         this.sprite.setTint(0xffffff)
         sc.time.delayedCall(300, () => { if (!this._dead) this.sprite.clearTint() })

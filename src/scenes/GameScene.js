@@ -117,6 +117,7 @@ export default class GameScene extends Phaser.Scene {
     this._caltropTimer      = 0
     this._substitutionReady = false
     this._substitutionCd    = 0
+    this._substitutionGrace = 0
     this._daimyoTax         = false
     this._daimyoTaxXp       = 0
     this._soulBurstKills    = 0
@@ -439,6 +440,9 @@ export default class GameScene extends Phaser.Scene {
     // Substitution cooldown countdown
     if (this._substitutionCd > 0) {
       this._substitutionCd = Math.max(0, this._substitutionCd - delta)
+    }
+    if (this._substitutionGrace > 0) {
+      this._substitutionGrace = Math.max(0, this._substitutionGrace - delta)
     }
 
     // Caltrops — drop every 3s at player position

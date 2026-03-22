@@ -97,7 +97,7 @@ export const ALL_PASSIVES = [
     apply: (_p, scene) => { scene._firstStrikeCrit = true },
   },
   {
-    id: 'shadow_dodge', name: '【影分身・閃】', desc: '移動時有 15% 機率使碰撞傷害無效',
+    id: 'shadow_dodge', name: '【影分身・閃】', desc: '移動時有 30% 機率閃避碰撞傷害，並在原地留下爆裂殘影',
     rarity: 'rare', oneTime: true,
     apply: (_p, scene) => { scene._shadowDodge = true },
   },
@@ -107,7 +107,7 @@ export const ALL_PASSIVES = [
     apply: (_p, scene) => { scene._critKillXpMult = 2 },
   },
   {
-    id: 'substitution', name: '【替身術】', desc: '致死傷害時無效化一次（冷卻 60s）',
+    id: 'substitution', name: '【替身術】', desc: '致死傷害改為留下替身，回復 20% 最大生命並獲得 1.5 秒無敵（冷卻 45 秒）',
     rarity: 'epic', oneTime: true,
     apply: (_p, scene) => { scene._substitutionReady = true; scene._substitutionCd = 0 },
   },
@@ -122,14 +122,14 @@ export const ALL_PASSIVES = [
     apply: (_p, scene) => { scene._caltrops = true; scene._caltropTimer = 0 },
   },
   {
-    id: 'steady_stance', name: '【防禦‧姿態】', desc: '站立不動時受到傷害降低 40%',
+    id: 'steady_stance', name: '【防禦‧姿態】', desc: '站立不動時受傷 -45%，且造成傷害 +18%',
     rarity: 'rare', oneTime: true,
     apply: (_p, scene) => { scene._steadyStance = true },
   },
   {
-    id: 'cooldown_cut', name: '【冷卻‧縮減】', desc: '所有觸發技能冷卻時間縮短 20%',
+    id: 'cooldown_cut', name: '【冷卻‧縮減】', desc: '戰吼、菱釘、兵糧丸、月讀、替身術冷卻縮短 30%',
     rarity: 'common', oneTime: true,
-    apply: (_p, scene) => { scene._cdMult = (scene._cdMult || 1) * 0.80 },
+    apply: (_p, scene) => { scene._cdMult = (scene._cdMult || 1) * 0.70 },
   },
   {
     id: 'xp_hunger', name: '【經驗‧渴望】', desc: '經驗獲取 +15%，但敵人跑速 +5%',
@@ -145,10 +145,10 @@ export const ALL_PASSIVES = [
     apply: (_p, scene) => { scene._daimyoTax = true },
   },
   {
-    id: 'ki_blast', name: '【空振‧氣勁】', desc: '太刀揮砍末端追加真空波，距離翻倍、傷害 55%',
+    id: 'ki_blast', name: '【間合‧極】', desc: '太刀在刀尖命中時傷害 +25%，且擊退略微提升',
     rarity: 'rare', oneTime: true,
     requiresWeapons: ['tachi'],   // melee swing only
-    apply: (_p, scene) => { scene._kiBlast = true },
+    apply: (_p, scene) => { scene._tachiMaai = true },
   },
   {
     id: 'ricochet_arc', name: '【折射‧弧刃】', desc: '投射物首次碰到場地邊緣時反彈一次',

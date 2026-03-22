@@ -96,13 +96,17 @@ export default {
         enemies.getChildren()
           .filter(e => e.active && !e.dying && !hitSet.has(e))
           .forEach(e => {
-            if (Phaser.Math.Distance.Between(player.x, player.y, e.x, e.y) > range) return
+            const distToEnemy = Phaser.Math.Distance.Between(player.x, player.y, e.x, e.y)
+            if (distToEnemy > range) return
             const eDeg = Phaser.Math.RadToDeg(
               Phaser.Math.Angle.Between(player.x, player.y, e.x, e.y))
             const norm = ((eDeg - startDeg) % 360 + 360) % 360
             if (norm <= sweepTotal * t) {
               hitSet.add(e)
-              Enemy.takeDamage(e, damage, player.x, player.y, affixes, stats.knockback ?? 120, {
+              const outerEdge = scene._tachiMaai && distToEnemy >= range * 0.68
+              const hitDamage = outerEdge ? damage * 1.25 : damage
+              const hitKnockback = outerEdge ? Math.max(stats.knockback ?? 120, 150) : (stats.knockback ?? 120)
+              Enemy.takeDamage(e, hitDamage, player.x, player.y, affixes, hitKnockback, {
                 source: 'weapon',
                 weaponId: 'tachi',
               })
@@ -125,9 +129,6 @@ export default {
           // 鐮鼬・真空 — 3 wind blades
           if (!isChain && stats._windBlade) {
             _fireWindBlades(scene, player, facingDeg, damage * 0.5, affixes, enemies)
-          }
-          if (!isChain && scene._kiBlast) {
-            _fireKiBlast(scene, player, facingDeg, damage * 0.55, affixes, enemies, range * 2)
           }
         }
       }
@@ -178,40 +179,4 @@ function _fireWindBlades(scene, player, facingDeg, damage, affixes, enemies) {
     }
     scene.events.on('update', fn)
   })
-}
-
-function _fireKiBlast(scene, player, facingDeg, damage, affixes, enemies, maxDist) {
-  const SPEED = 720
-  const ARC_RADIUS = 26
-  const dir = Phaser.Math.DegToRad(facingDeg)
-  let wx = player.x
-  let wy = player.y
-  let dist = 0
-  const hitSet = new Set()
-  const g = scene.add.graphics().setDepth(6)
-  const fn = (_, dt) => {
-    const step = SPEED * dt / 1000
-    wx += Math.cos(dir) * step
-    wy += Math.sin(dir) * step
-    dist += step
-    const alpha = 1 - dist / maxDist
-    g.clear().setPosition(wx, wy)
-    g.lineStyle(3, 0xcceeff, Math.max(0, alpha))
-    g.beginPath()
-    g.arc(0, 0, ARC_RADIUS, dir - 0.8, dir + 0.8, false)
-    g.strokePath()
-
-    enemies.getChildren().filter(e => e.active && !e.dying && !hitSet.has(e)).forEach(e => {
-      if (Phaser.Math.Distance.Between(wx, wy, e.x, e.y) < ARC_RADIUS + 10) {
-        hitSet.add(e)
-        Enemy.takeDamage(e, damage, wx, wy, affixes, 35, { source: 'weapon', weaponId: 'tachi' })
-      }
-    })
-
-    if (dist >= maxDist) {
-      scene.events.off('update', fn)
-      g.destroy()
-    }
-  }
-  scene.events.on('update', fn)
 }

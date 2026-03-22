@@ -401,6 +401,11 @@ export default class Enemy {
         dmgMult *= (1 + (scene._globalDmgMult - 1) * (sourceType === 'weapon' ? 0.85 : 0.55))
       }
       if (scene._armorPen) dmgMult *= (1 + Math.min(0.18, scene._armorPen * 0.5))
+      if (scene._steadyStance) {
+        const vel = scene._player?.sprite?.body?.velocity
+        const isMoving = vel ? (Math.abs(vel.x) + Math.abs(vel.y)) > 5 : false
+        if (!isMoving) dmgMult *= 1.18
+      }
     } else if (sourceType === 'proc' && scene._globalDmgMult && scene._globalDmgMult !== 1) {
       dmgMult *= (1 + (scene._globalDmgMult - 1) * 0.35)
     }
@@ -526,11 +531,26 @@ export default class Enemy {
     if (sprite.damageCd > 0 || sprite.dying) return
     const scene = sprite.scene
 
-    // Shadow dodge — 15% chance to negate contact damage while moving
+    if ((scene._substitutionGrace || 0) > 0) {
+      sprite.damageCd = 250
+      return
+    }
+
+    // Shadow dodge — evade while moving and leave a damaging afterimage
     if (scene._shadowDodge) {
       const vel = scene._player?.sprite?.body?.velocity
       const isMoving = vel ? (Math.abs(vel.x) + Math.abs(vel.y)) > 5 : false
-      if (isMoving && Math.random() < 0.15) {
+      if (isMoving && Math.random() < 0.30) {
+        const px = player.x, py = player.y
+        scene._enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
+          if (Phaser.Math.Distance.Between(px, py, e.x, e.y) < 75) {
+            Enemy.takeDamage(e, 24, px, py, scene._affixes || [], 80, { source: 'proc' })
+          }
+        })
+        const g = scene.add.graphics().setDepth(8)
+        g.lineStyle(2, 0x99bbff, 0.85)
+        g.strokeCircle(px, py, 75)
+        scene.tweens.add({ targets: g, alpha: 0, duration: 220, onComplete: () => g.destroy() })
         sprite.damageCd = 600
         return
       }
@@ -545,7 +565,7 @@ export default class Enemy {
     if (scene._steadyStance) {
       const vel = scene._player?.sprite?.body?.velocity
       const isMoving = vel ? (Math.abs(vel.x) + Math.abs(vel.y)) > 5 : false
-      if (!isMoving) dmgToPlayer *= 0.60
+      if (!isMoving) dmgToPlayer *= 0.55
     }
 
     // Iron body shield — absorb one hit
