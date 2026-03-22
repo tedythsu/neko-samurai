@@ -958,8 +958,8 @@ export default class GameScene extends Phaser.Scene {
 
     // ── Weight modifiers ──────────────────────────────────────────────────────
     const DEFENSIVE_IDS        = new Set(['defense','soul_drain','life_leech','thorns','sanctuary_aura','war_cry','iron_body','vitality','steady_stance','substitution'])
-    const earlyGame            = elapsed < 2 * 60 * 1000
-    const needDefense          = elapsed >= 4 * 60 * 1000 && !this._hasDefensive
+    const earlyGame            = level <= 4
+    const needDefense          = level >= 8 && !this._hasDefensive
     const isLegendaryMilestone = mode === 'legendary_milestone'
 
     const weights = candidates.map(u => {
