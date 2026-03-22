@@ -5,7 +5,7 @@ import { RARITY_UI } from '../config.js'
 const CATEGORY = {
   weapon:    { color: 0xc8a84b, label: '武器',   text: '#c8a84b' },
   elemental: { color: 0x8888ee, label: '元素',   text: '#aaaaff' },
-  proc:      { color: 0x44ccff, label: '觸發',   text: '#44ccff' },
+  proc:      { color: 0x44ccff, label: '觸發',   text: '#66ddff' },
   keystone:  { color: 0xff4444, label: '傳奇',   text: '#ff8888' },
   passive:   { color: 0x44ddbb, label: '被動',   text: '#55eedd' },
 }
@@ -20,6 +20,13 @@ const ELEMENTAL_COLOR = {
   holy:        0xffffaa,
 }
 
+// Sharp resolution factor for crisp text on high-DPI screens
+const RES = Math.min(2, Math.ceil(window?.devicePixelRatio || 1))
+
+// Shared font stacks
+const SERIF_JP = '"Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", serif'
+const CINZEL    = '"Cinzel", "Palatino Linotype", serif'
+
 export default class UpgradeScene extends Phaser.Scene {
   constructor() { super('UpgradeScene') }
 
@@ -31,135 +38,196 @@ export default class UpgradeScene extends Phaser.Scene {
   create() {
     const { width: W, height: H } = this.cameras.main
 
-    this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.80)
+    // ── Backdrop ──────────────────────────────────────────────────────────────
+    this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.82)
 
+    // Subtle vignette lines (thin, gold, low opacity)
     const gfx = this.add.graphics()
-    gfx.lineStyle(1, 0xb8943f, 0.4)
-    gfx.lineBetween(W * 0.08, H * 0.19, W * 0.92, H * 0.19)
-    gfx.lineBetween(W * 0.08, H * 0.85, W * 0.92, H * 0.85)
+    gfx.lineStyle(1, 0xb8943f, 0.25)
+    gfx.lineBetween(Math.round(W * 0.06), Math.round(H * 0.17), Math.round(W * 0.94), Math.round(H * 0.17))
+    gfx.lineBetween(Math.round(W * 0.06), Math.round(H * 0.88), Math.round(W * 0.94), Math.round(H * 0.88))
 
-    this.add.text(W / 2, H * 0.09, `Level  ${this._level}`, {
-      fontSize: '36px', color: '#c8a84b',
-      fontFamily: '"Cinzel", "Palatino Linotype", serif',
+    // ── Header ────────────────────────────────────────────────────────────────
+    this.add.text(Math.round(W / 2), Math.round(H * 0.08), `Level  ${this._level}`, {
+      fontSize: '34px', color: '#c8a84b',
+      fontFamily: CINZEL,
       fontStyle: 'bold',
-      stroke: '#3a2800', strokeThickness: 3,
-    }).setOrigin(0.5)
+      stroke: '#2a1800', strokeThickness: 4,
+    }).setOrigin(0.5).setResolution(RES)
 
-    this.add.text(W / 2, H * 0.205, '選擇強化', {
-      fontSize: '14px', color: '#6a5e40',
-      fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
-    }).setOrigin(0.5)
+    this.add.text(Math.round(W / 2), Math.round(H * 0.145), '選擇強化', {
+      fontSize: '13px', color: '#7a6e52',
+      fontFamily: SERIF_JP,
+      letterSpacing: 6,
+    }).setOrigin(0.5).setResolution(RES)
 
-    const cardW   = Math.min(252, (W - 120) / 3)
-    const cardH   = 196
-    const spacing = cardW + 22
-    const startX  = W / 2 - spacing
-    const cardY   = H / 2 + H * 0.025
+    // ── Cards ─────────────────────────────────────────────────────────────────
+    // Use more screen width — 3 cards with tighter outer margins
+    const GAP    = 14
+    const MARGIN = Math.round(W * 0.04)
+    const cardW  = Math.round((W - MARGIN * 2 - GAP * 2) / 3)
+    const cardY  = Math.round(H / 2 + H * 0.02)
 
     this._containers = []
     this._upgrades.forEach((upg, i) => {
-      this._buildCard(startX + i * spacing, cardY, cardW, cardH, upg, i)
+      const cx = Math.round(MARGIN + cardW / 2 + i * (cardW + GAP))
+      this._buildCard(cx, cardY, cardW, upg, i)
     })
   }
 
-  _buildCard(cx, cy, w, minH, upg, idx) {
+  _buildCard(cx, cy, w, upg, idx) {
     const cat = CATEGORY[upg.target] || CATEGORY.passive
     let accent = cat.color
     if (upg.target === 'elemental' && upg.elemental) {
       accent = ELEMENTAL_COLOR[upg.elemental.id] ?? cat.color
     }
 
+    const rui         = RARITY_UI[upg.rarity] || RARITY_UI.common
+    const rarityBorder = rui.border
+    const accentHex   = '#' + accent.toString(16).padStart(6, '0')
+
+    // ── Measure text to compute card height ──────────────────────────────────
+    const CONTENT_W  = w - 28   // inner content width
+    const HEADER_H   = 44       // zone for top bar + badges
+    const NAME_PAD   = 10       // padding above name
+    const SEP_PAD    = 8        // padding above/below separator
+    const DESC_PAD   = 10       // padding above desc
+    const BOTTOM_PAD = 16       // bottom breathing room
+
     const tmpName = this.add.text(-9999, -9999, upg.name, {
-      fontSize: '15px',
-      fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
-      fontStyle: 'bold',
-      wordWrap: { width: w - 44, useAdvancedWrap: true },
-    })
+      fontSize: '14px', fontFamily: SERIF_JP, fontStyle: 'bold',
+      wordWrap: { width: CONTENT_W, useAdvancedWrap: true },
+    }).setResolution(RES)
     const tmpDesc = this.add.text(-9999, -9999, upg.desc || '', {
-      fontSize: '11px',
-      fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
-      wordWrap: { width: w - 36, useAdvancedWrap: true },
-      lineSpacing: 3,
-    })
-    const nameH = tmpName.height
-    const descH = tmpDesc.height
+      fontSize: '12px', fontFamily: SERIF_JP,
+      wordWrap: { width: CONTENT_W, useAdvancedWrap: true },
+      lineSpacing: 4,
+    }).setResolution(RES)
+    const nameH = Math.ceil(tmpName.height)
+    const descH = Math.ceil(tmpDesc.height)
     tmpName.destroy()
     tmpDesc.destroy()
 
-    const NAME_TOP = 24
-    const SEP_Y    = NAME_TOP + nameH + 10
-    const DESC_TOP = SEP_Y + 10
-    const h = Math.max(minH, DESC_TOP + descH + 14)
+    const NAME_Y  = HEADER_H + NAME_PAD
+    const SEP_Y   = NAME_Y + nameH + SEP_PAD
+    const DESC_Y  = SEP_Y + SEP_PAD
+    const h       = Math.max(220, DESC_Y + descH + BOTTOM_PAD)
+    const halfH   = Math.round(h / 2)
+    const halfW   = Math.round(w / 2)
 
     const container = this.add.container(cx, cy)
 
-    const rui = RARITY_UI[upg.rarity] || RARITY_UI.common
-    const rarityBorder = rui.border
-
-    const bg = this.add.rectangle(0, 0, w, h, 0x0b0b1c)
-      .setStrokeStyle(1.5, rarityBorder)
+    // ── Card background ───────────────────────────────────────────────────────
+    const bg = this.add.rectangle(0, 0, w, h, 0x0a0a18)
+      .setStrokeStyle(1.5, rarityBorder, 0.9)
       .setInteractive()
 
-    const strip = this.add.rectangle(-w / 2 + 2, 0, 4, h - 2, accent, 1)
+    // Subtle inner gradient feel — lighter top band
+    const headerBg = this.add.rectangle(0, -halfH + Math.round(HEADER_H / 2), w, HEADER_H, 0x0f0f22, 1)
 
-    // Rarity badge (top-right)
-    const rarityBadge = this.add.text(w / 2 - 8, -h / 2 + 8, rui.label, {
-      fontSize: '9px', color: rui.text,
-      fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
-      fontStyle: 'bold',
-    }).setOrigin(1, 0)
+    // Rarity-colored top accent bar (3px, full width)
+    const topBar = this.add.rectangle(0, -halfH + 1, w, 3, accent, 0.9)
 
-    // Category label below rarity
-    const badge = this.add.text(w / 2 - 8, -h / 2 + 20, cat.label, {
-      fontSize: '9px', color: cat.text,
-      fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
-    }).setOrigin(1, 0)
+    // ── Badges row (inside header zone) ──────────────────────────────────────
+    // Category badge — left side of header
+    const catBadge = this.add.text(
+      Math.round(-halfW + 10),
+      Math.round(-halfH + 10),
+      cat.label,
+      {
+        fontSize: '11px', color: cat.text,
+        fontFamily: SERIF_JP, fontStyle: 'bold',
+        backgroundColor: '#00000055',
+        padding: { x: 4, y: 2 },
+      }
+    ).setOrigin(0, 0).setResolution(RES)
 
-    // Stack indicator for maxStacks passives (e.g. "Lv.1/3")
-    const stackItems = []
+    // Rarity badge — right side of header
+    const rarBadge = this.add.text(
+      Math.round(halfW - 10),
+      Math.round(-halfH + 10),
+      rui.label,
+      {
+        fontSize: '11px', color: rui.text,
+        fontFamily: SERIF_JP, fontStyle: 'bold',
+        backgroundColor: '#00000055',
+        padding: { x: 4, y: 2 },
+      }
+    ).setOrigin(1, 0).setResolution(RES)
+
+    // Stack badge — only for maxStacks passives, shown in header right below rarity
+    const extraItems = []
     if (upg.stackMax != null) {
       const nextStack = (upg.stackCur || 0) + 1
-      const stackBadge = this.add.text(w / 2 - 8, -h / 2 + 32, `Lv.${nextStack}/${upg.stackMax}`, {
-        fontSize: '9px', color: '#88ddcc',
-        fontFamily: '"Cinzel", serif',
-      }).setOrigin(1, 0)
-      stackItems.push(stackBadge)
+      const pip = this.add.text(
+        Math.round(halfW - 10),
+        Math.round(-halfH + 28),
+        `Lv ${nextStack} / ${upg.stackMax}`,
+        {
+          fontSize: '10px', color: '#88ddcc',
+          fontFamily: CINZEL,
+          backgroundColor: '#08152055',
+          padding: { x: 3, y: 1 },
+        }
+      ).setOrigin(1, 0).setResolution(RES)
+      extraItems.push(pip)
     }
 
-    const nameText = this.add.text(-w / 2 + 18, -h / 2 + NAME_TOP, upg.name, {
-      fontSize: '15px', color: '#f0e8d0',
-      fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
-      fontStyle: 'bold',
-      wordWrap: { width: w - 44, useAdvancedWrap: true },
-    }).setOrigin(0, 0)
-
+    // ── Separator line ────────────────────────────────────────────────────────
     const sepGfx = this.add.graphics()
-    sepGfx.lineStyle(1, accent, 0.25)
-    sepGfx.lineBetween(-w / 2 + 14, -h / 2 + SEP_Y, w / 2 - 14, -h / 2 + SEP_Y)
+    sepGfx.lineStyle(1, accent, 0.35)
+    sepGfx.lineBetween(
+      Math.round(-halfW + 12), Math.round(-halfH + SEP_Y),
+      Math.round(halfW - 12),  Math.round(-halfH + SEP_Y)
+    )
 
-    const descText = this.add.text(-w / 2 + 18, -h / 2 + DESC_TOP, upg.desc || '', {
-      fontSize: '11px', color: '#6a6878',
-      fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
-      wordWrap: { width: w - 36, useAdvancedWrap: true },
-      lineSpacing: 3,
-    }).setOrigin(0, 0)
+    // ── Name ─────────────────────────────────────────────────────────────────
+    // Name uses warm cream, bold — primary affordance
+    const nameText = this.add.text(
+      Math.round(-halfW + 14),
+      Math.round(-halfH + NAME_Y),
+      upg.name,
+      {
+        fontSize: '14px', color: '#ede4cc',
+        fontFamily: SERIF_JP, fontStyle: 'bold',
+        wordWrap: { width: CONTENT_W, useAdvancedWrap: true },
+      }
+    ).setOrigin(0, 0).setResolution(RES)
 
-    container.add([bg, strip, rarityBadge, badge, ...stackItems, nameText, sepGfx, descText])
+    // ── Description ──────────────────────────────────────────────────────────
+    // Light warm grey — high contrast, clearly readable
+    const descText = this.add.text(
+      Math.round(-halfW + 14),
+      Math.round(-halfH + DESC_Y),
+      upg.desc || '',
+      {
+        fontSize: '12px', color: '#c8c0d0',
+        fontFamily: SERIF_JP,
+        wordWrap: { width: CONTENT_W, useAdvancedWrap: true },
+        lineSpacing: 4,
+      }
+    ).setOrigin(0, 0).setResolution(RES)
+
+    container.add([bg, headerBg, topBar, catBadge, rarBadge, ...extraItems, sepGfx, nameText, descText])
     this._containers.push(container)
 
-    container.setAlpha(0).setY(cy + 26)
+    // ── Entrance animation ────────────────────────────────────────────────────
+    container.setAlpha(0).setY(cy + 22)
     this.tweens.add({
       targets: container, alpha: 1, y: cy,
-      duration: 310, delay: idx * 85, ease: 'Back.easeOut',
+      duration: 300, delay: idx * 80, ease: 'Back.easeOut',
     })
 
+    // ── Hover ─────────────────────────────────────────────────────────────────
     bg.on('pointerover', () => {
-      bg.setFillStyle(0x14142a).setStrokeStyle(2, rarityBorder, 1.0)
-      this.tweens.add({ targets: container, scaleX: 1.04, scaleY: 1.04, duration: 100 })
+      bg.setFillStyle(0x12122a).setStrokeStyle(2, rarityBorder, 1.0)
+      headerBg.setFillStyle(0x16162e)
+      this.tweens.add({ targets: container, scaleX: 1.03, scaleY: 1.03, duration: 90, ease: 'Quad.easeOut' })
     })
     bg.on('pointerout', () => {
-      bg.setFillStyle(0x0b0b1c).setStrokeStyle(1.5, rarityBorder)
-      this.tweens.add({ targets: container, scaleX: 1, scaleY: 1, duration: 120 })
+      bg.setFillStyle(0x0a0a18).setStrokeStyle(1.5, rarityBorder, 0.9)
+      headerBg.setFillStyle(0x0f0f22)
+      this.tweens.add({ targets: container, scaleX: 1, scaleY: 1, duration: 110, ease: 'Quad.easeOut' })
     })
     bg.on('pointerdown', () => this._choose(upg))
   }
@@ -170,8 +238,8 @@ export default class UpgradeScene extends Phaser.Scene {
     const last = this._containers.length - 1
     this._containers.forEach((c, i) => {
       this.tweens.add({
-        targets: c, alpha: 0, y: c.y + 26,
-        duration: 200, delay: i * 50, ease: 'Back.easeIn',
+        targets: c, alpha: 0, y: c.y + 22,
+        duration: 190, delay: i * 45, ease: 'Back.easeIn',
         onComplete: i === last ? () => {
           this.scene.get('GameScene').events.emit('upgrade-chosen', upgrade)
           this.scene.stop()
