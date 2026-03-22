@@ -27,7 +27,7 @@ export default class Player {
     this.sprite = scene.physics.add.sprite(x, y, 'idle', 0)
       .setDisplaySize(this._dW.idle, CHAR_H)
       .setCollideWorldBounds(true)
-    this.sprite.body.setSize(22, 40)   // hitbox smaller than visual
+    this._syncHitbox()
 
     // Keyboard
     this._keys = scene.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT')
@@ -134,6 +134,18 @@ export default class Player {
     this.sprite
       .setTexture(key, this._frame[key])
       .setDisplaySize(this._dW[key], CHAR_H)
+
+    this._syncHitbox()
+  }
+
+  _syncHitbox() {
+    const frame = this.sprite.frame
+    if (!frame || !this.sprite.body) return
+
+    // Keep the hurtbox close to the visible silhouette so contact damage feels fair.
+    const bodyW = Math.max(28, Math.round(frame.realWidth * 0.68))
+    const bodyH = Math.max(44, Math.round(frame.realHeight * 0.82))
+    this.sprite.body.setSize(bodyW, bodyH, true)
   }
 
   _onDown(p) {
