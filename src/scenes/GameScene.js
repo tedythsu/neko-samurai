@@ -2,13 +2,13 @@
 import Phaser from 'phaser'
 import Player   from '../entities/Player.js'
 import Enemy    from '../entities/Enemy.js'
-import { CFG, randomEdgePoint, xpThreshold, PROGRESSION_BREAKPOINTS, RARITY_WEIGHTS } from '../config.js'
+import { CFG, randomEdgePoint, xpThreshold, getWaveConfig, getWaveIndex, WAVE_NAMES, RARITY_WEIGHTS } from '../config.js'
 import { WEAPON_UPGRADES_MAP } from '../upgrades/weaponUpgrades.js'
 import { ALL_ELEMENTALS }      from '../upgrades/elementals.js'
 import { ALL_PROCS }           from '../upgrades/procs.js'
 import { ALL_KEYSTONES }       from '../upgrades/keystones.js'
 import { ALL_PASSIVES }        from '../upgrades/passives.js'
-import { ENEMY_TYPES, getDifficultyMult } from '../enemies/EnemyTypes.js'
+import { ENEMY_TYPES } from '../enemies/EnemyTypes.js'
 import BossManager from '../enemies/BossManager.js'
 
 export default class GameScene extends Phaser.Scene {
@@ -86,6 +86,8 @@ export default class GameScene extends Phaser.Scene {
     this._orbAttractRadius     = CFG.ORB_ATTRACT_RADIUS
     this._bossChestBonus       = 1.0
     this._hasDefensive         = false
+    this._currentWaveXp        = 10    // updated each spawn tick
+    this._currentWaveIdx       = -1    // -1 = not yet announced
     this._critBonus            = 0
     this._critDmgBonus         = 0
     this._warCryTimer          = 0
@@ -141,10 +143,24 @@ export default class GameScene extends Phaser.Scene {
       }
     ).setScrollFactor(0).setDepth(201).setOrigin(1, 0)
 
-    // Pause button (below timer, top-right)
+    // Wave name (below timer, top-right)
     const W = this.cameras.main.width
     const H = this.cameras.main.height
-    this._pauseBtn = this.add.text(W - 12, 36, '⏸', {
+    this._hudWave = this.add.text(W - 12, 35, '第壱波', {
+      fontSize: '11px', color: '#6a5e40',
+      fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
+      stroke: '#06060f', strokeThickness: 2,
+    }).setScrollFactor(0).setDepth(201).setOrigin(1, 0)
+
+    // Wave announcement overlay (center screen, animated)
+    this._waveAnnounce = this.add.text(W / 2, H * 0.28, '', {
+      fontSize: '36px', color: '#c8a84b',
+      fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
+      stroke: '#06060f', strokeThickness: 5,
+    }).setScrollFactor(0).setDepth(502).setOrigin(0.5).setAlpha(0)
+
+    // Pause button (below wave name, top-right)
+    this._pauseBtn = this.add.text(W - 12, 50, '⏸', {
       fontSize: '13px', color: '#8a7a5a',
       stroke: '#06060f', strokeThickness: 2,
     }).setScrollFactor(0).setDepth(201).setOrigin(1, 0)
@@ -443,7 +459,7 @@ export default class GameScene extends Phaser.Scene {
         if (orb._emitter) orb._emitter.destroy()
         orb.destroy()
         this._orbs.splice(i, 1)
-        this._addXp(CFG.XP_PER_ENEMY)
+        this._addXp(this._currentWaveXp)
         continue
       }
 
@@ -512,6 +528,7 @@ export default class GameScene extends Phaser.Scene {
 
     this._hudLevel.setText(`Lv ${this._level}`)
     this._hudTimer.setX(W - 12).setText(_fmtTime(this._elapsed))
+    this._hudWave.setX(W - 12).setText(WAVE_NAMES[getWaveIndex(this._elapsed)] || '')
 
     // Weapon icon — left of bars, top=HP bar top (y=21), bottom=XP bar bottom (y=47)
     if (this._weapons.length !== this._lastWeaponCount) {
@@ -556,35 +573,59 @@ export default class GameScene extends Phaser.Scene {
   }
 
   _spawnWave() {
-    // Difficulty multipliers for current elapsed time
-    const diff = getDifficultyMult(this._elapsed, PROGRESSION_BREAKPOINTS)
+    const wave    = getWaveConfig(this._elapsed)
+    const waveIdx = getWaveIndex(this._elapsed)
 
-    // Update spawn interval in-place (no destroy/recreate)
-    this._spawnEvent.delay = Math.round(diff.spawnInterval)
-
-    // Max-on-screen cap
-    if (this._enemies.countActive() >= diff.maxEnemies) return
-
-    // Build unlocked type pool (excluding 爆炸型 during boss — _bossActive flag)
-    const pool = ENEMY_TYPES.filter(t =>
-      t.unlockMs <= this._elapsed &&
-      !(this._bossActive && t.id === 'bakuha')
-    )
-    if (pool.length === 0) return
-
-    const count = Math.floor(this._level / CFG.WAVE_SCALE) + 1
-    for (let i = 0; i < count; i++) {
-      if (this._enemies.countActive() >= diff.maxEnemies) break
-      const { x, y } = randomEdgePoint(CFG.WORLD_WIDTH, CFG.WORLD_HEIGHT)
-      let enemy = this._enemies.getFirstDead(false)
-      if (!enemy) {
-        enemy = this._enemies.create(x, y, 'kisotsu-run', 0)
-        enemy.setDepth(5)
-      }
-      // Pick a random type from the unlocked pool
-      const typeConfig = pool[Math.floor(Math.random() * pool.length)]
-      Enemy.activate(enemy, x, y, typeConfig, diff)
+    // Detect wave transition → announce + surge
+    if (waveIdx !== this._currentWaveIdx) {
+      this._currentWaveIdx = waveIdx
+      this._currentWaveXp  = wave.xpDrop
+      this._showWaveAnnouncement(WAVE_NAMES[waveIdx])
+      this._triggerWaveSurge(wave)
     }
+
+    // Update trickle interval
+    this._spawnEvent.delay = wave.spawnInterval
+    this._currentWaveXp    = wave.xpDrop
+
+    // Trickle: refill up to max
+    if (this._enemies.countActive() < wave.maxEnemies) {
+      this._spawnOneEnemy(wave)
+    }
+  }
+
+  // Surge: 3 batches of (surgeSize/3) enemies, each batch 1.5s apart.
+  // Fills the opening "flood" feeling at each wave transition.
+  _triggerWaveSurge(wave) {
+    const batchSize = Math.ceil(wave.surgeSize / 3)
+    for (let b = 0; b < 3; b++) {
+      this.time.delayedCall(b * 1500, () => {
+        if (this._paused || this._bossActive) return
+        const n = Math.min(batchSize, wave.maxEnemies - this._enemies.countActive())
+        for (let i = 0; i < n; i++) {
+          this._spawnOneEnemy(wave)
+        }
+      })
+    }
+  }
+
+  // Spawn a single kisotsu enemy using current wave stats.
+  _spawnOneEnemy(wave) {
+    const { x, y } = randomEdgePoint(CFG.WORLD_WIDTH, CFG.WORLD_HEIGHT)
+    let enemy = this._enemies.getFirstDead(false)
+    if (!enemy) {
+      enemy = this._enemies.create(x, y, 'kisotsu-run', 0)
+      enemy.setDepth(5)
+    }
+    const typeConfig = {
+      id:            'kisotsu',
+      baseTint:      null,
+      hpMult:        wave.hp    / CFG.ENEMY_HP,
+      speedMult:     wave.speed / CFG.ENEMY_SPEED,
+      sizeMult:      wave.scale,
+      behaviorFlags: {},
+    }
+    Enemy.activate(enemy, x, y, typeConfig, null, wave.damage)
   }
 
   _spawnOrb(ex, ey) {
@@ -624,12 +665,24 @@ export default class GameScene extends Phaser.Scene {
 
   _addXp(amount) {
     if (this._upgrading) return
+    // At max level, XP is frozen
+    if (this._level >= CFG.MAX_LEVEL) {
+      this._xp = this._xpToNext
+      return
+    }
     this._xp += amount
     if (this._xp >= this._xpToNext) {
       this._xp      -= this._xpToNext
       this._displayXp = 0   // snap to zero so bar fills from start on new level
       this._level   += 1
       this._xpToNext = xpThreshold(this._level)
+
+      // At max level — no upgrade prompt, just stop
+      if (this._level >= CFG.MAX_LEVEL) {
+        this._xp = this._xpToNext
+        return
+      }
+
       this._upgrading = true
 
       this.events.once('upgrade-chosen', (upgrade) => {
@@ -785,6 +838,22 @@ export default class GameScene extends Phaser.Scene {
     g.lineStyle(3, 0xffcc44, 0.9)
     g.strokeCircle(px, py, radius)
     this.tweens.add({ targets: g, alpha: 0, scaleX: 1.5, scaleY: 1.5, duration: 400, onComplete: () => g.destroy() })
+  }
+
+  _showWaveAnnouncement(name) {
+    const txt = this._waveAnnounce
+    if (!txt) return
+    // Kill any existing tween on this text
+    this.tweens.killTweensOf(txt)
+    txt.setText(name).setAlpha(0).setScale(1.2)
+    this.tweens.add({
+      targets: txt, alpha: 1, scaleX: 1, scaleY: 1,
+      duration: 350, ease: 'Back.easeOut',
+    })
+    this.tweens.add({
+      targets: txt, alpha: 0,
+      duration: 500, delay: 1800, ease: 'Cubic.easeIn',
+    })
   }
 
   _createGravityField(x, y, radius, affixes) {

@@ -50,32 +50,4 @@ export const ENEMY_TYPES = [
   },
 ]
 
-/**
- * Return { hpMult, speedMult, spawnInterval, maxEnemies } for the given
- * elapsed time in ms, linearly interpolating between PROGRESSION_BREAKPOINTS.
- * Pass in the `PROGRESSION_BREAKPOINTS` array imported from config.js.
- */
-export function getDifficultyMult(elapsedMs, breakpoints) {
-  const pts = breakpoints
-  // Clamp to last breakpoint
-  if (elapsedMs >= pts[pts.length - 1].timeMs) {
-    const last = pts[pts.length - 1]
-    return { hpMult: last.hpMult, speedMult: last.speedMult,
-             spawnInterval: last.spawnInterval, maxEnemies: last.maxEnemies }
-  }
-  for (let i = 0; i < pts.length - 1; i++) {
-    const a = pts[i], b = pts[i + 1]
-    if (elapsedMs >= a.timeMs && elapsedMs < b.timeMs) {
-      const t = (elapsedMs - a.timeMs) / (b.timeMs - a.timeMs)
-      return {
-        hpMult:        a.hpMult        + (b.hpMult        - a.hpMult)        * t,
-        speedMult:     a.speedMult     + (b.speedMult     - a.speedMult)     * t,
-        spawnInterval: a.spawnInterval + (b.spawnInterval - a.spawnInterval) * t,
-        maxEnemies:    Math.round(a.maxEnemies + (b.maxEnemies - a.maxEnemies) * t),
-      }
-    }
-  }
-  // Unreachable: above loop covers all cases between breakpoints, clamp covers >= last.
-  // Defensive fallback only.
-  return { hpMult: 1, speedMult: 1, spawnInterval: 2000, maxEnemies: 20 }
-}
+// getDifficultyMult removed — replaced by getWaveConfig() in config.js

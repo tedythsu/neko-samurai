@@ -23,7 +23,7 @@ export default class Enemy {
     }
   }
 
-  static activate(sprite, x, y, typeConfig = null, diffMult = null) {
+  static activate(sprite, x, y, typeConfig = null, diffMult = null, contactDamage = null) {
     const type = typeConfig || { id: 'kisotsu', baseTint: null, hpMult: 1.0, speedMult: 1.0, sizeMult: 1.0, behaviorFlags: {} }
     const dm   = diffMult   || { hpMult: 1.0, speedMult: 1.0 }
 
@@ -38,6 +38,7 @@ export default class Enemy {
     sprite._baseTint      = type.baseTint
     sprite._typeConfig    = type
     sprite._speed         = CFG.ENEMY_SPEED * type.speedMult * dm.speedMult
+    sprite._contactDamage = contactDamage !== null ? contactDamage : CFG.ENEMY_DAMAGE
     sprite._stunTimer     = 0
     sprite._armorShred    = 0
     sprite._outputMult    = 1.0
@@ -389,7 +390,7 @@ export default class Enemy {
     if (sprite.damageCd > 0 || sprite.dying) return
     const scene = sprite.scene
 
-    let dmgToPlayer = CFG.ENEMY_DAMAGE * (sprite._outputMult ?? 1.0)
+    let dmgToPlayer = (sprite._contactDamage ?? CFG.ENEMY_DAMAGE) * (sprite._outputMult ?? 1.0)
 
     // Glass cannon — player takes double damage
     if (scene._glassCannon) dmgToPlayer *= 2
@@ -414,7 +415,7 @@ export default class Enemy {
 
     // Thorns — reflect 300% damage back to enemy
     if (scene._procsOwned?.has('thorns')) {
-      const thornsDmg = CFG.ENEMY_DAMAGE * 3
+      const thornsDmg = (sprite._contactDamage ?? CFG.ENEMY_DAMAGE) * 3
       const dx = sprite.x - player.x, dy = sprite.y - player.y
       const len = Math.hypot(dx, dy) || 1
       sprite.body.velocity.x = (dx / len) * 250
