@@ -785,8 +785,16 @@ export default class GameScene extends Phaser.Scene {
               this._weaponUpgradesOwned.set(upgrade.weaponId, new Set())
             this._weaponUpgradesOwned.get(upgrade.weaponId).add(upgrade.id)
           }
-          // Mark Lv.3 branch as done so mode doesn't repeat
-          this._weaponChoiceDone = true
+          // Lv.3 branch: seal ALL weapon upgrades — none will appear again this run
+          if (!this._weaponChoiceDone) {
+            this._weaponChoiceDone = true
+            const wId = this._weapons[0]?.weapon.id
+            if (wId) {
+              if (!this._weaponUpgradesOwned.has(wId)) this._weaponUpgradesOwned.set(wId, new Set())
+              for (const u of (WEAPON_UPGRADES_MAP[wId] || []))
+                this._weaponUpgradesOwned.get(wId).add(u.id)
+            }
+          }
         } else if (upgrade.target === 'elemental') {
           this._affixes.push(upgrade.elemental)
           this._affixCounts.set(upgrade.elemental.id, 1)
@@ -846,16 +854,8 @@ export default class GameScene extends Phaser.Scene {
 
     const candidates = []
 
-    // Weapon-specific upgrades — oneTime, available in regular pool after Lv.3
-    const entry = this._weapons[0]
-    if (entry) {
-      const wId    = entry.weapon.id
-      const owned  = this._weaponUpgradesOwned.get(wId) || new Set()
-      for (const u of (WEAPON_UPGRADES_MAP[wId] || [])) {
-        if (!owned.has(u.id))
-          candidates.push({ ...u, target: 'weapon', weaponId: wId })
-      }
-    }
+    // Weapon upgrades are handled exclusively by the weapon_branch pool at Lv.3.
+    // They never appear in the normal pool (before or after the branch).
 
     // Elemental ailments
     for (const e of ALL_ELEMENTALS) {
