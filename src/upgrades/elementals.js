@@ -6,6 +6,7 @@
 // holy → rarity: 'rare' (minTimeMs 2 分鐘後解鎖)
 //
 // onHit(enemy, damage, scene) — called from Enemy.takeDamage affix pipeline
+import poisonAffix from '../affixes/poison.js'
 
 export const ALL_ELEMENTALS = [
   {
@@ -96,14 +97,9 @@ export const ALL_ELEMENTALS = [
     desc:       '攻擊有 30% 機率使敵人中毒，每秒扣除最大生命 1%；中毒的敵人死亡後爆出毒霧傳染周邊',
     rarity:     'rare',
     minTimeMs:  1 * 60 * 1000,
-    onHit(enemy) {
+    onHit(enemy, damage, scene) {
       if (Math.random() < 0.30) {
-        const se = enemy._statusEffects
-        if (!se) return
-        if (!se.poison) se.poison = { active: false, timer: 0, _accum: 0 }
-        const dur = 5000 * (enemy.scene?._ailmentDurMult || 1)
-        se.poison.active = true
-        se.poison.timer  = Math.max(se.poison.timer, dur)
+        poisonAffix.onHit(enemy, damage, scene)
       }
     },
   },

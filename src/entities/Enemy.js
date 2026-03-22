@@ -1,6 +1,7 @@
 // src/entities/Enemy.js
 import Phaser from 'phaser'
 import { CFG } from '../config.js'
+import { applyPoisonStacks, ensurePoisonState } from '../affixes/poison.js'
 
 export default class Enemy {
   static createTexture(scene) {
@@ -44,6 +45,8 @@ export default class Enemy {
     sprite._outputMult    = 1.0
     sprite._inSanctuaryAura = false
     sprite._darkAura        = false
+    sprite._kunaiPlague     = false
+    sprite._kunaiRuptureUntil = 0
 
     sprite.setAlpha(1)
     if (type.baseTint !== null) {
@@ -58,7 +61,7 @@ export default class Enemy {
       ignite: { active: false, timer: 0, dps: 0, _accum: 0 },
       shock:  { active: false, timer: 0 },
       bleed:  { active: false, timer: 0, _accum: 0 },
-      poison: { active: false, timer: 0, _accum: 0 },
+      poison: { active: false, timer: 0, stacks: 0, rate: 0.01, flat: 0, _accum: 0 },
     }
 
     const frame0 = sprite.scene.textures.get('kisotsu-run').frames[0]
@@ -147,10 +150,14 @@ export default class Enemy {
       if (sprite.hp <= 0 && !sprite.dying) Enemy._triggerDeath(sprite)
     }
 
-    // Poison DoT — 1% max HP per second
+    // Poison DoT — defaults to 1% max HP per second, but specific skills can raise it.
     if (se.poison && se.poison.active) {
       se.poison.timer -= delta
-      const dmg = sprite.maxHp * 0.01 * (delta / 1000)
+      const stackDps = (se.poison.stacks || 0) * 3
+      const rate = se.poison.rate ?? 0.01
+      const flat = se.poison.flat ?? 0
+      const dps = Math.max(sprite.maxHp * rate, flat, stackDps)
+      const dmg = dps * (delta / 1000)
       sprite.hp -= dmg
       se.poison._accum = (se.poison._accum || 0) + dmg
       if (se.poison._accum >= 1) {
@@ -158,7 +165,12 @@ export default class Enemy {
         se.poison._accum -= shown
         Enemy.showDamageNumber(sprite, shown, '#44ff44')
       }
-      if (se.poison.timer <= 0) se.poison.active = false
+      if (se.poison.timer <= 0) {
+        se.poison.active = false
+        se.poison.stacks = 0
+        se.poison.rate = 0.01
+        se.poison.flat = 0
+      }
       if (sprite.hp <= 0 && !sprite.dying) Enemy._triggerDeath(sprite)
     }
 
@@ -236,6 +248,9 @@ export default class Enemy {
     if (se?.poison?.active && scene._affixCounts?.has('poison')) {
       Enemy._spawnPoisonCloud(scene, x, y)
     }
+    if (sprite._kunaiPlague) {
+      Enemy._spreadKunaiPlague(scene, sprite)
+    }
     if (sprite._pulseTween) { sprite._pulseTween.stop(); sprite._pulseTween = null }
     sprite.clearTint()
 
@@ -274,6 +289,8 @@ export default class Enemy {
         sprite._stunTimer  = 0
         sprite._inSanctuaryAura = false
         sprite._darkAura   = false
+        sprite._kunaiPlague = false
+        sprite._kunaiRuptureUntil = 0
         const se = sprite._statusEffects
         if (se) {
           se.chill.active = false; se.chill.timer = 0; se.chill.stacks = 0
@@ -281,7 +298,7 @@ export default class Enemy {
           if (se.ignite) { se.ignite.active = false; se.ignite.timer = 0; se.ignite.dps = 0; se.ignite._accum = 0 }
           if (se.shock)  { se.shock.active  = false; se.shock.timer  = 0 }
           if (se.bleed)  { se.bleed.active  = false; se.bleed.timer  = 0; se.bleed._accum = 0 }
-          if (se.poison) { se.poison.active = false; se.poison.timer = 0; se.poison._accum = 0 }
+          if (se.poison) { se.poison.active = false; se.poison.timer = 0; se.poison.stacks = 0; se.poison.rate = 0.01; se.poison.flat = 0; se.poison._accum = 0 }
         }
         sprite.dying = false
         sprite.setAlpha(1)
@@ -306,10 +323,8 @@ export default class Enemy {
             const last = damageCd.get(e) || 0
             if (now - last >= 400) {
               damageCd.set(e, now)
-              if (!e._statusEffects.poison) e._statusEffects.poison = { active: false, timer: 0, _accum: 0 }
-              const dur = 3000 * (scene._ailmentDurMult || 1)
-              e._statusEffects.poison.active = true
-              e._statusEffects.poison.timer  = Math.max(e._statusEffects.poison.timer, dur)
+              ensurePoisonState(e)
+              applyPoisonStacks(e, scene, 1, 3000)
             }
           }
         })
@@ -319,6 +334,32 @@ export default class Enemy {
       cloud.destroy()
       tick.remove()
     })
+  }
+
+  static _spreadKunaiPlague(scene, source) {
+    const count = Phaser.Math.Between(2, 3)
+    const dur = 5000 * (scene._ailmentDurMult || 1)
+    const targets = (scene._enemies?.getChildren() || [])
+      .filter(e => e.active && !e.dying && e !== source)
+      .filter(e => Phaser.Math.Distance.Between(source.x, source.y, e.x, e.y) <= 150)
+      .sort((a, b) =>
+        Phaser.Math.Distance.Between(source.x, source.y, a.x, a.y) -
+        Phaser.Math.Distance.Between(source.x, source.y, b.x, b.y)
+      )
+      .slice(0, count)
+
+    targets.forEach(e => {
+      applyPoisonStacks(e, scene, 2, dur)
+      const poison = ensurePoisonState(e)
+      poison.flat = Math.max(poison.flat ?? 0, Math.max(6, (source.maxHp || 0) * 0.015))
+      e._kunaiPlague = true
+    })
+
+    if (!targets.length) return
+    const g = scene.add.graphics().setDepth(6)
+    g.lineStyle(2, 0x55dd66, 0.7)
+    targets.forEach(e => g.lineBetween(source.x, source.y, e.x, e.y))
+    scene.tweens.add({ targets: g, alpha: 0, duration: 220, onComplete: () => g.destroy() })
   }
 
   // ── Soft Separation ──────────────────────────────────────────────────────
