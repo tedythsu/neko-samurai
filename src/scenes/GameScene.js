@@ -378,6 +378,10 @@ export default class GameScene extends Phaser.Scene {
 
     this._enemies.getChildren().forEach(e => Enemy.update(e, this._player, delta))
 
+    // Soft separation — nudge overlapping enemies apart without hard colliders
+    const _activeEnemies = this._enemies.getChildren().filter(e => e.active && !e.dying)
+    Enemy.applySeparation(_activeEnemies)
+
     const px = this._player.x
     const py = this._player.y
 

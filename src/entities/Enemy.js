@@ -321,6 +321,54 @@ export default class Enemy {
     })
   }
 
+  // ── Soft Separation ──────────────────────────────────────────────────────
+  // Prevents enemies from fully stacking on each other without hard colliders.
+  // Call once per frame AFTER all Enemy.update() calls, passing the live array.
+  static applySeparation(activeEnemies) {
+    const n = activeEnemies.length
+    if (n < 2) return
+
+    // Pre-compute each enemy's separation radius (scales with sizeMult)
+    const SEP_BASE = 26   // px for sizeMult=1 enemy
+    const FORCE    = 90   // base velocity impulse
+    const CAP      = 180  // max separation velocity added per frame
+
+    const radii = activeEnemies.map(e => SEP_BASE * (e._typeConfig?.sizeMult || 1))
+
+    for (let i = 0; i < n; i++) {
+      const a = activeEnemies[i]
+      if (a.knockbackTimer > 0) continue   // don't fight active knockback
+
+      const ra = radii[i]
+      let fx = 0, fy = 0
+
+      for (let j = 0; j < n; j++) {
+        if (i === j) continue
+        const b   = activeEnemies[j]
+        const rb  = radii[j]
+        const minDist = ra + rb
+
+        const dx = a.x - b.x
+        const dy = a.y - b.y
+        const dist2 = dx * dx + dy * dy
+        if (dist2 >= minDist * minDist) continue   // far enough — skip
+
+        const dist = Math.sqrt(dist2) || 0.1
+        // Elites push with more force (sizeMult>1 = bigger = heavier = more push)
+        const push = FORCE * (b._typeConfig?.sizeMult || 1) * (1 - dist / minDist)
+        fx += (dx / dist) * push
+        fy += (dy / dist) * push
+      }
+
+      if (fx !== 0 || fy !== 0) {
+        const len = Math.hypot(fx, fy)
+        if (len > CAP) { fx = fx / len * CAP; fy = fy / len * CAP }
+        a.body.velocity.x += fx
+        a.body.velocity.y += fy
+      }
+    }
+  }
+
   static showDamageNumber(sprite, amount, color) {
     if (!amount || amount < 1) return
     const scene = sprite.scene
