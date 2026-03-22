@@ -3,6 +3,7 @@ import Phaser from 'phaser'
 import Enemy  from '../entities/Enemy.js'
 import { getOrCreate, nearestEnemies, rollDamage } from './_pool.js'
 import { applyRicochet } from '../upgrades/projEffects.js'
+import { applyPoisonStacks } from '../affixes/poison.js'
 
 const BASE_H    = 40
 const HIT_HALF  = 14
@@ -51,7 +52,8 @@ export default {
       s.penetrate      = stats.penetrate || false
       s.knockback      = stats.knockback ?? 60
       s._hitRadius     = HIT_HALF * stats._scale
-      s._homing        = stats._homing        || false
+      s._plague        = stats._plague        || false
+      s._rupture       = stats._rupture       || false
       s._pierceBonus   = stats._pierceBonus   || 0
       s._stun          = stats._stun          || false
       s._ricochet      = stats._ricochet      || false
@@ -98,28 +100,6 @@ export default {
       if (bounced) sprite._wallBounced = true
     }
 
-    // 咒印・自動 — homing: steer toward nearest enemy each frame
-    if (sprite._homing) {
-      const scene   = sprite.scene
-      const enemies = scene._enemies
-      if (enemies) {
-        const nearest = enemies.getChildren()
-          .filter(e => e.active && !e.dying && !sprite.hitSet.has(e))
-          .sort((a, b) =>
-            Phaser.Math.Distance.Between(sprite.x, sprite.y, a.x, a.y) -
-            Phaser.Math.Distance.Between(sprite.x, sprite.y, b.x, b.y))[0]
-        if (nearest) {
-          const speed = Math.hypot(sprite.body.velocity.x, sprite.body.velocity.y)
-          const angle = Phaser.Math.Angle.Between(sprite.x, sprite.y, nearest.x, nearest.y)
-          const tx = Math.cos(angle) * speed
-          const ty = Math.sin(angle) * speed
-          // Gradual steering (lerp velocity)
-          sprite.body.velocity.x += (tx - sprite.body.velocity.x) * 0.12
-          sprite.body.velocity.y += (ty - sprite.body.velocity.y) * 0.12
-        }
-      }
-    }
-
     if (Phaser.Math.Distance.Between(sprite.spawnX, sprite.spawnY, sprite.x, sprite.y) >= sprite.range) {
       sprite.disableBody(true, true)
     }
@@ -132,12 +112,22 @@ export default {
         if (proj._spent || proj.hitSet.has(e)) return
         if (Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y) < proj._hitRadius) {
           const pierceCount = proj.hitSet.size
-          const dmg = proj.damage * (1 + pierceCount * (proj._pierceBonus || 0))
+          const pierceBonus = (proj._pierceBonus || 0) * pierceCount
+          const pierceBonusCap = entry.stats._pierceBonusCap ?? Infinity
+          const dmg = proj.damage * (1 + Math.min(pierceBonus, pierceBonusCap))
           proj.hitSet.add(e)
           Enemy.takeDamage(e, dmg, proj.x, proj.y, affixes, proj.knockback ?? 60, {
             source: 'weapon',
             weaponId: this.id,
           })
+
+          if (proj._plague) {
+            _applyPlague(e, proj, scene)
+          }
+
+          if (proj._rupture) {
+            _applyRupture(e, proj, scene)
+          }
 
           // 影縫・定身 — stun on hit
           if (proj._stun && Math.random() < 0.40) {
@@ -177,7 +167,8 @@ function _spawnMicroKunai(scene, pool, proj, enemy, stats) {
     micro.penetrate      = false
     micro.knockback      = 25
     micro._hitRadius     = HIT_HALF * 0.55 * stats._scale
-    micro._homing        = false
+    micro._plague        = false
+    micro._rupture       = false
     micro._pierceBonus   = 0
     micro._stun          = false
     micro._ricochet      = false
@@ -191,4 +182,62 @@ function _spawnMicroKunai(scene, pool, proj, enemy, stats) {
     micro._spent         = false
     scene.physics.velocityFromAngle(baseAngle + offset, 520, micro.body.velocity)
   })
+}
+
+function _applyPlague(enemy, proj, scene) {
+  applyPoisonStacks(enemy, scene, enemy._bossId ? 1 : 2, 5000)
+  const se = enemy._statusEffects
+  if (!se?.poison) return
+  se.poison.flat = Math.max(se.poison.flat ?? 0, Math.max(6, proj.damage * 0.28))
+  enemy._kunaiPlague = true
+}
+
+function _applyRupture(enemy, proj, scene) {
+  const se = enemy._statusEffects
+  if (!se) return
+  if (!se.bleed) se.bleed = { active: false, timer: 0, _accum: 0 }
+  const hadBleed = se.bleed.active && se.bleed.timer > 0
+
+  const dur = 3000 * (scene._ailmentDurMult || 1)
+  se.bleed.active = true
+  se.bleed.timer = Math.max(se.bleed.timer, dur)
+
+  if (hadBleed) {
+    const bonus = Math.max(
+      Math.round(proj.damage * 1.35),
+      Math.round((enemy.maxHp || proj.damage) * (enemy._bossId ? 0.018 : 0.035))
+    )
+    Enemy.takeDamage(enemy, bonus, proj.x, proj.y, [], 20, {
+      source: 'ability',
+      weaponId: 'kunai',
+    })
+    _triggerBloodburst(enemy, proj, scene, bonus)
+  }
+}
+
+function _triggerBloodburst(enemy, proj, scene, bonus) {
+  const radius = enemy._bossId ? 88 : 72
+  const splash = Math.max(Math.round(bonus * 0.45), Math.round(proj.damage * 0.75))
+
+  const g = scene.add.graphics().setDepth(7)
+  g.fillStyle(0xaa2233, 0.28)
+  g.fillCircle(enemy.x, enemy.y, radius)
+  g.lineStyle(2, 0xff6677, 0.8)
+  g.strokeCircle(enemy.x, enemy.y, radius)
+  scene.tweens.add({ targets: g, alpha: 0, duration: 220, onComplete: () => g.destroy() })
+
+  scene._enemies?.getChildren()
+    .filter(e => e.active && !e.dying && e !== enemy)
+    .forEach(e => {
+      if (Phaser.Math.Distance.Between(enemy.x, enemy.y, e.x, e.y) > radius) return
+      Enemy.takeDamage(e, splash, enemy.x, enemy.y, [], 40, {
+        source: 'ability',
+        weaponId: 'kunai',
+      })
+      const se = e._statusEffects
+      if (se?.bleed) {
+        se.bleed.active = true
+        se.bleed.timer = Math.max(se.bleed.timer, 2000 * (scene._ailmentDurMult || 1))
+      }
+    })
 }

@@ -46,31 +46,32 @@ export const WEAPON_UPGRADES_MAP = {
 
   kunai: [
     {
-      id: 'kunai_multi',
-      name: '【影分身・量】',
-      desc: '額外增加 2 個投射物（扇形發射）',
+      id: 'kunai_plague',
+      name: '【疫刃・傳染】',
+      desc: '命中時施加劇毒；中毒目標死亡時，會把毒性擴散給周圍 2 至 3 名敵人',
       rarity: 'rare',
       oneTime: true,
-      apply(stats) { stats.projectileCount = (stats.projectileCount || 1) + 2 },
+      apply(stats) { stats._plague = true },
     },
     {
-      id: 'kunai_homing',
-      name: '【咒印・自動】',
-      desc: '苦無自動轉向飛行，優先攻擊最近的敵人',
+      id: 'kunai_rupture',
+      name: '【血契・裂傷】',
+      desc: '命中會附加流血；只要命中已流血的目標，就會引爆血爆造成高額傷害，並波及周圍敵人',
       rarity: 'rare',
       oneTime: true,
-      apply(stats) { stats._homing = true },
+      apply(stats) { stats._rupture = true },
     },
     {
       id: 'kunai_pierce',
       name: '【穿雲・貫通】',
-      desc: '苦無可穿透 3 個目標，每穿透一個目標傷害提升 10%',
+      desc: '苦無可無限穿透目標；每穿透一個目標傷害提升 10%，最多提升至 60%',
       rarity: 'rare',
       oneTime: true,
       apply(stats) {
         stats.penetrate    = true
         stats._pierceBonus = 0.10
-        stats._pierceMax   = 3
+        stats._pierceMax   = Infinity
+        stats._pierceBonusCap = 0.60
       },
     },
     {
