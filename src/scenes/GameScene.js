@@ -4,7 +4,6 @@ import Player   from '../entities/Player.js'
 import Enemy    from '../entities/Enemy.js'
 import { CFG, randomEdgePoint, xpThreshold, getWaveConfig, getWaveIndex, WAVE_NAMES, RARITY_WEIGHTS } from '../config.js'
 import { WEAPON_UPGRADES_MAP } from '../upgrades/weaponUpgrades.js'
-import { ALL_ELEMENTALS }      from '../upgrades/elementals.js'
 import { ALL_PROCS }           from '../upgrades/procs.js'
 import { ALL_KEYSTONES }       from '../upgrades/keystones.js'
 import { ALL_PASSIVES }        from '../upgrades/passives.js'
@@ -71,8 +70,6 @@ export default class GameScene extends Phaser.Scene {
 
     // Multi-weapon state
     this._weapons              = []
-    this._affixes              = []          // active elemental ailments
-    this._affixCounts          = new Map()   // elemental id → 1 (one-time)
     this._weaponUpgradesOwned  = new Map()   // weaponId → Set(upgradeId)
     this._procsOwned           = new Set()
     this._keystonesOwned       = new Set()
@@ -106,13 +103,19 @@ export default class GameScene extends Phaser.Scene {
     this._projSpeedMult     = 1.0
     this._attackSpeedMult   = 1.0
     this._critKillXpMult    = 1
+    this._critSoul          = false
     this._xpMult            = 1.0
     this._enemySpeedBuff    = 1.0
     this._cdMult            = 1.0
     this._furyMode          = false
     this._shadowDodge       = false
+    this._shadowCloneTimer  = 0
+    this._shadowStrideUntil = 0
     this._firstStrikeCrit   = false
     this._steadyStance      = false
+    this._ailmentExpose     = false
+    this._bloodRush         = false
+    this._bloodRushUntil    = 0
     this._caltrops          = false
     this._caltropTimer      = 0
     this._substitutionReady = false
@@ -139,8 +142,7 @@ export default class GameScene extends Phaser.Scene {
     this._displayXp = 0
     this._orbs = []
 
-    this.events.on('enemy-died', ({ x, y }) => {
-      this._spawnOrb(x, y)
+    this.events.on('enemy-died', () => {
       this._killCount++
       // Soul burst — every 50 kills triggers a screen shockwave
       if (this._procsOwned.has('soul_burst')) {
@@ -153,6 +155,15 @@ export default class GameScene extends Phaser.Scene {
       // Yamatanoorochi — +0.5% attack speed per kill (capped at +50%)
       if (this._yamatano) {
         this._attackSpeedMult = Math.min(1.30, (this._attackSpeedMult || 1) + 0.002)
+      }
+    })
+    this.events.on('enemy-died-detailed', ({ x, y, enemy }) => {
+      const critSoulMult = this._critSoul && enemy?._lastHitWasCrit ? 1.8 : 1
+      this._spawnOrb(x, y, this._currentWaveXp * critSoulMult)
+      if (!this._bloodRush || !enemy) return
+      const se = enemy._statusEffects
+      if (se?.poison?.active || se?.bleed?.active) {
+        this._bloodRushUntil = this.time.now + 3000
       }
     })
     this.events.on('player-dead', this._onPlayerDead, this)
@@ -474,6 +485,22 @@ export default class GameScene extends Phaser.Scene {
     if (this._substitutionCd > 0) {
       this._substitutionCd = Math.max(0, this._substitutionCd - delta)
     }
+    if (this._shadowDodge) {
+      const vel = this._player?.sprite?.body?.velocity
+      const isMoving = vel ? (Math.abs(vel.x) + Math.abs(vel.y)) > 35 : false
+      if (isMoving) {
+        this._shadowCloneTimer = (this._shadowCloneTimer || 0) + delta
+        if (this._shadowCloneTimer >= 1800) {
+          this._shadowCloneTimer = 0
+          this._triggerShadowCloneBurst(px, py, 80, 18, 70)
+        }
+      } else {
+        this._shadowCloneTimer = 0
+      }
+    }
+    if (this._bloodRushUntil > 0 && this.time.now >= this._bloodRushUntil) {
+      this._bloodRushUntil = 0
+    }
     if (this._substitutionGrace > 0) {
       this._substitutionGrace = Math.max(0, this._substitutionGrace - delta)
     }
@@ -528,7 +555,8 @@ export default class GameScene extends Phaser.Scene {
     for (const entry of this._weapons) {
       if (entry.stats.fireRate > 0) {
         entry.timer += delta
-        const effectiveRate = Math.max(120, entry.stats.fireRate / (this._attackSpeedMult || 1))
+        const tempAtkSpd = this._bloodRushUntil > this.time.now ? 1.12 : 1
+        const effectiveRate = Math.max(120, entry.stats.fireRate / ((this._attackSpeedMult || 1) * tempAtkSpd))
         if (entry.timer >= effectiveRate) {
           entry.timer = 0
           entry.weapon.fire(this, entry.projectiles, px, py, entry.stats, this._enemies, this._player, this._affixes)
@@ -589,7 +617,7 @@ export default class GameScene extends Phaser.Scene {
         if (orb._emitter) orb._emitter.destroy()
         orb.destroy()
         this._orbs.splice(i, 1)
-        this._addXp(this._currentWaveXp * (this._critKillXpMult || 1))
+        this._addXp((orb._xpValue ?? this._currentWaveXp) * (this._critKillXpMult || 1))
         continue
       }
 
@@ -758,11 +786,12 @@ export default class GameScene extends Phaser.Scene {
     Enemy.activate(enemy, x, y, typeConfig, null, wave.damage)
   }
 
-  _spawnOrb(ex, ey) {
+  _spawnOrb(ex, ey, xpValue = null) {
     const orb = this.add.sprite(ex, ey, 'musou', 0)
       .setDisplaySize(this._orbW, this._orbH)
       .setDepth(4)
     orb.play('musou-spin')
+    orb._xpValue = xpValue ?? this._currentWaveXp
 
     // Floating bob ±8px
     this.tweens.add({
@@ -847,9 +876,6 @@ export default class GameScene extends Phaser.Scene {
           } else if (!this._weaponFinalChoiceDone) {
             this._weaponFinalChoiceDone = true
           }
-        } else if (upgrade.target === 'elemental') {
-          this._affixes.push(upgrade.elemental)
-          this._affixCounts.set(upgrade.elemental.id, 1)
         } else if (upgrade.target === 'proc') {
           this._procsOwned.add(upgrade.id)
           if (upgrade.apply) upgrade.apply(this._player, this)
@@ -897,7 +923,6 @@ export default class GameScene extends Phaser.Scene {
     const elapsed = this._elapsed || 0
     const ownedIds = new Set()
 
-    this._affixCounts.forEach((_, id) => ownedIds.add(id))
     this._procsOwned.forEach(id => ownedIds.add(id))
     this._keystonesOwned.forEach(id => ownedIds.add(id))
     this._passivesOwned.forEach(id => ownedIds.add(id))
@@ -907,13 +932,6 @@ export default class GameScene extends Phaser.Scene {
     const activeWeaponIds = new Set(this._weapons.map(e => e.weapon.id))
 
     const candidates = []
-
-    // Elemental ailments
-    for (const e of ALL_ELEMENTALS) {
-      if (!this._affixCounts.has(e.id) && elapsed >= (e.minTimeMs || 0))
-        candidates.push({ id: e.id, name: e.name, desc: e.desc, rarity: e.rarity,
-          target: 'elemental', elemental: e })
-    }
 
     // Procs/Auras
     if (elapsed >= 2 * 60 * 1000) {
@@ -1080,6 +1098,18 @@ export default class GameScene extends Phaser.Scene {
     const flash = this.add.rectangle(W / 2, H / 2, W, H, 0x220066, 0.35)
       .setScrollFactor(0).setDepth(299)
     this.tweens.add({ targets: flash, alpha: 0, duration: 800, onComplete: () => flash.destroy() })
+  }
+
+  _triggerShadowCloneBurst(x, y, radius = 90, damage = 30, knockback = 90) {
+    this._enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
+      if (Phaser.Math.Distance.Between(x, y, e.x, e.y) < radius) {
+        Enemy.takeDamage(e, damage, x, y, this._affixes || [], knockback, { source: 'proc' })
+      }
+    })
+    const g = this.add.graphics().setDepth(8)
+    g.lineStyle(2, 0x99bbff, 0.85)
+    g.strokeCircle(x, y, radius)
+    this.tweens.add({ targets: g, alpha: 0, duration: 220, onComplete: () => g.destroy() })
   }
 
   _cooldownAdjusted(baseMs) {

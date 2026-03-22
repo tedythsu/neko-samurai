@@ -47,6 +47,7 @@ export default class Enemy {
     sprite._darkAura        = false
     sprite._kunaiPlague     = false
     sprite._kunaiRuptureUntil = 0
+    sprite._lastHitWasCrit  = false
 
     sprite.setAlpha(1)
     if (type.baseTint !== null) {
@@ -242,6 +243,7 @@ export default class Enemy {
     const se        = sprite._statusEffects
 
     scene.events.emit('enemy-died', { x, y })
+    scene.events.emit('enemy-died-detailed', { x, y, enemy: sprite })
     sprite.dying = true
 
     // Poison cloud — spread on death if poisoned and player has the elemental
@@ -442,11 +444,11 @@ export default class Enemy {
         dmgMult *= (1 + (scene._globalDmgMult - 1) * (sourceType === 'weapon' ? 0.85 : 0.55))
       }
       if (scene._armorPen) dmgMult *= (1 + Math.min(0.18, scene._armorPen * 0.5))
-      if (scene._steadyStance) {
-        const vel = scene._player?.sprite?.body?.velocity
-        const isMoving = vel ? (Math.abs(vel.x) + Math.abs(vel.y)) > 5 : false
-        if (!isMoving) dmgMult *= 1.18
-      }
+    if (scene._steadyStance) {
+      const vel = scene._player?.sprite?.body?.velocity
+      const isMoving = vel ? (Math.abs(vel.x) + Math.abs(vel.y)) > 5 : false
+      if (!isMoving) dmgMult *= 1.12
+    }
     } else if (sourceType === 'proc' && scene._globalDmgMult && scene._globalDmgMult !== 1) {
       dmgMult *= (1 + (scene._globalDmgMult - 1) * 0.35)
     }
@@ -463,6 +465,7 @@ export default class Enemy {
     if (scene._keystonesOwned?.has('ice_thunder') && se?.frozen?.active) dmgMult *= 1.75
     // Dark aura: +25% damage to aura-marked enemies
     if (sprite._darkAura) dmgMult *= 1.18
+    if (scene._ailmentExpose && (se?.poison?.active || se?.bleed?.active)) dmgMult *= 1.16
     // Boss chest bonus (kijo kill reward)
     if (scene._bossChestBonus) dmgMult *= scene._bossChestBonus
 
@@ -481,9 +484,10 @@ export default class Enemy {
     const isFullHp      = sprite.hp >= sprite.maxHp * 0.99
     const firstStrike   = sourceType === 'weapon' && scene._firstStrikeCrit && isFullHp
     const isCrit        = sourceType === 'weapon' && (firstStrike || (Math.random() < critChance))
-    const firstStrikeMult = firstStrike ? 2.0 : 1.0
+    const firstStrikeMult = firstStrike ? 1.35 : 1.0
 
     const damage = Math.round(amount * dmgMult * (isCrit ? critMult : 1) * firstStrikeMult)
+    sprite._lastHitWasCrit = isCrit
     sprite.hp -= damage
     scene.playHitSound?.(scene._hitSoundKey)
 
@@ -581,17 +585,10 @@ export default class Enemy {
     if (scene._shadowDodge) {
       const vel = scene._player?.sprite?.body?.velocity
       const isMoving = vel ? (Math.abs(vel.x) + Math.abs(vel.y)) > 5 : false
-      if (isMoving && Math.random() < 0.30) {
+      if (isMoving && Math.random() < 0.40) {
         const px = player.x, py = player.y
-        scene._enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
-          if (Phaser.Math.Distance.Between(px, py, e.x, e.y) < 75) {
-            Enemy.takeDamage(e, 24, px, py, scene._affixes || [], 80, { source: 'proc' })
-          }
-        })
-        const g = scene.add.graphics().setDepth(8)
-        g.lineStyle(2, 0x99bbff, 0.85)
-        g.strokeCircle(px, py, 75)
-        scene.tweens.add({ targets: g, alpha: 0, duration: 220, onComplete: () => g.destroy() })
+        scene._triggerShadowCloneBurst?.(px, py, 100, 30, 90)
+        scene._shadowStrideUntil = scene.time.now + 1200
         sprite.damageCd = 600
         return
       }
@@ -606,7 +603,7 @@ export default class Enemy {
     if (scene._steadyStance) {
       const vel = scene._player?.sprite?.body?.velocity
       const isMoving = vel ? (Math.abs(vel.x) + Math.abs(vel.y)) > 5 : false
-      if (!isMoving) dmgToPlayer *= 0.55
+      if (!isMoving) dmgToPlayer *= 0.65
     }
 
     // Iron body shield — absorb one hit

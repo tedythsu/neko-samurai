@@ -110,7 +110,8 @@ export default class Player {
     const len = Math.hypot(vx, vy)
     if (len > 1) { vx /= len; vy /= len }
 
-    this.sprite.setVelocity(vx * this.speed, vy * this.speed)
+    const tempSpeedMult = this.scene._shadowStrideUntil > this.scene.time.now ? 1.12 : 1
+    this.sprite.setVelocity(vx * this.speed * tempSpeedMult, vy * this.speed * tempSpeedMult)
 
     if      (vx >  0.05) this.sprite.setFlipX(false)
     else if (vx < -0.05) this.sprite.setFlipX(true)

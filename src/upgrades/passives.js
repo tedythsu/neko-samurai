@@ -92,19 +92,19 @@ export const ALL_PASSIVES = [
 
   // ─── Tactical / utility (oneTime) ────────────────────────────────────────
   {
-    id: 'first_strike', name: '【拔刀・一閃】', desc: '對滿血敵人必定爆擊，且傷害翻倍',
+    id: 'first_strike', name: '【拔刀・一閃】', desc: '對滿血敵人必定爆擊，且本次傷害額外 +35%',
     rarity: 'rare', oneTime: true,
     apply: (_p, scene) => { scene._firstStrikeCrit = true },
   },
   {
-    id: 'shadow_dodge', name: '【影分身・閃】', desc: '移動時有 30% 機率閃避碰撞傷害，並在原地留下爆裂殘影',
+    id: 'shadow_dodge', name: '【影分身・閃】', desc: '移動時會週期性留下爆裂殘影；碰撞時有 40% 機率閃避並立刻觸發更強殘影，觸發後短暫加速',
     rarity: 'rare', oneTime: true,
-    apply: (_p, scene) => { scene._shadowDodge = true },
+    apply: (_p, scene) => { scene._shadowDodge = true; scene._shadowCloneTimer = 0 },
   },
   {
-    id: 'crit_soul', name: '【處決‧魂吸】', desc: '所有擊殺掉落的經驗球價值翻倍',
+    id: 'crit_soul', name: '【處決‧魂吸】', desc: '爆擊擊殺時，掉落的經驗球價值 +80%',
     rarity: 'rare', oneTime: true,
-    apply: (_p, scene) => { scene._critKillXpMult = 2 },
+    apply: (_p, scene) => { scene._critSoul = true },
   },
   {
     id: 'substitution', name: '【替身術】', desc: '致死傷害改為留下替身，回復 20% 最大生命並獲得 1.5 秒無敵（冷卻 45 秒）',
@@ -122,7 +122,7 @@ export const ALL_PASSIVES = [
     apply: (_p, scene) => { scene._caltrops = true; scene._caltropTimer = 0 },
   },
   {
-    id: 'steady_stance', name: '【防禦‧姿態】', desc: '站立不動時受傷 -45%，且造成傷害 +18%',
+    id: 'steady_stance', name: '【防禦‧姿態】', desc: '站立不動時受傷 -35%，且造成傷害 +12%',
     rarity: 'rare', oneTime: true,
     apply: (_p, scene) => { scene._steadyStance = true },
   },
@@ -132,11 +132,12 @@ export const ALL_PASSIVES = [
     apply: (_p, scene) => { scene._cdMult = (scene._cdMult || 1) * 0.70 },
   },
   {
-    id: 'xp_hunger', name: '【經驗‧渴望】', desc: '經驗獲取 +15%，但敵人跑速 +5%',
+    id: 'xp_hunger', name: '【經驗‧渴望】', desc: '經驗獲取 +25%，拾取半徑 +25%，但敵人跑速 +4%',
     rarity: 'common', oneTime: true,
     apply: (_p, scene) => {
-      scene._xpMult        = (scene._xpMult        || 1) * 1.15
-      scene._enemySpeedBuff = (scene._enemySpeedBuff || 1) * 1.05
+      scene._xpMult         = (scene._xpMult         || 1) * 1.25
+      scene._orbAttractRadius = (scene._orbAttractRadius || 130) * 1.25
+      scene._enemySpeedBuff = (scene._enemySpeedBuff || 1) * 1.04
     },
   },
   {
@@ -161,5 +162,15 @@ export const ALL_PASSIVES = [
     rarity: 'epic', oneTime: true,
     requiresWeapons: ['kunai', 'shuriken'],   // multi-projectile weapons only
     apply: (_p, scene) => { scene._secondSplit = true },
+  },
+  {
+    id: 'toxicology', name: '【毒傷‧見切】', desc: '對中毒或流血的敵人造成傷害 +16%',
+    rarity: 'rare', oneTime: true,
+    apply: (_p, scene) => { scene._ailmentExpose = true },
+  },
+  {
+    id: 'blood_rush', name: '【血狩‧疾走】', desc: '擊殺中毒或流血的敵人時，3 秒內移速與攻擊頻率 +12%',
+    rarity: 'rare', oneTime: true,
+    apply: (_p, scene) => { scene._bloodRush = true },
   },
 ]
