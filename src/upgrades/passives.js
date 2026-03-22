@@ -147,16 +147,19 @@ export const ALL_PASSIVES = [
   {
     id: 'ki_blast', name: '【空振‧氣勁】', desc: '近戰攻擊末端發出氣勁，距離翻倍但傷害減半',
     rarity: 'rare', oneTime: true,
-    apply: (_p, scene) => { scene._kiBlast = true },  // weapon-level implementation
+    requiresWeapons: ['tachi'],   // melee swing only
+    apply: (_p, scene) => { scene._kiBlast = true },
   },
   {
     id: 'ricochet_arc', name: '【折射‧弧刃】', desc: '投射物在螢幕邊緣反彈一次',
     rarity: 'rare', oneTime: true,
-    apply: (_p, scene) => { scene._ricochetWall = true },  // weapon-level implementation
+    requiresWeapons: ['kunai', 'shuriken', 'homura'],   // projectile only
+    apply: (_p, scene) => { scene._ricochetWall = true },
   },
   {
     id: 'second_split', name: '【分裂‧二次】', desc: '分裂子彈命中後再次分裂為兩枚微型子彈',
     rarity: 'epic', oneTime: true,
-    apply: (_p, scene) => { scene._secondSplit = true },  // weapon-level implementation
+    requiresWeapons: ['kunai', 'shuriken'],   // multi-projectile weapons only
+    apply: (_p, scene) => { scene._secondSplit = true },
   },
 ]

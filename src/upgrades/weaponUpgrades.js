@@ -29,7 +29,7 @@ export const WEAPON_UPGRADES_MAP = {
     {
       id: 'tachi_windblade',
       name: '【鐮鼬・真空】',
-      desc: '揮砍時發出 3 道穿透風刃，解決近戰手短問題',
+      desc: '揮砍時發出 3 道穿透風刃',
       rarity: 'rare',
       oneTime: true,
       apply(stats) { stats._windBlade = true },

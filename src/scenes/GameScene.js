@@ -97,6 +97,7 @@ export default class GameScene extends Phaser.Scene {
     this._tachiComboGuardMult   = 1.0
 
     // ── New passive/proc state ────────────────────────────────────────────────
+    this._weaponChoiceDone  = false       // set true after Lv.3 weapon branch chosen
     this._passiveStacks     = new Map()   // passiveId → stack count
     this._globalDmgMult     = 1.0
     this._armorPen          = 0
@@ -769,6 +770,12 @@ export default class GameScene extends Phaser.Scene {
 
       this._upgrading = true
 
+      // Lv.3 = weapon branch (four-choice, one-time). Lv.12 = legendary milestone.
+      const isWeaponBranch = (this._level === 3) && !this._weaponChoiceDone
+      const upgradeMode    = isWeaponBranch ? 'weapon_branch'
+                           : (this._level === 12) ? 'legendary_milestone'
+                           : 'normal'
+
       this.events.once('upgrade-chosen', (upgrade) => {
         if (upgrade.target === 'weapon') {
           const entry = this._weapons.find(e => e.weapon.id === upgrade.weaponId)
@@ -778,6 +785,8 @@ export default class GameScene extends Phaser.Scene {
               this._weaponUpgradesOwned.set(upgrade.weaponId, new Set())
             this._weaponUpgradesOwned.get(upgrade.weaponId).add(upgrade.id)
           }
+          // Mark Lv.3 branch as done so mode doesn't repeat
+          this._weaponChoiceDone = true
         } else if (upgrade.target === 'elemental') {
           this._affixes.push(upgrade.elemental)
           this._affixCounts.set(upgrade.elemental.id, 1)
@@ -804,45 +813,58 @@ export default class GameScene extends Phaser.Scene {
         this.scene.resume('GameScene')
       })
 
-      const choices = this._buildUpgradePool()
-      this.scene.launch('UpgradeScene', { level: this._level, upgrades: choices })
+      const choices    = this._buildUpgradePool(upgradeMode)
+      const weaponName = this._weapons[0]?.weapon.name ?? ''
+      this.scene.launch('UpgradeScene', { level: this._level, upgrades: choices, mode: upgradeMode, weaponName })
       this.scene.pause('GameScene')
     }
   }
 
-  _buildUpgradePool() {
+  _buildUpgradePool(mode = 'normal') {
+    // ── Lv.3 Weapon Branch: 2 random picks from current weapon's 4 upgrades ──
+    if (mode === 'weapon_branch') {
+      const entry = this._weapons[0]
+      if (!entry) return []
+      const wId  = entry.weapon.id
+      const pool = (WEAPON_UPGRADES_MAP[wId] || []).map(u => ({ ...u, target: 'weapon', weaponId: wId }))
+      // Equal weight random 2-of-4
+      return this._weightedSelect(pool, pool.map(() => 1), 2)
+    }
+
+    // ── Normal / Legendary-Milestone pool ─────────────────────────────────────
     const elapsed = this._elapsed || 0
     const ownedIds = new Set()
 
-    // Collect all owned upgrade IDs for dedup and prereq checks
     this._affixCounts.forEach((_, id) => ownedIds.add(id))
     this._procsOwned.forEach(id => ownedIds.add(id))
     this._keystonesOwned.forEach(id => ownedIds.add(id))
     this._passivesOwned.forEach(id => ownedIds.add(id))
     this._weaponUpgradesOwned.forEach(set => set.forEach(id => ownedIds.add(id)))
 
+    // Current weapon IDs — used for weapon-gated passive filtering
+    const activeWeaponIds = new Set(this._weapons.map(e => e.weapon.id))
+
     const candidates = []
 
-    // Weapon-specific upgrades
+    // Weapon-specific upgrades — oneTime, available in regular pool after Lv.3
     const entry = this._weapons[0]
     if (entry) {
-      const wId = entry.weapon.id
-      const upgrades = WEAPON_UPGRADES_MAP[wId] || []
-      const owned = this._weaponUpgradesOwned.get(wId) || new Set()
-      for (const u of upgrades) {
+      const wId    = entry.weapon.id
+      const owned  = this._weaponUpgradesOwned.get(wId) || new Set()
+      for (const u of (WEAPON_UPGRADES_MAP[wId] || [])) {
         if (!owned.has(u.id))
           candidates.push({ ...u, target: 'weapon', weaponId: wId })
       }
     }
 
-    // Elemental ailments — each has its own minTimeMs (some from 1 min, most from 2 min)
+    // Elemental ailments
     for (const e of ALL_ELEMENTALS) {
       if (!this._affixCounts.has(e.id) && elapsed >= (e.minTimeMs || 0))
         candidates.push({ id: e.id, name: e.name, desc: e.desc, rarity: e.rarity,
           target: 'elemental', elemental: e })
     }
 
-    // Procs/Auras — unlock at 2 min
+    // Procs/Auras
     if (elapsed >= 2 * 60 * 1000) {
       for (const p of ALL_PROCS) {
         if (!this._procsOwned.has(p.id) && elapsed >= (p.minTimeMs || 0))
@@ -859,10 +881,11 @@ export default class GameScene extends Phaser.Scene {
       }
     }
 
-    // Passives — available unless maxed out (oneTime or maxStacks reached)
+    // Passives — filter by weapon compatibility, then by ownership
     for (const p of ALL_PASSIVES) {
       if (this._passivesOwned.has(p.id)) continue
-      // For maxStacks passives, attach current stack info for UpgradeScene display
+      // Skip weapon-gated passives that don't apply to the current weapon
+      if (p.requiresWeapons && !p.requiresWeapons.some(id => activeWeaponIds.has(id))) continue
       if (p.maxStacks) {
         const cur = this._passiveStacks.get(p.id) || 0
         candidates.push({ ...p, target: 'passive', stackCur: cur, stackMax: p.maxStacks })
@@ -875,23 +898,24 @@ export default class GameScene extends Phaser.Scene {
       return ALL_PASSIVES.slice(0, 3).map(p => ({ ...p, target: 'passive' }))
     }
 
-    // Build weights
-    const DEFENSIVE_IDS = new Set(['defense','soul_drain','life_leech','thorns','sanctuary_aura','war_cry','iron_body'])
-    const earlyGame   = elapsed < 2 * 60 * 1000
-    const needDefense = elapsed >= 4 * 60 * 1000 && !this._hasDefensive
+    // ── Weight modifiers ──────────────────────────────────────────────────────
+    const DEFENSIVE_IDS        = new Set(['defense','soul_drain','life_leech','thorns','sanctuary_aura','war_cry','iron_body','vitality','steady_stance','substitution'])
+    const earlyGame            = elapsed < 2 * 60 * 1000
+    const needDefense          = elapsed >= 4 * 60 * 1000 && !this._hasDefensive
+    const isLegendaryMilestone = mode === 'legendary_milestone'
 
     const weights = candidates.map(u => {
       const base = RARITY_WEIGHTS[u.rarity] ?? RARITY_WEIGHTS.common
-      // Early game: strongly favour weapon + passive, suppress others
-      if (earlyGame && u.target !== 'weapon' && u.target !== 'passive')
-        return base * 0.1
-      // Defensive guarantee boost
-      if (needDefense && DEFENSIVE_IDS.has(u.id))
-        return base * 5
+      if (earlyGame && u.target !== 'weapon' && u.target !== 'passive') return base * 0.1
+      if (needDefense && DEFENSIVE_IDS.has(u.id)) return base * 5
+      if (isLegendaryMilestone && u.rarity === 'legendary') return base * 6
+      if (isLegendaryMilestone && u.rarity === 'epic')      return base * 3
       return base
     })
 
-    return this._weightedSelect(candidates, weights, 3)
+    // weapon_branch = 2-card pick from full pool; everything else = 3
+    const pickCount = mode === 'weapon_branch' ? 2 : 3
+    return this._weightedSelect(candidates, weights, pickCount)
   }
 
   // Weighted random sampling without replacement
