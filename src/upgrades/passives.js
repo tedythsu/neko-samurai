@@ -9,8 +9,8 @@ export const ALL_PASSIVES = [
 
   // ─── Original passives ───────────────────────────────────────────────────
   {
-    id: 'speed', name: '【神速・走位】', desc: '移動速度 +20%',
-    rarity: 'common',
+    id: 'speed', name: '【神速・走位】', desc: '移動速度 +20%（可疊 2 層）',
+    rarity: 'common', maxStacks: 2,
     apply: (player) => { player.speed *= 1.20 },
   },
   {
@@ -37,7 +37,7 @@ export const ALL_PASSIVES = [
   },
   {
     id: 'daimyo', name: '【大名・増幅】', desc: '每升一級全傷害 +5%',
-    rarity: 'common', oneTime: true,
+    rarity: 'common', oneTime: true, minLevel: 4,
     apply: (_p, scene) => { scene._daimyoStacks = (scene._daimyoStacks || 0) + 1 },
   },
 
@@ -54,7 +54,7 @@ export const ALL_PASSIVES = [
   },
   {
     id: 'crit_blade', name: '【痛擊‧一刀】', desc: '爆擊傷害 +35%（可疊 2 層）',
-    rarity: 'common', maxStacks: 2,
+    rarity: 'common', maxStacks: 2, minLevel: 4,
     apply: (_p, scene) => { scene._critDmgBonus = (scene._critDmgBonus || 0) + 0.35 },
   },
   {
@@ -64,7 +64,7 @@ export const ALL_PASSIVES = [
   },
   {
     id: 'armor_pen', name: '【破甲‧貫穿】', desc: '無視敵人 12% 防禦（可疊 2 層）',
-    rarity: 'rare', maxStacks: 2,
+    rarity: 'rare', maxStacks: 2, minLevel: 4,
     apply: (_p, scene) => { scene._armorPen = (scene._armorPen || 0) + 0.12 },
   },
   {
@@ -74,7 +74,7 @@ export const ALL_PASSIVES = [
   },
   {
     id: 'ailment_dur', name: '【長久‧咒印】', desc: '異常、標記與持續效果時間 +30%（可疊 2 層）',
-    rarity: 'rare', maxStacks: 2,
+    rarity: 'rare', maxStacks: 2, minLevel: 4,
     apply: (_p, scene) => { scene._ailmentDurMult = (scene._ailmentDurMult || 1) * 1.30 },
   },
   {
@@ -89,7 +89,7 @@ export const ALL_PASSIVES = [
   // ─── Tactical / utility (oneTime) ────────────────────────────────────────
   {
     id: 'first_strike', name: '【拔刀・一閃】', desc: '對滿血敵人必定爆擊，且本次傷害額外 +35%',
-    rarity: 'rare', oneTime: true,
+    rarity: 'rare', oneTime: true, minLevel: 4,
     apply: (_p, scene) => { scene._firstStrikeCrit = true },
   },
   {
@@ -99,17 +99,17 @@ export const ALL_PASSIVES = [
   },
   {
     id: 'crit_soul', name: '【處決‧魂吸】', desc: '爆擊擊殺時，掉落的經驗球價值 +80%',
-    rarity: 'rare', oneTime: true,
+    rarity: 'rare', oneTime: true, minLevel: 4,
     apply: (_p, scene) => { scene._critSoul = true },
   },
   {
     id: 'substitution', name: '【替身術】', desc: '致死傷害改為留下替身，回復 20% 最大生命並獲得 1.5 秒無敵（冷卻 45 秒）',
-    rarity: 'epic', oneTime: true,
+    rarity: 'epic', oneTime: true, minLevel: 6,
     apply: (_p, scene) => { scene._substitutionReady = true; scene._substitutionCd = 0 },
   },
   {
     id: 'fury', name: '【憤怒‧反擊】', desc: '血量低於 30% 時傷害 +50%、擊退翻倍',
-    rarity: 'epic', oneTime: true,
+    rarity: 'epic', oneTime: true, minLevel: 6,
     apply: (_p, scene) => { scene._furyMode = true },
   },
   {
@@ -119,12 +119,12 @@ export const ALL_PASSIVES = [
   },
   {
     id: 'steady_stance', name: '【流轉‧見切】', desc: '持續移動時受傷 -20%，且造成傷害 +8%',
-    rarity: 'rare', oneTime: true,
+    rarity: 'rare', oneTime: true, minLevel: 4,
     apply: (_p, scene) => { scene._steadyStance = true },
   },
   {
     id: 'cooldown_cut', name: '【冷卻‧縮減】', desc: '戰吼、菱釘、兵糧丸、月讀、替身術冷卻縮短 30%',
-    rarity: 'common', oneTime: true,
+    rarity: 'common', oneTime: true, minLevel: 4,
     apply: (_p, scene) => { scene._cdMult = (scene._cdMult || 1) * 0.70 },
   },
   {
@@ -135,34 +135,34 @@ export const ALL_PASSIVES = [
   },
   {
     id: 'ricochet_arc', name: '【折射‧弧刃】', desc: '投射物首次碰到場地邊緣時反彈一次',
-    rarity: 'rare', oneTime: true,
+    rarity: 'rare', oneTime: true, minLevel: 4,
     requiresWeapons: ['kunai', 'shuriken', 'homura'],   // projectile only
     apply: (_p, scene) => { scene._ricochetWall = true },
   },
   {
     id: 'second_split', name: '【分裂‧二次】', desc: '苦無與手裏劍命中後分裂出兩枚微型彈',
-    rarity: 'epic', oneTime: true,
+    rarity: 'epic', oneTime: true, minLevel: 6,
     requiresWeapons: ['kunai', 'shuriken'],   // multi-projectile weapons only
     apply: (_p, scene) => { scene._secondSplit = true },
   },
   {
     id: 'toxicology', name: '【毒傷‧見切】', desc: '對中毒或流血的敵人造成傷害 +16%',
-    rarity: 'rare', oneTime: true,
+    rarity: 'rare', oneTime: true, minLevel: 4,
     apply: (_p, scene) => { scene._ailmentExpose = true },
   },
   {
     id: 'blood_rush', name: '【血狩‧疾走】', desc: '擊殺中毒或流血的敵人時，3 秒內移速與攻擊頻率 +12%',
-    rarity: 'rare', oneTime: true,
+    rarity: 'rare', oneTime: true, minLevel: 4,
     apply: (_p, scene) => { scene._bloodRush = true },
   },
   {
     id: 'weakpoint_focus', name: '【弱點‧收束】', desc: '對同一目標連續命中時，使其後續 3 秒承受更多傷害',
-    rarity: 'rare', oneTime: true,
+    rarity: 'rare', oneTime: true, minLevel: 4,
     apply: (_p, scene) => { scene._weakpointFocus = true },
   },
   {
     id: 'pathogen_spread', name: '【病灶‧擴散】', desc: '異常目標死亡時，把部分剩餘持續時間傳給最近敵人',
-    rarity: 'epic', oneTime: true,
+    rarity: 'epic', oneTime: true, minLevel: 6,
     apply: (_p, scene) => { scene._pathogenSpread = true },
   },
 
