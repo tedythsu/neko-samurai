@@ -33,6 +33,7 @@ export default {
     if (targets.length === 0) return
     targets.forEach(target => {
       const s = getOrCreate(pool, fromX, fromY, this.texKey)
+      if (!s) return
       // Use native frame dimensions so pooled scale doesn't affect sizing
       const nativeH = s.frame.realHeight
       const nativeW = s.frame.realWidth
@@ -107,4 +108,3 @@ export default {
     })
   },
 }
-

@@ -9,6 +9,7 @@ export function getOrCreate(pool, fromX, fromY, texKey) {
   let s = pool.getFirstDead(false)
   if (!s) {
     s = pool.create(fromX, fromY, texKey)
+    if (!s) return null
     s.setDepth(8)
     s.body.onWorldBounds = true
   }

@@ -226,7 +226,7 @@ export default class GameScene extends Phaser.Scene {
 
   _addWeapon(weapon) {
     weapon.createTexture(this)
-    const projectiles = this.physics.add.group({ maxSize: 60 })
+    const projectiles = this.physics.add.group()
 
     // Fallback overlap only for weapons WITHOUT updateActive().
     // Weapons with updateActive() handle all hit logic there — registering an overlap would

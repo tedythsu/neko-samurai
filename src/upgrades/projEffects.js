@@ -110,6 +110,7 @@ export function applyRicochet(proj, hitEnemy, scene, enemies, affixes, buildExtr
   if (!next) return
 
   const r2 = getOrCreate(pool, hitEnemy.x, hitEnemy.y, proj.texture.key)
+  if (!r2) return
   r2.setDisplaySize(proj.displayWidth, proj.displayHeight)
   r2.damage         = proj.damage * RICOCHET_DAMAGE
   r2.hitSet         = new Set([hitEnemy])

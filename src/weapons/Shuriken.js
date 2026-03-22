@@ -38,6 +38,7 @@ export default {
 
     for (let i = 0; i < stats.projectileCount; i++) {
       const s = getOrCreate(pool, fromX, fromY, this.texKey)
+      if (!s) return
       const baseW = 28, baseH = 28
       s.setDisplaySize(baseW * stats._scale, baseH * stats._scale)
       s.damage    = stats.damage

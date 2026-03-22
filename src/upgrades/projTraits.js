@@ -72,6 +72,7 @@ export function doScatter(proj, scene, extraProps = {}) {
   const baseAngle = Math.atan2(proj.body.velocity.y, proj.body.velocity.x)
   for (let i = -1; i <= 1; i++) {
     const s = getOrCreate(pool, proj.x, proj.y, proj.texture.key)
+    if (!s) continue
     s.setDisplaySize(proj.displayWidth * 0.5, proj.displayHeight * 0.5)
     s.damage         = proj.damage * 0.4
     s.hitSet         = new Set()

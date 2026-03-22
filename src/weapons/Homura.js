@@ -37,6 +37,7 @@ export default {
     if (targets.length === 0) return
     targets.forEach(target => {
       const s = getOrCreate(pool, fromX, fromY, this.texKey)
+      if (!s) return
       s.setDisplaySize(24, 24)
       s.damage         = stats.damage
       s.hitSet         = new Set()
@@ -120,4 +121,3 @@ export default {
     })
   },
 }
-
