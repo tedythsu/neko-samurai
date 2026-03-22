@@ -75,6 +75,16 @@ export default class Player {
     this.scene.cameras.main.flash(250, 255, 20, 20, false)
 
     if (this.hp <= 0 && !this._dead) {
+      // Substitution — negate lethal hit once (60s cooldown)
+      const sc = this.scene
+      if (sc._substitutionReady && sc._substitutionCd <= 0) {
+        this.hp = 1
+        sc._substitutionCd = 60000
+        // Flash white to signal activation
+        this.sprite.setTint(0xffffff)
+        sc.time.delayedCall(300, () => { if (!this._dead) this.sprite.clearTint() })
+        return
+      }
       this._dead = true
       this.sprite.clearTint()
       this.scene.events.emit('player-dead')

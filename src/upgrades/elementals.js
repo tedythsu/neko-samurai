@@ -2,6 +2,10 @@
 // Elemental ailment system
 // ignite / chill → rarity: 'rare'  (出現自遊戲開始)
 // shock / bleed / armor_shred → rarity: 'epic' (minTimeMs 2 分鐘後解鎖)
+// poison → rarity: 'rare' (minTimeMs 1 分鐘後解鎖)
+// holy → rarity: 'rare' (minTimeMs 2 分鐘後解鎖)
+//
+// onHit(enemy, damage, scene) — called from Enemy.takeDamage affix pipeline
 
 export const ALL_ELEMENTALS = [
   {
@@ -14,8 +18,9 @@ export const ALL_ELEMENTALS = [
         const se = enemy._statusEffects
         if (!se) return
         if (!se.ignite) se.ignite = { active: false, timer: 0, dps: 0, _accum: 0 }
+        const dur = 4000 * (enemy.scene?._ailmentDurMult || 1)
         se.ignite.active = true
-        se.ignite.timer  = Math.max(se.ignite.timer, 4000)
+        se.ignite.timer  = Math.max(se.ignite.timer, dur)
         se.ignite.dps    = Math.max(se.ignite.dps, damage * 0.20)
       }
     },
@@ -28,12 +33,13 @@ export const ALL_ELEMENTALS = [
     onHit(enemy) {
       const se = enemy._statusEffects
       if (!se) return
+      const durMult = enemy.scene?._ailmentDurMult || 1
       se.chill.active = true
-      se.chill.timer  = Math.max(se.chill.timer, 2000)
+      se.chill.timer  = Math.max(se.chill.timer, 2000 * durMult)
       se.chill.stacks = (se.chill.stacks || 0) + 1
       if (se.chill.stacks >= 5) {
         se.frozen.active = true
-        se.frozen.timer  = 2000
+        se.frozen.timer  = 2000 * durMult
         se.chill.stacks  = 0
       }
     },
@@ -48,8 +54,9 @@ export const ALL_ELEMENTALS = [
       const se = enemy._statusEffects
       if (!se) return
       if (!se.shock) se.shock = { active: false, timer: 0 }
+      const dur = 3000 * (enemy.scene?._ailmentDurMult || 1)
       se.shock.active = true
-      se.shock.timer  = Math.max(se.shock.timer, 3000)
+      se.shock.timer  = Math.max(se.shock.timer, dur)
       if (Math.random() < 0.20) {
         enemy.knockbackTimer = Math.max(enemy.knockbackTimer || 0, 100)
       }
@@ -65,8 +72,9 @@ export const ALL_ELEMENTALS = [
       const se = enemy._statusEffects
       if (!se) return
       if (!se.bleed) se.bleed = { active: false, timer: 0, _accum: 0 }
+      const dur = 3000 * (enemy.scene?._ailmentDurMult || 1)
       se.bleed.active = true
-      se.bleed.timer  = Math.max(se.bleed.timer, 3000)
+      se.bleed.timer  = Math.max(se.bleed.timer, dur)
     },
   },
   {
@@ -80,6 +88,58 @@ export const ALL_ELEMENTALS = [
       enemy._armorShred = Math.min(0.50, (enemy._armorShred || 0) + 0.10)
       if (enemy._outputMult === undefined) enemy._outputMult = 1.0
       enemy._outputMult = Math.max(0.40, enemy._outputMult * 0.85)
+    },
+  },
+  {
+    id:         'poison',
+    name:       '【毒：腐化】',
+    desc:       '攻擊有 30% 機率使敵人中毒，每秒扣除最大生命 1%；中毒的敵人死亡後爆出毒霧傳染周邊',
+    rarity:     'rare',
+    minTimeMs:  1 * 60 * 1000,
+    onHit(enemy) {
+      if (Math.random() < 0.30) {
+        const se = enemy._statusEffects
+        if (!se) return
+        if (!se.poison) se.poison = { active: false, timer: 0, _accum: 0 }
+        const dur = 5000 * (enemy.scene?._ailmentDurMult || 1)
+        se.poison.active = true
+        se.poison.timer  = Math.max(se.poison.timer, dur)
+      }
+    },
+  },
+  {
+    id:         'holy',
+    name:       '【聖：淨化】',
+    desc:       '攻擊附帶神聖光傷害，對精英怪傷害 +30%，且有機率施加短暫遲緩',
+    rarity:     'rare',
+    minTimeMs:  2 * 60 * 1000,
+    onHit(enemy, damage, scene) {
+      // +30% bonus damage vs elite enemies (sizeMult > 1.0)
+      const isElite = (enemy._typeConfig?.sizeMult || 1.0) > 1.0
+      if (isElite && !enemy.dying) {
+        const bonusDmg = Math.round(damage * 0.30)
+        if (bonusDmg >= 1) {
+          enemy.hp -= bonusDmg
+          if (scene) {
+            const offset = Math.round(Math.random() * 20 - 10)
+            const txt = scene.add.text(enemy.x + offset, enemy.y - 40, `+${bonusDmg}`, {
+              fontSize: '14px', color: '#ffffaa', stroke: '#554400', strokeThickness: 2,
+            }).setDepth(15).setOrigin(0.5)
+            scene.tweens.add({
+              targets: txt, y: txt.y - 24, alpha: 0, duration: 700,
+              ease: 'Power1', onComplete: () => txt.destroy(),
+            })
+          }
+        }
+      }
+      // 25% chance to apply a brief chill (strip speed buff)
+      if (Math.random() < 0.25) {
+        const se = enemy._statusEffects
+        if (se) {
+          se.chill.active = true
+          se.chill.timer  = Math.max(se.chill.timer, 1000)
+        }
+      }
     },
   },
 ]

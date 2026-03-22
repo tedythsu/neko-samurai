@@ -96,6 +96,31 @@ export default class GameScene extends Phaser.Scene {
     this._tachiComboGuardActive = false
     this._tachiComboGuardMult   = 1.0
 
+    // ── New passive/proc state ────────────────────────────────────────────────
+    this._passiveStacks     = new Map()   // passiveId → stack count
+    this._globalDmgMult     = 1.0
+    this._armorPen          = 0
+    this._ailmentDurMult    = 1.0
+    this._projSpeedMult     = 1.0
+    this._attackSpeedMult   = 1.0
+    this._critKillXpMult    = 1
+    this._xpMult            = 1.0
+    this._enemySpeedBuff    = 1.0
+    this._furyMode          = false
+    this._shadowDodge       = false
+    this._firstStrikeCrit   = false
+    this._steadyStance      = false
+    this._caltrops          = false
+    this._caltropTimer      = 0
+    this._substitutionReady = false
+    this._substitutionCd    = 0
+    this._daimyoTax         = false
+    this._daimyoTaxXp       = 0
+    this._soulBurstKills    = 0
+    this._rationTimer       = 0
+    this._tsukuyomiTimer    = 0
+    this._susanoCd          = 0
+
     this._addWeapon(this._startWeapon)
 
     // XP / level system
@@ -110,6 +135,18 @@ export default class GameScene extends Phaser.Scene {
     this.events.on('enemy-died', ({ x, y }) => {
       this._spawnOrb(x, y)
       this._killCount++
+      // Soul burst — every 50 kills triggers a screen shockwave
+      if (this._procsOwned.has('soul_burst')) {
+        this._soulBurstKills++
+        if (this._soulBurstKills >= 50) {
+          this._soulBurstKills = 0
+          this._doSoulBurst()
+        }
+      }
+      // Yamatanoorochi — +0.5% attack speed per kill (capped at +50%)
+      if (this._yamatano) {
+        this._attackSpeedMult = Math.min(1.50, (this._attackSpeedMult || 1) + 0.005)
+      }
     })
     this.events.on('player-dead', this._onPlayerDead, this)
     this.events.on('player-hit', () => { this._regenTimer = 0 })
@@ -382,6 +419,43 @@ export default class GameScene extends Phaser.Scene {
       })
     }
 
+    // Substitution cooldown countdown
+    if (this._substitutionCd > 0) {
+      this._substitutionCd = Math.max(0, this._substitutionCd - delta)
+    }
+
+    // Caltrops — drop every 3s at player position
+    if (this._caltrops) {
+      this._caltropTimer = (this._caltropTimer || 0) + delta
+      if (this._caltropTimer >= 3000) {
+        this._caltropTimer = 0
+        this._dropCaltrops(px, py)
+      }
+    }
+
+    // Ration — restore 5% HP every 30s
+    if (this._procsOwned.has('ration')) {
+      this._rationTimer = (this._rationTimer || 0) + delta
+      if (this._rationTimer >= 30000) {
+        this._rationTimer = 0
+        this._player.heal(this._player.maxHp * 0.05)
+      }
+    }
+
+    // Tsukuyomi — confuse enemies every 15s
+    if (this._tsukuyomi) {
+      this._tsukuyomiTimer = (this._tsukuyomiTimer || 0) + delta
+      if (this._tsukuyomiTimer >= 15000) {
+        this._tsukuyomiTimer = 0
+        this._doTsukuyomi()
+      }
+    }
+
+    // Susano cooldown countdown
+    if (this._susanoCd > 0) {
+      this._susanoCd = Math.max(0, this._susanoCd - delta)
+    }
+
     // Iron Body proc — stand still shield
     if (this._procsOwned.has('iron_body')) {
       const dx = Math.abs(px - (this._ibPX || px))
@@ -400,7 +474,8 @@ export default class GameScene extends Phaser.Scene {
     for (const entry of this._weapons) {
       if (entry.stats.fireRate > 0) {
         entry.timer += delta
-        if (entry.timer >= entry.stats.fireRate) {
+        const effectiveRate = entry.stats.fireRate / (this._attackSpeedMult || 1)
+        if (entry.timer >= effectiveRate) {
           entry.timer = 0
           entry.weapon.fire(this, entry.projectiles, px, py, entry.stats, this._enemies, this._player, this._affixes)
         }
@@ -459,7 +534,7 @@ export default class GameScene extends Phaser.Scene {
         if (orb._emitter) orb._emitter.destroy()
         orb.destroy()
         this._orbs.splice(i, 1)
-        this._addXp(this._currentWaveXp)
+        this._addXp(this._currentWaveXp * (this._critKillXpMult || 1))
         continue
       }
 
@@ -621,7 +696,7 @@ export default class GameScene extends Phaser.Scene {
       id:            'kisotsu',
       baseTint:      null,
       hpMult:        wave.hp    / CFG.ENEMY_HP,
-      speedMult:     wave.speed / CFG.ENEMY_SPEED,
+      speedMult:     (wave.speed / CFG.ENEMY_SPEED) * (this._enemySpeedBuff || 1),
       sizeMult:      wave.scale,
       behaviorFlags: {},
     }
@@ -670,7 +745,16 @@ export default class GameScene extends Phaser.Scene {
       this._xp = this._xpToNext
       return
     }
-    this._xp += amount
+    const gained = amount * (this._xpMult || 1)
+    // Daimyo tax — every 100 XP permanently +1% global damage
+    if (this._daimyoTax) {
+      this._daimyoTaxXp = (this._daimyoTaxXp || 0) + gained
+      while (this._daimyoTaxXp >= 100) {
+        this._daimyoTaxXp -= 100
+        this._globalDmgMult = (this._globalDmgMult || 1) * 1.01
+      }
+    }
+    this._xp += gained
     if (this._xp >= this._xpToNext) {
       this._xp      -= this._xpToNext
       this._displayXp = 0   // snap to zero so bar fills from start on new level
@@ -705,10 +789,16 @@ export default class GameScene extends Phaser.Scene {
           if (upgrade.apply) upgrade.apply(this._player, this)
         } else if (upgrade.target === 'passive') {
           upgrade.apply(this._player, this)
-          if (upgrade.oneTime) this._passivesOwned.add(upgrade.id)
+          if (upgrade.oneTime) {
+            this._passivesOwned.add(upgrade.id)
+          } else if (upgrade.maxStacks) {
+            const cur = (this._passiveStacks.get(upgrade.id) || 0) + 1
+            this._passiveStacks.set(upgrade.id, cur)
+            if (cur >= upgrade.maxStacks) this._passivesOwned.add(upgrade.id)
+          }
         }
         // Track defensive pickup for guarantee logic
-        const DEFENSIVE_IDS = new Set(['defense','soul_drain','life_leech','thorns','sanctuary_aura','war_cry','iron_body'])
+        const DEFENSIVE_IDS = new Set(['defense','soul_drain','life_leech','thorns','sanctuary_aura','war_cry','iron_body','vitality','steady_stance','substitution'])
         if (DEFENSIVE_IDS.has(upgrade.id)) this._hasDefensive = true
         this._upgrading = false
         this.scene.resume('GameScene')
@@ -745,13 +835,11 @@ export default class GameScene extends Phaser.Scene {
       }
     }
 
-    // Elemental ailments — unlock at 2 min
-    if (elapsed >= 2 * 60 * 1000) {
-      for (const e of ALL_ELEMENTALS) {
-        if (!this._affixCounts.has(e.id) && elapsed >= (e.minTimeMs || 0))
-          candidates.push({ id: e.id, name: e.name, desc: e.desc, rarity: e.rarity,
-            target: 'elemental', elemental: e })
-      }
+    // Elemental ailments — each has its own minTimeMs (some from 1 min, most from 2 min)
+    for (const e of ALL_ELEMENTALS) {
+      if (!this._affixCounts.has(e.id) && elapsed >= (e.minTimeMs || 0))
+        candidates.push({ id: e.id, name: e.name, desc: e.desc, rarity: e.rarity,
+          target: 'elemental', elemental: e })
     }
 
     // Procs/Auras — unlock at 2 min
@@ -771,10 +859,16 @@ export default class GameScene extends Phaser.Scene {
       }
     }
 
-    // Passives — always available
+    // Passives — available unless maxed out (oneTime or maxStacks reached)
     for (const p of ALL_PASSIVES) {
-      if (!p.oneTime || !this._passivesOwned.has(p.id))
+      if (this._passivesOwned.has(p.id)) continue
+      // For maxStacks passives, attach current stack info for UpgradeScene display
+      if (p.maxStacks) {
+        const cur = this._passiveStacks.get(p.id) || 0
+        candidates.push({ ...p, target: 'passive', stackCur: cur, stackMax: p.maxStacks })
+      } else {
         candidates.push({ ...p, target: 'passive' })
+      }
     }
 
     if (candidates.length === 0) {
@@ -838,6 +932,71 @@ export default class GameScene extends Phaser.Scene {
     g.lineStyle(3, 0xffcc44, 0.9)
     g.strokeCircle(px, py, radius)
     this.tweens.add({ targets: g, alpha: 0, scaleX: 1.5, scaleY: 1.5, duration: 400, onComplete: () => g.destroy() })
+  }
+
+  _doSoulBurst() {
+    const px = this._player.x, py = this._player.y
+    const radius = Math.max(CFG.WORLD_WIDTH, CFG.WORLD_HEIGHT)
+    this._enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
+      const dx = e.x - px, dy = e.y - py
+      const len = Math.hypot(dx, dy) || 1
+      e.body.velocity.x = (dx / len) * 600
+      e.body.velocity.y = (dy / len) * 600
+      e.knockbackTimer = 400
+      Enemy.takeDamage(e, 80, px, py, this._affixes, 0)
+    })
+    const g = this.add.graphics().setDepth(8)
+    g.lineStyle(4, 0xddaaff, 1.0)
+    g.strokeCircle(px, py, 10)
+    this.tweens.add({
+      targets: g, scaleX: radius / 10, scaleY: radius / 10, alpha: 0,
+      duration: 500, ease: 'Power2', onComplete: () => g.destroy(),
+    })
+  }
+
+  _dropCaltrops(x, y) {
+    const radius = 40
+    const dur    = 4000
+    const g = this.add.graphics().setDepth(3)
+    g.fillStyle(0x886622, 0.5)
+    g.fillCircle(x, y, radius)
+    const damageCd = new Map()
+    const tick = this.time.addEvent({
+      delay: 300,
+      repeat: Math.ceil(dur / 300),
+      callback: () => {
+        const now = this.time.now
+        this._enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
+          if (Phaser.Math.Distance.Between(x, y, e.x, e.y) < radius) {
+            const last = damageCd.get(e) || 0
+            if (now - last >= 500) {
+              damageCd.set(e, now)
+              Enemy.takeDamage(e, 15, x, y, this._affixes, 0)
+              // Slow enemy
+              const se = e._statusEffects
+              if (se) {
+                se.chill.active = true
+                se.chill.timer  = Math.max(se.chill.timer, 2000 * (this._ailmentDurMult || 1))
+              }
+            }
+          }
+        })
+      },
+    })
+    this.time.delayedCall(dur, () => { g.destroy(); tick.remove() })
+  }
+
+  _doTsukuyomi() {
+    // Reverse all enemy velocities for 2 seconds, causing chaos
+    const affected = this._enemies.getChildren().filter(e => e.active && !e.dying)
+    affected.forEach(e => {
+      e._stunTimer = Math.max(e._stunTimer || 0, 2000)
+    })
+    // Visual flash
+    const W = this.cameras.main.width, H = this.cameras.main.height
+    const flash = this.add.rectangle(W / 2, H / 2, W, H, 0x220066, 0.35)
+      .setScrollFactor(0).setDepth(299)
+    this.tweens.add({ targets: flash, alpha: 0, duration: 800, onComplete: () => flash.destroy() })
   }
 
   _showWaveAnnouncement(name) {

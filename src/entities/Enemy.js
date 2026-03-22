@@ -58,6 +58,7 @@ export default class Enemy {
       ignite: { active: false, timer: 0, dps: 0, _accum: 0 },
       shock:  { active: false, timer: 0 },
       bleed:  { active: false, timer: 0, _accum: 0 },
+      poison: { active: false, timer: 0, _accum: 0 },
     }
 
     const frame0 = sprite.scene.textures.get('kisotsu-run').frames[0]
@@ -146,6 +147,21 @@ export default class Enemy {
       if (sprite.hp <= 0 && !sprite.dying) Enemy._triggerDeath(sprite)
     }
 
+    // Poison DoT — 1% max HP per second
+    if (se.poison && se.poison.active) {
+      se.poison.timer -= delta
+      const dmg = sprite.maxHp * 0.01 * (delta / 1000)
+      sprite.hp -= dmg
+      se.poison._accum = (se.poison._accum || 0) + dmg
+      if (se.poison._accum >= 1) {
+        const shown = Math.floor(se.poison._accum)
+        se.poison._accum -= shown
+        Enemy.showDamageNumber(sprite, shown, '#44ff44')
+      }
+      if (se.poison.timer <= 0) se.poison.active = false
+      if (sprite.hp <= 0 && !sprite.dying) Enemy._triggerDeath(sprite)
+    }
+
     // Bleed DoT — scales with enemy speed
     if (se.bleed && se.bleed.active) {
       se.bleed.timer -= delta
@@ -188,6 +204,7 @@ export default class Enemy {
     const se = sprite._statusEffects
     if (!se) return
     if (se.ignite && se.ignite.active)           { sprite.setTint(0xff4400); return }
+    if (se.poison && se.poison.active)           { sprite.setTint(0x44cc00); return }
     if (se.bleed  && se.bleed.active)            { sprite.setTint(0xcc44ff); return }
     if (se.shock  && se.shock.active)            { sprite.setTint(0xffff44); return }
     if (se.chill.active || se.frozen.active)     { sprite.setTint(0x88ccff); return }
@@ -201,8 +218,8 @@ export default class Enemy {
   static _hasStatusTint(sprite) {
     const se = sprite._statusEffects
     if (!se) return false
-    return (se.ignite?.active) || (se.bleed?.active) || (se.shock?.active) ||
-           se.chill.active || se.frozen.active
+    return (se.ignite?.active) || (se.poison?.active) || (se.bleed?.active) ||
+           (se.shock?.active) || se.chill.active || se.frozen.active
   }
 
   static _triggerDeath(sprite) {
@@ -210,9 +227,15 @@ export default class Enemy {
     sprite._doomTimer = null
     const { x, y } = sprite
     const scene     = sprite.scene
+    const se        = sprite._statusEffects
 
     scene.events.emit('enemy-died', { x, y })
     sprite.dying = true
+
+    // Poison cloud — spread on death if poisoned and player has the elemental
+    if (se?.poison?.active && scene._affixCounts?.has('poison')) {
+      Enemy._spawnPoisonCloud(scene, x, y)
+    }
     if (sprite._pulseTween) { sprite._pulseTween.stop(); sprite._pulseTween = null }
     sprite.clearTint()
 
@@ -258,11 +281,43 @@ export default class Enemy {
           if (se.ignite) { se.ignite.active = false; se.ignite.timer = 0; se.ignite.dps = 0; se.ignite._accum = 0 }
           if (se.shock)  { se.shock.active  = false; se.shock.timer  = 0 }
           if (se.bleed)  { se.bleed.active  = false; se.bleed.timer  = 0; se.bleed._accum = 0 }
+          if (se.poison) { se.poison.active = false; se.poison.timer = 0; se.poison._accum = 0 }
         }
         sprite.dying = false
         sprite.setAlpha(1)
         sprite.disableBody(true, true)
       },
+    })
+  }
+
+  static _spawnPoisonCloud(scene, x, y) {
+    const radius = 64
+    const cloud = scene.add.circle(x, y, radius, 0x44cc00, 0.22).setDepth(3)
+    const damageCd = new Map()
+    const tick = scene.time.addEvent({
+      delay: 400,
+      repeat: 4,
+      callback: () => {
+        const now = scene.time.now
+        scene._enemies?.getChildren().forEach(e => {
+          if (!e.active || e.dying) return
+          const dist = Math.hypot(e.x - x, e.y - y)
+          if (dist < radius) {
+            const last = damageCd.get(e) || 0
+            if (now - last >= 400) {
+              damageCd.set(e, now)
+              if (!e._statusEffects.poison) e._statusEffects.poison = { active: false, timer: 0, _accum: 0 }
+              const dur = 3000 * (scene._ailmentDurMult || 1)
+              e._statusEffects.poison.active = true
+              e._statusEffects.poison.timer  = Math.max(e._statusEffects.poison.timer, dur)
+            }
+          }
+        })
+      },
+    })
+    scene.time.delayedCall(2000, () => {
+      cloud.destroy()
+      tick.remove()
     })
   }
 
@@ -293,6 +348,16 @@ export default class Enemy {
     if (scene._ironWillMult) dmgMult *= scene._ironWillMult
     // Daimyo: +2% per stack per level
     if (scene._daimyoStacks) dmgMult *= (1 + scene._daimyoStacks * 0.02 * ((scene._level || 1) - 1))
+    // Global damage multiplier (from power_up passive stacks)
+    if (scene._globalDmgMult && scene._globalDmgMult !== 1) dmgMult *= scene._globalDmgMult
+    // Armor penetration — bonus damage
+    if (scene._armorPen) dmgMult *= (1 + scene._armorPen)
+    // Fury mode — +50% damage when player HP < 30%
+    if (scene._furyMode) {
+      const playerHp    = scene._player?.hp    || 100
+      const playerMaxHp = scene._player?.maxHp || 100
+      if (playerHp / playerMaxHp < 0.30) dmgMult *= 1.50
+    }
     // Shock: +30% damage taken
     if (se?.shock?.active) dmgMult *= 1.30
     // Armor shred: amplify by shred amount
@@ -308,9 +373,14 @@ export default class Enemy {
     const critDmgBon = scene._critDmgBonus || 0
     const critChance = Math.min(1.0, CFG.CRIT_CHANCE + critBonus)
     const critMult   = CFG.CRIT_MULTIPLIER + critDmgBon
-    const isCrit     = Math.random() < critChance
 
-    const damage = Math.round(amount * dmgMult * (isCrit ? critMult : 1))
+    // First strike — guaranteed crit + 2× bonus damage on full-HP enemies
+    const isFullHp      = sprite.hp >= sprite.maxHp * 0.99
+    const firstStrike   = scene._firstStrikeCrit && isFullHp
+    const isCrit        = firstStrike || (Math.random() < critChance)
+    const firstStrikeMult = firstStrike ? 2.0 : 1.0
+
+    const damage = Math.round(amount * dmgMult * (isCrit ? critMult : 1) * firstStrikeMult)
     sprite.hp -= damage
 
     // Culling — execute below 15% of base HP
@@ -390,10 +460,27 @@ export default class Enemy {
     if (sprite.damageCd > 0 || sprite.dying) return
     const scene = sprite.scene
 
+    // Shadow dodge — 15% chance to negate contact damage while moving
+    if (scene._shadowDodge) {
+      const vel = scene._player?.sprite?.body?.velocity
+      const isMoving = vel ? (Math.abs(vel.x) + Math.abs(vel.y)) > 5 : false
+      if (isMoving && Math.random() < 0.15) {
+        sprite.damageCd = 600
+        return
+      }
+    }
+
     let dmgToPlayer = (sprite._contactDamage ?? CFG.ENEMY_DAMAGE) * (sprite._outputMult ?? 1.0)
 
     // Glass cannon — player takes double damage
     if (scene._glassCannon) dmgToPlayer *= 2
+
+    // Steady stance — -40% damage when player is standing still
+    if (scene._steadyStance) {
+      const vel = scene._player?.sprite?.body?.velocity
+      const isMoving = vel ? (Math.abs(vel.x) + Math.abs(vel.y)) > 5 : false
+      if (!isMoving) dmgToPlayer *= 0.60
+    }
 
     // Iron body shield — absorb one hit
     if (scene._ironBodyShield) {

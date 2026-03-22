@@ -16,6 +16,8 @@ const ELEMENTAL_COLOR = {
   shock:       0xffee00,
   bleed:       0xcc44ff,
   armor_shred: 0x884400,
+  poison:      0x44cc00,
+  holy:        0xffffaa,
 }
 
 export default class UpgradeScene extends Phaser.Scene {
@@ -113,6 +115,17 @@ export default class UpgradeScene extends Phaser.Scene {
       fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
     }).setOrigin(1, 0)
 
+    // Stack indicator for maxStacks passives (e.g. "Lv.1/3")
+    const stackItems = []
+    if (upg.stackMax != null) {
+      const nextStack = (upg.stackCur || 0) + 1
+      const stackBadge = this.add.text(w / 2 - 8, -h / 2 + 32, `Lv.${nextStack}/${upg.stackMax}`, {
+        fontSize: '9px', color: '#88ddcc',
+        fontFamily: '"Cinzel", serif',
+      }).setOrigin(1, 0)
+      stackItems.push(stackBadge)
+    }
+
     const nameText = this.add.text(-w / 2 + 18, -h / 2 + NAME_TOP, upg.name, {
       fontSize: '15px', color: '#f0e8d0',
       fontFamily: '"Noto Serif JP", "Hiragino Mincho ProN", serif',
@@ -131,7 +144,7 @@ export default class UpgradeScene extends Phaser.Scene {
       lineSpacing: 3,
     }).setOrigin(0, 0)
 
-    container.add([bg, strip, rarityBadge, badge, nameText, sepGfx, descText])
+    container.add([bg, strip, rarityBadge, badge, ...stackItems, nameText, sepGfx, descText])
     this._containers.push(container)
 
     container.setAlpha(0).setY(cy + 26)
