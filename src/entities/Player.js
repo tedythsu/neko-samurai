@@ -86,6 +86,15 @@ export default class Player {
         sc.time.delayedCall(300, () => { if (!this._dead) this.sprite.clearTint() })
         return
       }
+      if (sc._susano && sc._susanoCd <= 0) {
+        this.hp = 1
+        sc._susanoCd = sc._cooldownAdjusted ? sc._cooldownAdjusted(30000) : 30000
+        sc._substitutionGrace = Math.max(sc._substitutionGrace || 0, 800)
+        sc._triggerSusanoBurst?.(this.x, this.y)
+        this.sprite.setTint(0xffccff)
+        sc.time.delayedCall(300, () => { if (!this._dead) this.sprite.clearTint() })
+        return
+      }
       this._dead = true
       this.sprite.clearTint()
       this.scene.events.emit('player-dead')

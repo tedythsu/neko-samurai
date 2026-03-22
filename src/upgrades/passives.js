@@ -19,20 +19,16 @@ export const ALL_PASSIVES = [
     apply: (_p, scene) => { scene._defenseBonus = (scene._defenseBonus || 0) + 0.15 },
   },
   {
-    id: 'aoe', name: '【靈力・擴張】', desc: '所有武器 AoE / 鎖鎌半徑 +25%',
+    id: 'aoe', name: '【靈力・擴張】', desc: '範圍型效果半徑 +25%',
     rarity: 'common', oneTime: true,
     apply: (_p, scene) => {
       for (const entry of scene._weapons || []) {
         if (entry.stats._explodeRadius != null) entry.stats._explodeRadius *= 1.25
-        if (entry.stats.range          != null) entry.stats.range          *= 1.25
         if (entry.stats._orbitRadius   != null) entry.stats._orbitRadius   *= 1.25
+        if (entry.stats._lingerRadius  != null) entry.stats._lingerRadius  *= 1.25
+        if (entry.stats._gravityRadius != null) entry.stats._gravityRadius *= 1.25
       }
     },
-  },
-  {
-    id: 'pickup', name: '【磁力・取物】', desc: '拾取半徑 +100%',
-    rarity: 'common',
-    apply: (_p, scene) => { scene._orbAttractRadius = (scene._orbAttractRadius || 130) * 2 },
   },
   {
     id: 'soul_drain', name: '【魂吸・奪命】', desc: '擊殺有 2% 機率回復 1 點生命值',
@@ -77,7 +73,7 @@ export const ALL_PASSIVES = [
     apply: (player) => { player.maxHp *= 1.30; player.heal(player.maxHp * 0.10) },
   },
   {
-    id: 'ailment_dur', name: '【長久‧咒印】', desc: '元素異常持續時間 +30%（可疊 2 層）',
+    id: 'ailment_dur', name: '【長久‧咒印】', desc: '異常、標記與持續效果時間 +30%（可疊 2 層）',
     rarity: 'rare', maxStacks: 2,
     apply: (_p, scene) => { scene._ailmentDurMult = (scene._ailmentDurMult || 1) * 1.30 },
   },
@@ -122,7 +118,7 @@ export const ALL_PASSIVES = [
     apply: (_p, scene) => { scene._caltrops = true; scene._caltropTimer = 0 },
   },
   {
-    id: 'steady_stance', name: '【防禦‧姿態】', desc: '站立不動時受傷 -35%，且造成傷害 +12%',
+    id: 'steady_stance', name: '【流轉‧見切】', desc: '持續移動時受傷 -20%，且造成傷害 +8%',
     rarity: 'rare', oneTime: true,
     apply: (_p, scene) => { scene._steadyStance = true },
   },
@@ -130,20 +126,6 @@ export const ALL_PASSIVES = [
     id: 'cooldown_cut', name: '【冷卻‧縮減】', desc: '戰吼、菱釘、兵糧丸、月讀、替身術冷卻縮短 30%',
     rarity: 'common', oneTime: true,
     apply: (_p, scene) => { scene._cdMult = (scene._cdMult || 1) * 0.70 },
-  },
-  {
-    id: 'xp_hunger', name: '【經驗‧渴望】', desc: '經驗獲取 +25%，拾取半徑 +25%，但敵人跑速 +4%',
-    rarity: 'common', oneTime: true,
-    apply: (_p, scene) => {
-      scene._xpMult         = (scene._xpMult         || 1) * 1.25
-      scene._orbAttractRadius = (scene._orbAttractRadius || 130) * 1.25
-      scene._enemySpeedBuff = (scene._enemySpeedBuff || 1) * 1.04
-    },
-  },
-  {
-    id: 'daimyo_tax', name: '【大名‧徵稅】', desc: '每獲得 100 XP，全傷害永久 +1%',
-    rarity: 'rare', oneTime: true,
-    apply: (_p, scene) => { scene._daimyoTax = true },
   },
   {
     id: 'ki_blast', name: '【間合‧極】', desc: '太刀在刀尖命中時傷害 +25%，且擊退略微提升',
@@ -172,6 +154,16 @@ export const ALL_PASSIVES = [
     id: 'blood_rush', name: '【血狩‧疾走】', desc: '擊殺中毒或流血的敵人時，3 秒內移速與攻擊頻率 +12%',
     rarity: 'rare', oneTime: true,
     apply: (_p, scene) => { scene._bloodRush = true },
+  },
+  {
+    id: 'weakpoint_focus', name: '【弱點‧收束】', desc: '對同一目標連續命中時，使其後續 3 秒承受更多傷害',
+    rarity: 'rare', oneTime: true,
+    apply: (_p, scene) => { scene._weakpointFocus = true },
+  },
+  {
+    id: 'pathogen_spread', name: '【病灶‧擴散】', desc: '異常目標死亡時，把部分剩餘持續時間傳給最近敵人',
+    rarity: 'epic', oneTime: true,
+    apply: (_p, scene) => { scene._pathogenSpread = true },
   },
 
   // ─── Trigger Passives (formerly procs) ───────────────────────────────────
@@ -208,13 +200,13 @@ export const ALL_PASSIVES = [
     rarity: 'epic', oneTime: true, minLevel: 8, subtype: 'proc',
   },
   {
-    id: 'iron_body', name: '【不動・護盾】', desc: '站定不動 1.5 秒後獲得護盾；護盾被打破時，釋放護身震波反擊周圍敵人',
+    id: 'iron_body', name: '【殘影・護身】', desc: '持續移動 1.5 秒後獲得護盾；護盾被打破時，釋放護身震波反擊周圍敵人',
     rarity: 'epic', oneTime: true, minLevel: 8, subtype: 'proc',
   },
 
   // ─── Legendary Passives (formerly keystones) ─────────────────────────────
   {
-    id: 'iron_will', name: '【不動如山】', desc: '站定不動時每秒傷害提升 20%（最高 100%），並獲得霸體',
+    id: 'iron_will', name: '【疾風如火】', desc: '持續移動時每秒傷害提升 12%（最高 60%），停下來會逐步衰減',
     rarity: 'legendary', oneTime: true, minLevel: 10, subtype: 'keystone',
   },
   {
@@ -240,12 +232,12 @@ export const ALL_PASSIVES = [
     apply(_player, scene) { scene._amaterasu = true },
   },
   {
-    id: 'susano', name: '【須佐・守護】', desc: '受到致命傷害時，將傷害反射給周邊所有怪物（冷卻 30 秒）',
+    id: 'susano', name: '【須佐・守護】', desc: '受到致命傷害時保留 1 HP，並震滅周邊怪物（冷卻 30 秒）',
     rarity: 'legendary', oneTime: true, minLevel: 10, subtype: 'keystone',
     apply(_player, scene) { scene._susano = true; scene._susanoCd = 0 },
   },
   {
-    id: 'tsukuyomi', name: '【月讀・幻境】', desc: '每 15 秒使畫面上所有怪物短暫混亂，互相碰撞造成傷害',
+    id: 'tsukuyomi', name: '【月讀・幻境】', desc: '每 15 秒使畫面上所有怪物短暫停滯並陷入幻惑',
     rarity: 'legendary', oneTime: true, minLevel: 10, subtype: 'keystone',
     apply(_player, scene) { scene._tsukuyomi = true; scene._tsukuyomiTimer = 0 },
   },

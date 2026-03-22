@@ -114,6 +114,8 @@ export default class GameScene extends Phaser.Scene {
     this._ailmentExpose     = false
     this._bloodRush         = false
     this._bloodRushUntil    = 0
+    this._weakpointFocus    = false
+    this._pathogenSpread    = false
     this._rationBuffUntil   = 0
     this._caltrops          = false
     this._caltropTimer      = 0
@@ -443,17 +445,17 @@ export default class GameScene extends Phaser.Scene {
     const px = this._player.x
     const py = this._player.y
 
-    // Iron Will keystone — boost damage when standing still
+    // Iron Will keystone — build damage while moving
     if (this._keystonesOwned.has('iron_will')) {
       const dx = Math.abs(px - (this._iwPX || px))
       const dy = Math.abs(py - (this._iwPY || py))
       this._iwPX = px; this._iwPY = py
       if (dx > 2 || dy > 2) {
-        this._ironWillTimer = 0
-        this._ironWillMult  = 1.0
-      } else {
         this._ironWillTimer = (this._ironWillTimer || 0) + delta
-        this._ironWillMult  = Math.min(2.0, 1.0 + (this._ironWillTimer / 1000) * 0.20)
+        this._ironWillMult  = Math.min(1.60, 1.0 + (this._ironWillTimer / 1000) * 0.12)
+      } else {
+        this._ironWillTimer = Math.max(0, (this._ironWillTimer || 0) - delta * 1.5)
+        this._ironWillMult  = Math.max(1.0, 1.0 + (this._ironWillTimer / 1000) * 0.12)
       }
     }
 
@@ -544,18 +546,18 @@ export default class GameScene extends Phaser.Scene {
       this._susanoCd = Math.max(0, this._susanoCd - delta)
     }
 
-    // Iron Body proc — stand still shield
+    // Iron Body proc — gain shield while staying in motion
     if (this._procsOwned.has('iron_body')) {
       const dx = Math.abs(px - (this._ibPX || px))
       const dy = Math.abs(py - (this._ibPY || py))
       this._ibPX = px; this._ibPY = py
       if (dx > 2 || dy > 2) {
-        this._ironBodyTimer = 0
-      } else {
         this._ironBodyTimer = (this._ironBodyTimer || 0) + delta
         if (this._ironBodyTimer >= 1500 && !this._ironBodyShield) {
           this._ironBodyShield = true
         }
+      } else {
+        this._ironBodyTimer = 0
       }
     }
 
@@ -1123,6 +1125,24 @@ export default class GameScene extends Phaser.Scene {
     g.lineStyle(3, 0xaad8ff, 0.9)
     g.strokeCircle(x, y, radius)
     this.tweens.add({ targets: g, alpha: 0, duration: 240, onComplete: () => g.destroy() })
+  }
+
+  _triggerSusanoBurst(x, y) {
+    const radius = 180
+    this._enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
+      if (Phaser.Math.Distance.Between(x, y, e.x, e.y) < radius) {
+        const dx = e.x - x, dy = e.y - y
+        const len = Math.hypot(dx, dy) || 1
+        e.body.velocity.x = (dx / len) * 520
+        e.body.velocity.y = (dy / len) * 520
+        e.knockbackTimer = 320
+        Enemy.takeDamage(e, 140, x, y, this._affixes || [], 0, { source: 'ability' })
+      }
+    })
+    const g = this.add.graphics().setDepth(9)
+    g.lineStyle(4, 0xff8899, 0.95)
+    g.strokeCircle(x, y, radius)
+    this.tweens.add({ targets: g, alpha: 0, scaleX: 1.25, scaleY: 1.25, duration: 260, onComplete: () => g.destroy() })
   }
 
   _cooldownAdjusted(baseMs) {

@@ -48,6 +48,8 @@ export default class Enemy {
     sprite._kunaiPlague     = false
     sprite._kunaiRuptureUntil = 0
     sprite._lastHitWasCrit  = false
+    sprite._focusWindowUntil = 0
+    sprite._focusStacks      = 0
 
     sprite.setAlpha(1)
     if (type.baseTint !== null) {
@@ -209,6 +211,14 @@ export default class Enemy {
       if (se.frozen.timer <= 0) se.frozen.active = false
     }
 
+    if ((sprite._focusWindowUntil || 0) > 0) {
+      sprite._focusWindowUntil -= delta
+      if (sprite._focusWindowUntil <= 0) {
+        sprite._focusWindowUntil = 0
+        sprite._focusStacks = 0
+      }
+    }
+
     Enemy._applyStatusTint(sprite)
   }
 
@@ -253,6 +263,9 @@ export default class Enemy {
     if (sprite._kunaiPlague) {
       Enemy._spreadKunaiPlague(scene, sprite)
     }
+    if (scene._pathogenSpread) {
+      Enemy._spreadAilments(scene, sprite)
+    }
     if (sprite._pulseTween) { sprite._pulseTween.stop(); sprite._pulseTween = null }
     sprite.clearTint()
 
@@ -293,6 +306,8 @@ export default class Enemy {
         sprite._darkAura   = false
         sprite._kunaiPlague = false
         sprite._kunaiRuptureUntil = 0
+        sprite._focusWindowUntil = 0
+        sprite._focusStacks = 0
         const se = sprite._statusEffects
         if (se) {
           se.chill.active = false; se.chill.timer = 0; se.chill.stacks = 0
@@ -361,6 +376,51 @@ export default class Enemy {
     const g = scene.add.graphics().setDepth(6)
     g.lineStyle(2, 0x55dd66, 0.7)
     targets.forEach(e => g.lineBetween(source.x, source.y, e.x, e.y))
+    scene.tweens.add({ targets: g, alpha: 0, duration: 220, onComplete: () => g.destroy() })
+  }
+
+  static _spreadAilments(scene, source) {
+    const target = (scene._enemies?.getChildren() || [])
+      .filter(e => e.active && !e.dying && e !== source)
+      .filter(e => Phaser.Math.Distance.Between(source.x, source.y, e.x, e.y) <= 180)
+      .sort((a, b) =>
+        Phaser.Math.Distance.Between(source.x, source.y, a.x, a.y) -
+        Phaser.Math.Distance.Between(source.x, source.y, b.x, b.y)
+      )[0]
+    if (!target) return
+
+    const from = source._statusEffects
+    const to = target._statusEffects
+    if (!from || !to) return
+
+    const durMult = scene._ailmentDurMult || 1
+    if (from.ignite?.active && from.ignite.timer > 0) {
+      to.ignite.active = true
+      to.ignite.timer = Math.max(to.ignite.timer, from.ignite.timer * 0.5)
+      to.ignite.dps = Math.max(to.ignite.dps, (from.ignite.dps || 0) * 0.5)
+    }
+    if (from.bleed?.active && from.bleed.timer > 0) {
+      to.bleed.active = true
+      to.bleed.timer = Math.max(to.bleed.timer, from.bleed.timer * 0.5)
+    }
+    if (from.poison?.active && from.poison.timer > 0) {
+      applyPoisonStacks(target, scene, Math.max(1, Math.ceil((from.poison.stacks || 1) * 0.5)), Math.max(1500, from.poison.timer * 0.5 / durMult))
+      const poison = ensurePoisonState(target)
+      poison.flat = Math.max(poison.flat, (from.poison.flat || 0) * 0.5)
+    }
+    if (from.shock?.active && from.shock.timer > 0) {
+      to.shock.active = true
+      to.shock.timer = Math.max(to.shock.timer, from.shock.timer * 0.5)
+    }
+    if (from.chill?.active && from.chill.timer > 0) {
+      to.chill.active = true
+      to.chill.timer = Math.max(to.chill.timer, from.chill.timer * 0.5)
+      to.chill.stacks = Math.max(to.chill.stacks || 0, Math.ceil((from.chill.stacks || 1) * 0.5))
+    }
+
+    const g = scene.add.graphics().setDepth(7)
+    g.lineStyle(2, 0x88ff88, 0.8)
+    g.lineBetween(source.x, source.y, target.x, target.y)
     scene.tweens.add({ targets: g, alpha: 0, duration: 220, onComplete: () => g.destroy() })
   }
 
@@ -447,7 +507,7 @@ export default class Enemy {
       if (scene._steadyStance) {
         const vel = scene._player?.sprite?.body?.velocity
         const isMoving = vel ? (Math.abs(vel.x) + Math.abs(vel.y)) > 5 : false
-        if (!isMoving) dmgMult *= 1.12
+        if (isMoving) dmgMult *= 1.08
       }
       if (scene._rationBuffUntil && scene._rationBuffUntil > scene.time.now) dmgMult *= 1.15
     } else if (sourceType === 'proc' && scene._globalDmgMult && scene._globalDmgMult !== 1) {
@@ -468,6 +528,9 @@ export default class Enemy {
     if (sprite._darkAura) dmgMult *= 1.18
     if ((sprite._warCryExposeUntil || 0) > scene.time.now) dmgMult *= 1.20
     if (scene._ailmentExpose && (se?.poison?.active || se?.bleed?.active)) dmgMult *= 1.16
+    if (scene._weakpointFocus && (sprite._focusWindowUntil || 0) > 0) {
+      dmgMult *= 1 + Math.min(0.18, (sprite._focusStacks || 0) * 0.06)
+    }
     // Boss chest bonus (kijo kill reward)
     if (scene._bossChestBonus) dmgMult *= scene._bossChestBonus
 
@@ -490,6 +553,10 @@ export default class Enemy {
 
     const damage = Math.round(amount * dmgMult * (isCrit ? critMult : 1) * firstStrikeMult)
     sprite._lastHitWasCrit = isCrit
+    if (scene._weakpointFocus && (sourceType === 'weapon' || sourceType === 'ability')) {
+      sprite._focusStacks = Math.min(3, (sprite._focusStacks || 0) + 1)
+      sprite._focusWindowUntil = 3000
+    }
     sprite.hp -= damage
     scene.playHitSound?.(scene._hitSoundKey)
 
@@ -605,7 +672,7 @@ export default class Enemy {
     if (scene._steadyStance) {
       const vel = scene._player?.sprite?.body?.velocity
       const isMoving = vel ? (Math.abs(vel.x) + Math.abs(vel.y)) > 5 : false
-      if (!isMoving) dmgToPlayer *= 0.65
+      if (isMoving) dmgToPlayer *= 0.80
     }
 
     // Iron body shield — absorb one hit
