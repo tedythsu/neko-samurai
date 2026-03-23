@@ -14,11 +14,11 @@ export default {
   iconKey: 'shuriken',
 
   baseStats: {
-    damage:          16,
+    damage:          13,
     damageVariance:  0.20,
-    fireRate:        760,
+    fireRate:        700,
     projectileCount: 3,
-    speed:           430,
+    speed:           450,
     penetrate:       false,
     knockback:       60,
     _scale:          1.0,
@@ -74,6 +74,7 @@ export default {
 
       const offset = (i - (count - 1) / 2) * SPREAD_DEG
       const speed = stats.speed * (scene._projSpeedMult || 1)
+      s._speed = speed
       scene.physics.velocityFromAngle(centerAngle + offset, speed, s.body.velocity)
     }
   },
@@ -221,7 +222,7 @@ function _updateOrbitingShuriken(entry, scene, enemies, player, affixes) {
     const s = getOrCreate(entry.projectiles, player.x, player.y, entry.weapon.texKey)
     if (!s) break
     s.setDisplaySize(baseW, baseH)
-    s.damage       = rollDamage(entry.stats) * 0.80
+    s.damage       = rollDamage(entry.stats) * (entry.stats._orbitDamageMult || 0.80)
     s.hitSet       = new Set()
     s.spawnX       = player.x
     s.spawnY       = player.y
@@ -253,14 +254,14 @@ function _updateOrbitingShuriken(entry, scene, enemies, player, affixes) {
     proj.x = player.x + Math.cos(angle) * radius
     proj.y = player.y + Math.sin(angle) * radius
     proj.angle += 10
-    proj.damage = rollDamage(entry.stats) * 0.80
+    proj.damage = rollDamage(entry.stats) * (entry.stats._orbitDamageMult || 0.80)
 
     enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
       if (Phaser.Math.Distance.Between(proj.x, proj.y, e.x, e.y) >= proj._hitRadius) return
       const lastHit = proj._orbitHitCd.get(e) || 0
-      if (now - lastHit < 500) return
+      if (now - lastHit < (entry.stats._orbitHitCooldown || 500)) return
       proj._orbitHitCd.set(e, now)
-      Enemy.takeDamage(e, proj.damage, proj.x, proj.y, [], proj.knockback ?? 60, {
+      Enemy.takeDamage(e, proj.damage, proj.x, proj.y, affixes, proj.knockback ?? 60, {
         source: 'weapon',
         weaponId: entry.weapon.id,
       })

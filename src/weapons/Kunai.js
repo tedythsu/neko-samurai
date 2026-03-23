@@ -15,11 +15,11 @@ export default {
   iconKey: 'kunai',
 
   baseStats: {
-    damage:          18,
+    damage:          19,
     damageVariance:  0.20,
-    fireRate:        550,
+    fireRate:        560,
     projectileCount: 1,
-    speed:           600,
+    speed:           620,
     penetrate:       false,
     knockback:       60,
     _scale:          1.0,
@@ -68,6 +68,7 @@ export default {
 
       const offset = (i - (stats.projectileCount - 1) / 2) * spreadStep
       const speed = stats.speed * (scene._projSpeedMult || 1)
+      s._speed = speed
       const angle = Phaser.Math.DegToRad(centerAngle + offset)
       scene.physics.velocityFromAngle(
         Phaser.Math.RadToDeg(angle), speed, s.body.velocity
@@ -130,8 +131,9 @@ export default {
           }
 
           // 影縫・定身 — stun on hit
-          if (proj._stun && Math.random() < 0.40) {
+          if (proj._stun && Math.random() < 0.32) {
             e._stunTimer = Math.max(e._stunTimer || 0, 1000)
+            e._stunExposeUntil = Math.max(e._stunExposeUntil || 0, scene.time.now + 1000)
           }
 
           if (scene._secondSplit && !proj._micro) {

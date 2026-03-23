@@ -11,15 +11,15 @@ export default {
   iconChar: '炎',
 
   baseStats: {
-    damage:          50,
+    damage:          48,
     damageVariance:  0.30,
-    fireRate:        2200,
+    fireRate:        1950,
     projectileCount: 1,
     range:           700,
-    speed:           240,
+    speed:           280,
     penetrate:       false,
     knockback:       140,
-    _explodeRadius:  72,
+    _explodeRadius:  78,
   },
 
   upgrades: [],
@@ -47,7 +47,7 @@ export default {
       s.penetrate      = stats.penetrate ?? false
       s.knockback      = stats.knockback ?? 160
       s._explodeRadius = stats._explodeRadius
-      s._explodeMult   = 0.7
+      s._explodeMult   = 0.72
       s._scorch        = stats._scorch        || false
       s._chainExplode  = stats._chainExplode  || false
       s._gravity       = stats._gravity       || false
@@ -58,9 +58,12 @@ export default {
       s._weaponId      = this.id
       s._hitRadius     = s.displayWidth * 0.5
       s._chainDepth    = 0
+      s._affixes       = scene._affixes || []
+      s._target        = target
 
       const angle = Phaser.Math.Angle.Between(fromX, fromY, target.x, target.y)
       const speed = stats.speed * (scene._projSpeedMult || 1)
+      s._speed = speed
       scene.physics.velocityFromAngle(Phaser.Math.RadToDeg(angle), speed, s.body.velocity)
     })
   },
@@ -69,6 +72,17 @@ export default {
     if (!sprite.active) return
     sprite.rotation += 0.1
     if (sprite._spent) { sprite.disableBody(true, true); return }
+
+    if (sprite._target?.active && !sprite._target?.dying && sprite.body) {
+      const desiredAngle = Phaser.Math.Angle.Between(sprite.x, sprite.y, sprite._target.x, sprite._target.y)
+      const curVel = sprite.body.velocity
+      const curSpeed = Math.max(1, Math.hypot(curVel.x, curVel.y))
+      const desiredX = Math.cos(desiredAngle) * curSpeed
+      const desiredY = Math.sin(desiredAngle) * curSpeed
+      curVel.x = Phaser.Math.Linear(curVel.x, desiredX, 0.08)
+      curVel.y = Phaser.Math.Linear(curVel.y, desiredY, 0.08)
+    }
+
     if (sprite._wallBounce && !sprite._wallBounced) {
       const bounds = sprite.scene.physics.world.bounds
       let bounced = false
@@ -85,6 +99,7 @@ export default {
       if (bounced) sprite._wallBounced = true
     }
     if (Phaser.Math.Distance.Between(sprite.spawnX, sprite.spawnY, sprite.x, sprite.y) >= sprite.range) {
+      applyExplosion(sprite, null, sprite.scene, sprite.scene._enemies, sprite._affixes || [])
       sprite.disableBody(true, true)
     }
   },

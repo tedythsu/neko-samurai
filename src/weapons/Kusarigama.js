@@ -9,10 +9,10 @@ export default {
   iconKey: 'kusarigama',
 
   baseStats: {
-    damage:         28,
+    damage:         22,
     damageVariance: 0.12,
     fireRate:       0,
-    projectileCount: 1,
+    projectileCount: 2,
     knockback:       0,
   },
 
@@ -78,10 +78,10 @@ export default {
       sicklePositions.push({ sx, sy, isHeavy: entry.stats._heavyBall && i === 0 })
 
       enemies.getChildren().filter(e => e.active && !e.dying).forEach(e => {
-        const hitR = entry.stats._heavyBall && i === 0 ? 35 : 20
+        const hitR = entry.stats._heavyBall && i === 0 ? 38 : 24
         if (Phaser.Math.Distance.Between(sx, sy, e.x, e.y) < hitR) {
           const last = entry.damageCd.get(e) || 0
-          if (now - last >= 550) {
+          if (now - last >= 700) {
             entry.damageCd.set(e, now)
             const rolledDmg = rollDamage(entry.stats)
             // 重鎚・碎裂 — heavy ball: extra damage + strong knockback
@@ -110,13 +110,13 @@ export default {
     if (entry.stats._arcLightning && entry.sickles.length >= 1) {
       if (!entry._arcLightCd) entry._arcLightCd = 0
       entry._arcLightCd += (delta || 16)
-      if (entry._arcLightCd >= 800) {
+      if (entry._arcLightCd >= 1020) {
         entry._arcLightCd = 0
         sicklePositions.forEach(({ sx, sy }) => {
           const nearby = enemies.getChildren().filter(e => e.active && !e.dying &&
             Phaser.Math.Distance.Between(sx, sy, e.x, e.y) < innerRadius * 1.4)
           nearby.forEach(e => {
-            Enemy.takeDamage(e, rollDamage(entry.stats) * 0.5, sx, sy, affixes, 0, {
+            Enemy.takeDamage(e, rollDamage(entry.stats) * 0.42, sx, sy, affixes, 0, {
               source: 'weapon',
               weaponId: 'kusarigama',
             })

@@ -6,24 +6,24 @@ export const WEAPON_UPGRADES_MAP = {
     {
       id: 'tachi_wide',
       name: '【斬鐵・廣域】',
-      desc: '攻擊半徑與扇形角度增加 40%',
+      desc: '攻擊半徑與扇形角度增加 32%',
       rarity: 'rare',
       oneTime: true,
       apply(stats) {
-        stats.range   *= 1.4
-        stats._arcMult = (stats._arcMult || 1) * 1.4
+        stats.range   *= 1.32
+        stats._arcMult = (stats._arcMult || 1) * 1.32
       },
     },
     {
       id: 'tachi_chain',
       name: '【極意・連斬】',
-      desc: '每次攻擊有 20% 機率觸發第二次斬擊，連斬瞬間獲得 20% 減傷',
+      desc: '每次攻擊有 30% 機率觸發第二次斬擊，連斬瞬間獲得 18% 減傷',
       rarity: 'rare',
       oneTime: true,
       apply(stats) {
         stats._doubleStrike       = true
-        stats._doubleStrikeChance = 0.20
-        stats._comboGuard         = 0.20
+        stats._doubleStrikeChance = 0.30
+        stats._comboGuard         = 0.18
       },
     },
     {
@@ -40,7 +40,7 @@ export const WEAPON_UPGRADES_MAP = {
       desc: '攻擊附帶極高擊退，強制推開貼身怪群',
       rarity: 'rare',
       oneTime: true,
-      apply(stats) { stats.knockback = (stats.knockback || 120) * 3 },
+      apply(stats) { stats.knockback = (stats.knockback || 120) * 2.2 },
     },
   ],
 
@@ -64,20 +64,20 @@ export const WEAPON_UPGRADES_MAP = {
     {
       id: 'kunai_pierce',
       name: '【穿雲・貫通】',
-      desc: '苦無可無限穿透目標；每穿透一個目標傷害提升 10%，最多提升至 60%',
+      desc: '苦無可無限穿透目標；每穿透一個目標傷害提升 10%，最多提升至 50%',
       rarity: 'rare',
       oneTime: true,
       apply(stats) {
         stats.penetrate    = true
         stats._pierceBonus = 0.10
         stats._pierceMax   = Infinity
-        stats._pierceBonusCap = 0.60
+        stats._pierceBonusCap = 0.50
       },
     },
     {
       id: 'kunai_stun',
       name: '【影縫・定身】',
-      desc: '命中時 40% 機率使怪物「原地停止」1 秒',
+      desc: '命中時 32% 機率使怪物「原地停止」1 秒，並在停滯期間承受更多傷害',
       rarity: 'rare',
       oneTime: true,
       apply(stats) { stats._stun = true },
@@ -115,13 +115,15 @@ export const WEAPON_UPGRADES_MAP = {
     {
       id: 'shuriken_omni',
       name: '【六道・全周】',
-      desc: '手裏劍化為環身刃陣，持續繞行角色周圍並切割靠近的敵人',
+      desc: '手裏劍化為環身刃陣，持續繞行角色周圍並切割靠近的敵人，且受到傷害降低 8%',
       rarity: 'rare',
       oneTime: true,
       apply(stats) {
         stats._omni = true
         stats.fireRate = 0
         stats._orbitRadius = 92
+        stats._orbitDamageMult = 0.84
+        stats._orbitHitCooldown = 500
       },
     },
   ],
@@ -158,11 +160,11 @@ export const WEAPON_UPGRADES_MAP = {
     {
       id: 'homura_doubleburst',
       name: '【連爆・擴散】',
-      desc: '爆炸範圍 +35%，且有 25% 機率在原位引發二次爆炸',
+      desc: '爆炸範圍 +30%，且有 20% 機率在原位引發二次爆炸',
       rarity: 'rare',
       oneTime: true,
       apply(stats) {
-        stats._explodeRadius = (stats._explodeRadius || 80) * 1.35
+        stats._explodeRadius = (stats._explodeRadius || 80) * 1.30
         stats._secondBurst   = true
       },
     },
@@ -180,11 +182,11 @@ export const WEAPON_UPGRADES_MAP = {
     {
       id: 'kusa_radius',
       name: '【不動・重力】',
-      desc: '鎖鎌半徑增大，並附帶強力擊退效果',
+      desc: '鎖鎌半徑增大 40%，並附帶強力擊退效果',
       rarity: 'rare',
       oneTime: true,
       apply(stats) {
-        stats._orbitRadius  = (stats._orbitRadius || 80) * 1.5
+        stats._orbitRadius  = (stats._orbitRadius || 80) * 1.4
         stats._aoeKnockback = true
       },
     },

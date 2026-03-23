@@ -50,6 +50,7 @@ export default class Enemy {
     sprite._lastHitWasCrit  = false
     sprite._focusWindowUntil = 0
     sprite._focusStacks      = 0
+    sprite._stunExposeUntil  = 0
 
     sprite.setAlpha(1)
     if (type.baseTint !== null) {
@@ -308,6 +309,7 @@ export default class Enemy {
         sprite._kunaiRuptureUntil = 0
         sprite._focusWindowUntil = 0
         sprite._focusStacks = 0
+        sprite._stunExposeUntil = 0
         const se = sprite._statusEffects
         if (se) {
           se.chill.active = false; se.chill.timer = 0; se.chill.stacks = 0
@@ -526,7 +528,8 @@ export default class Enemy {
     if (scene._keystonesOwned?.has('ice_thunder') && se?.frozen?.active) dmgMult *= 1.75
     // Dark aura: +25% damage to aura-marked enemies
     if (sprite._darkAura) dmgMult *= 1.18
-    if ((sprite._warCryExposeUntil || 0) > scene.time.now) dmgMult *= 1.20
+    if ((sprite._warCryExposeUntil || 0) > scene.time.now) dmgMult *= 1.14
+    if ((sprite._stunExposeUntil || 0) > scene.time.now) dmgMult *= 1.06
     if (scene._ailmentExpose && (se?.poison?.active || se?.bleed?.active)) dmgMult *= 1.16
     if (scene._weakpointFocus && (sprite._focusWindowUntil || 0) > 0) {
       dmgMult *= 1 + Math.min(0.18, (sprite._focusStacks || 0) * 0.06)
@@ -667,6 +670,10 @@ export default class Enemy {
 
     // Glass cannon — player takes double damage
     if (scene._glassCannon) dmgToPlayer *= 2
+
+    // Six-Path orbit build gets a small defensive rebate for staying close.
+    const hasOmniGuard = scene._weapons?.some(entry => entry.stats?._omni)
+    if (hasOmniGuard) dmgToPlayer *= 0.92
 
     // Steady stance — -40% damage when player is standing still
     if (scene._steadyStance) {

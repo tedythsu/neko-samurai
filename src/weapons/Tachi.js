@@ -9,10 +9,10 @@ export default {
   iconKey: 'tachi',
 
   baseStats: {
-    damage:         34,
+    damage:         36,
     damageVariance: 0.25,
-    fireRate:       1150,
-    range:          90,
+    fireRate:       1080,
+    range:          92,
     knockback:      120,
   },
 

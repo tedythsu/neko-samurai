@@ -8,6 +8,39 @@ import { ALL_PASSIVES }        from '../upgrades/passives.js'
 import { ENEMY_TYPES } from '../enemies/EnemyTypes.js'
 import BossManager from '../enemies/BossManager.js'
 
+const GAMEPLAY_PASSIVE_IDS = new Set([
+  'first_strike', 'shadow_dodge', 'substitution', 'fury', 'caltrops',
+  'steady_stance', 'ki_blast', 'ricochet_arc', 'second_split', 'toxicology',
+  'blood_rush', 'weakpoint_focus', 'pathogen_spread', 'war_cry', 'thorns',
+  'life_leech', 'sanctuary_aura', 'soul_burst', 'ration', 'culling',
+  'dark_aura', 'iron_body', 'iron_will', 'glass_cannon', 'spell_echo',
+  'ice_thunder', 'gravity_burst', 'amaterasu', 'susano', 'tsukuyomi',
+  'yamatanoorochi',
+])
+
+const WEAPON_SYNERGY_PASSIVE_IDS = {
+  tachi: new Set(['ki_blast', 'steady_stance', 'first_strike', 'crit_blade', 'attack_spd', 'iron_will']),
+  kunai: new Set(['toxicology', 'blood_rush', 'ailment_dur', 'pathogen_spread', 'second_split', 'crit_eye']),
+  shuriken: new Set(['ricochet_arc', 'second_split', 'iron_will', 'sanctuary_aura', 'spell_echo', 'attack_spd']),
+  homura: new Set(['aoe', 'war_cry', 'gravity_burst', 'cooldown_cut', 'ailment_dur', 'power_up']),
+  kusarigama: new Set(['sanctuary_aura', 'steady_stance', 'fury', 'iron_body', 'war_cry', 'vitality']),
+}
+
+const ENEMY_TYPE_MAP = new Map(ENEMY_TYPES.map(type => [type.id, type]))
+
+const ENEMY_MIX_BY_WAVE = [
+  [{ id: 'kisotsu', weight: 1 }],
+  [{ id: 'kisotsu', weight: 1 }],
+  [{ id: 'kisotsu', weight: 0.7 }, { id: 'hayate', weight: 0.3 }],
+  [{ id: 'kisotsu', weight: 0.7 }, { id: 'hayate', weight: 0.3 }],
+  [{ id: 'kisotsu', weight: 0.45 }, { id: 'hayate', weight: 0.3 }, { id: 'yoroi', weight: 0.25 }],
+  [{ id: 'kisotsu', weight: 0.45 }, { id: 'hayate', weight: 0.3 }, { id: 'yoroi', weight: 0.25 }],
+  [{ id: 'kisotsu', weight: 0.34 }, { id: 'hayate', weight: 0.28 }, { id: 'yoroi', weight: 0.38 }],
+  [{ id: 'kisotsu', weight: 0.32 }, { id: 'hayate', weight: 0.26 }, { id: 'yoroi', weight: 0.42 }],
+  [{ id: 'kisotsu', weight: 0.26 }, { id: 'hayate', weight: 0.18 }, { id: 'yoroi', weight: 0.34 }, { id: 'bakuha', weight: 0.16 }, { id: 'jonin', weight: 0.06 }],
+  [{ id: 'kisotsu', weight: 0.18 }, { id: 'hayate', weight: 0.14 }, { id: 'yoroi', weight: 0.42 }, { id: 'bakuha', weight: 0.16 }, { id: 'jonin', weight: 0.10 }],
+]
+
 export default class GameScene extends Phaser.Scene {
   constructor() { super('GameScene') }
 
@@ -93,6 +126,7 @@ export default class GameScene extends Phaser.Scene {
 
     // ── New passive/proc state ────────────────────────────────────────────────
     this._weaponChoiceDone  = false       // set true after Lv.3 weapon branch chosen
+    this._weaponMidChoiceDone = false     // set true after Lv.7 weapon branch chosen
     this._weaponFinalChoiceDone = false   // set true after Lv.12 weapon branch chosen
     this._passiveStacks     = new Map()   // passiveId → stack count
     this._globalDmgMult     = 1.0
@@ -596,7 +630,7 @@ export default class GameScene extends Phaser.Scene {
       if (!orb._attracted) {
         if (!orb._spawnTime) orb._spawnTime = this.time.now
         const elapsed = this.time.now - orb._spawnTime
-        if (elapsed >= 12000) {
+        if (elapsed >= CFG.ORB_LIFETIME_MS) {
           // Expire: kill existing tweens first, then fade out and destroy
           if (orb._emitter) orb._emitter.destroy()
           this.tweens.killTweensOf(orb)    // kill warning tween BEFORE adding fade tween
@@ -609,8 +643,8 @@ export default class GameScene extends Phaser.Scene {
         }
         // Warning flash: last 3 seconds — alpha oscillates and accelerates
         // Recreate tween whenever frequency changes by >10ms so flash visibly speeds up
-        if (elapsed >= 9000) {
-          const remaining = 12000 - elapsed         // 3000 → 0
+        if (elapsed >= CFG.ORB_LIFETIME_MS - 3000) {
+          const remaining = CFG.ORB_LIFETIME_MS - elapsed
           const freq = Math.round(Phaser.Math.Linear(200, 80, 1 - remaining / 3000))
           if (!orb._warnFreq || Math.abs(orb._warnFreq - freq) > 10) {
             orb._warnFreq = freq
@@ -631,7 +665,8 @@ export default class GameScene extends Phaser.Scene {
         continue
       }
 
-      const attractRadius = this._orbAttractRadius || CFG.ORB_ATTRACT_RADIUS
+      const attractRadius = (this._orbAttractRadius || CFG.ORB_ATTRACT_RADIUS) +
+        (this._level >= 8 ? 20 : 0)
       if (dist < attractRadius) {
         // First frame entering attract zone — stop floating tween
         if (!orb._attracted) {
@@ -777,7 +812,7 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
-  // Spawn a single kisotsu enemy using current wave stats.
+  // Spawn a single enemy using the current wave's stat budget and composition mix.
   _spawnOneEnemy(wave) {
     const { x, y } = randomEdgePoint(CFG.WORLD_WIDTH, CFG.WORLD_HEIGHT)
     let enemy = this._enemies.getFirstDead(false)
@@ -785,15 +820,34 @@ export default class GameScene extends Phaser.Scene {
       enemy = this._enemies.create(x, y, 'kisotsu-run', 0)
       enemy.setDepth(5)
     }
+    const spawnType = this._pickEnemyType()
     const typeConfig = {
-      id:            'kisotsu',
-      baseTint:      null,
-      hpMult:        wave.hp    / CFG.ENEMY_HP,
-      speedMult:     (wave.speed / CFG.ENEMY_SPEED) * (this._enemySpeedBuff || 1),
-      sizeMult:      wave.scale,
-      behaviorFlags: {},
+      id:            spawnType.id,
+      baseTint:      spawnType.baseTint ?? null,
+      hpMult:        (wave.hp / CFG.ENEMY_HP) * (spawnType.hpMult || 1),
+      speedMult:     (wave.speed / CFG.ENEMY_SPEED) * (this._enemySpeedBuff || 1) * (spawnType.speedMult || 1),
+      sizeMult:      wave.scale * (spawnType.sizeMult || 1),
+      behaviorFlags: { ...(spawnType.behaviorFlags || {}) },
     }
     Enemy.activate(enemy, x, y, typeConfig, null, wave.damage)
+  }
+
+  _pickEnemyType() {
+    const waveIdx = Math.max(0, getWaveIndex(this._elapsed))
+    const mix = ENEMY_MIX_BY_WAVE[Math.min(waveIdx, ENEMY_MIX_BY_WAVE.length - 1)] || ENEMY_MIX_BY_WAVE[0]
+    const total = mix.reduce((sum, entry) => sum + entry.weight, 0)
+
+    let roll = Math.random() * total
+    let chosen = mix[mix.length - 1]
+    for (const entry of mix) {
+      roll -= entry.weight
+      if (roll <= 0) {
+        chosen = entry
+        break
+      }
+    }
+
+    return ENEMY_TYPE_MAP.get(chosen.id) || ENEMY_TYPE_MAP.get('kisotsu') || ENEMY_TYPES[0]
   }
 
   _spawnOrb(ex, ey, xpValue = null) {
@@ -863,13 +917,15 @@ export default class GameScene extends Phaser.Scene {
 
       this._upgrading = true
 
-      // Lv.3 = first weapon branch. Lv.12 = second weapon branch if upgrades remain.
+      // Lv.3 / Lv.7 / Lv.12 are weapon-identity beats so builds form earlier and more reliably.
       const isWeaponBranch = (this._level === 3) && !this._weaponChoiceDone
       const hasRemainingWeaponUpgrades = this._getRemainingWeaponUpgradeCount() > 0
+      const isMidWeaponBranch = (this._level === 7) &&
+        this._weaponChoiceDone && !this._weaponMidChoiceDone && hasRemainingWeaponUpgrades
       const isFinalWeaponBranch = (this._level === 12) &&
-        this._weaponChoiceDone && !this._weaponFinalChoiceDone && hasRemainingWeaponUpgrades
-      const upgradeMode    = isWeaponBranch || isFinalWeaponBranch ? 'weapon_branch'
-                           : (this._level === 12) ? 'legendary_milestone'
+        this._weaponMidChoiceDone && !this._weaponFinalChoiceDone && hasRemainingWeaponUpgrades
+      const upgradeMode    = isWeaponBranch || isMidWeaponBranch || isFinalWeaponBranch ? 'weapon_branch'
+                           : (this._level === 10) ? 'legendary_milestone'
                            : 'normal'
 
       this.events.once('upgrade-chosen', (upgrade) => {
@@ -883,13 +939,17 @@ export default class GameScene extends Phaser.Scene {
           }
           if (!this._weaponChoiceDone) {
             this._weaponChoiceDone = true
+          } else if (!this._weaponMidChoiceDone) {
+            this._weaponMidChoiceDone = true
           } else if (!this._weaponFinalChoiceDone) {
             this._weaponFinalChoiceDone = true
           }
         } else if (upgrade.target === 'passive') {
           if (upgrade.subtype === 'proc') this._procsOwned.add(upgrade.id)
           if (upgrade.subtype === 'keystone') this._keystonesOwned.add(upgrade.id)
-          upgrade.apply(this._player, this)
+          if (typeof upgrade.apply === 'function') {
+            upgrade.apply(this._player, this)
+          }
           if (upgrade.oneTime) {
             this._passivesOwned.add(upgrade.id)
           } else if (upgrade.maxStacks) {
@@ -936,6 +996,7 @@ export default class GameScene extends Phaser.Scene {
 
     // Current weapon IDs — used for weapon-gated passive filtering
     const activeWeaponIds = new Set(this._weapons.map(e => e.weapon.id))
+    const primaryWeaponId = this._weapons[0]?.weapon?.id || null
 
     const candidates = []
 
@@ -966,17 +1027,17 @@ export default class GameScene extends Phaser.Scene {
 
     const weights = candidates.map(u => {
       const base = RARITY_WEIGHTS[u.rarity] ?? RARITY_WEIGHTS.common
+      const weaponSynergyIds = primaryWeaponId ? WEAPON_SYNERGY_PASSIVE_IDS[primaryWeaponId] : null
       if (earlyGame && u.target !== 'weapon' && u.target !== 'passive') return base * 0.1
       if (needDefense && DEFENSIVE_IDS.has(u.id)) return base * 5
       if (isLegendaryMilestone && u.rarity === 'legendary') return base * 6
       if (isLegendaryMilestone && u.rarity === 'epic')      return base * 3
+      if (weaponSynergyIds?.has(u.id)) return base * 1.7
       if (u.target === 'weapon') return base * 0.65
       return base
     })
 
-    // weapon_branch = 2-card pick from full pool; everything else = 3
-    const pickCount = mode === 'weapon_branch' ? 2 : 3
-    return this._weightedSelect(candidates, weights, pickCount)
+    return this._buildStructuredChoices(candidates, weights, mode, primaryWeaponId)
   }
 
   // Weighted random sampling without replacement
@@ -999,6 +1060,55 @@ export default class GameScene extends Phaser.Scene {
       w.splice(idx, 1)
     }
     return result
+  }
+
+  _buildStructuredChoices(candidates, weights, mode, primaryWeaponId = null) {
+    const entries = candidates.map((item, idx) => ({ item, weight: weights[idx] }))
+    const choices = []
+
+    if (mode === 'legendary_milestone') {
+      const legendary = this._pickWeightedEntry(entries, entry => entry.item.rarity === 'legendary')
+      if (legendary) choices.push(legendary)
+    }
+
+    const gameplay = this._pickWeightedEntry(entries, entry => GAMEPLAY_PASSIVE_IDS.has(entry.item.id))
+    if (gameplay) choices.push(gameplay)
+
+    if (primaryWeaponId) {
+      const synergyIds = WEAPON_SYNERGY_PASSIVE_IDS[primaryWeaponId]
+      const synergy = this._pickWeightedEntry(entries, entry => synergyIds?.has(entry.item.id))
+      if (synergy && !choices.some(choice => choice.id === synergy.id)) choices.push(synergy)
+    }
+
+    while (choices.length < Math.min(3, candidates.length)) {
+      const next = this._pickWeightedEntry(entries)
+      if (!next) break
+      choices.push(next)
+    }
+
+    return choices
+  }
+
+  _pickWeightedEntry(entries, predicate = null) {
+    const pool = predicate ? entries.filter(predicate) : entries
+    if (!pool.length) return null
+
+    const total = pool.reduce((sum, entry) => sum + entry.weight, 0)
+    if (total <= 0) return null
+
+    let roll = Math.random() * total
+    let picked = pool[pool.length - 1]
+    for (const entry of pool) {
+      roll -= entry.weight
+      if (roll <= 0) {
+        picked = entry
+        break
+      }
+    }
+
+    const idx = entries.indexOf(picked)
+    if (idx >= 0) entries.splice(idx, 1)
+    return picked.item
   }
 
   _getRemainingWeaponUpgradeCount() {

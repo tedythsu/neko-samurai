@@ -4,10 +4,10 @@ import Enemy  from '../entities/Enemy.js'
 import { getOrCreate } from '../weapons/_pool.js'
 
 const EXPLOSION_RADIUS   = 40
-const EXPLOSION_DAMAGE   = 0.4
+const EXPLOSION_DAMAGE   = 0.32
 const RICOCHET_SPEED     = 400
 const RICOCHET_RANGE     = 200
-const RICOCHET_DAMAGE    = 0.7
+const RICOCHET_DAMAGE    = 0.68
 const RICOCHET_MAX_DEPTH = 2
 
 export function applyExplosion(proj, hitEnemy, scene, enemies, affixes) {
@@ -35,7 +35,7 @@ export function applyExplosion(proj, hitEnemy, scene, enemies, affixes) {
 
   // 貫穿・連爆 — mini explosion on each pierce
   if (proj._chainExplode) {
-    const chainMult = amaterasu ? 0.50 : 0.28
+    const chainMult = amaterasu ? 0.42 : 0.24
     enemies.getChildren()
       .filter(en => en.active && !en.dying && en !== hitEnemy &&
         Phaser.Math.Distance.Between(proj.x, proj.y, en.x, en.y) < explodeR * 0.6)
@@ -51,13 +51,13 @@ export function applyExplosion(proj, hitEnemy, scene, enemies, affixes) {
   }
 
   // 連爆・擴散 — secondary burst
-  const secondBurstChance = amaterasu ? 0.45 : 0.25
+  const secondBurstChance = amaterasu ? 0.36 : 0.20
   if (proj._secondBurst && Math.random() < secondBurstChance) {
     scene.time.delayedCall(200, () => {
       enemies.getChildren()
         .filter(en => en.active && !en.dying && en !== hitEnemy &&
           Phaser.Math.Distance.Between(proj.x, proj.y, en.x, en.y) < explodeR)
-        .forEach(en => Enemy.takeDamage(en, proj.damage * 0.55, proj.x, proj.y, affixes, 0, {
+        .forEach(en => Enemy.takeDamage(en, proj.damage * 0.45, proj.x, proj.y, affixes, 0, {
           source: 'weapon',
           weaponId: proj._weaponId,
         }))
@@ -99,6 +99,7 @@ export function applyRicochet(proj, hitEnemy, scene, enemies, affixes, buildExtr
 
   const next = enemies.getChildren()
     .filter(e => e.active && !e.dying && !proj.hitSet.has(e))
+    .filter(e => Phaser.Math.Distance.Between(hitEnemy.x, hitEnemy.y, e.x, e.y) <= RICOCHET_RANGE * (amaterasu ? 1.2 : 1))
     .sort((a, b) =>
       Phaser.Math.Distance.Between(hitEnemy.x, hitEnemy.y, a.x, a.y) -
       Phaser.Math.Distance.Between(hitEnemy.x, hitEnemy.y, b.x, b.y))[0]
